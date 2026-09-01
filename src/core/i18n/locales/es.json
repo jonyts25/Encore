@@ -31,6 +31,26 @@
     "following": "Siguiendo",
     "followRequiresAuth": "Inicia sesión o crea una cuenta para seguir artistas."
   },
+  "events": {
+    "tab": "Shows",
+    "upcomingTitle": "Próximos shows",
+    "upcomingSubtitle": "Conciertos anunciados — explora sin cuenta.",
+    "showDetail": "Show",
+    "viewDetail": "Ver",
+    "emptyTitle": "No hay shows próximos",
+    "emptySubtitle": "Cuando haya fechas anunciadas, aparecerán aquí.",
+    "loadError": "No se pudieron cargar los shows",
+    "showNotFound": "Show no encontrado",
+    "genres": "Géneros",
+    "yourStatus": "Tu estado",
+    "currentStatus": "Estado actual: {{status}}",
+    "statusRequiresAuth": "Inicia sesión para marcar si vas o te interesa.",
+    "status": {
+      "interesado": "Me interesa",
+      "voy": "Voy",
+      "fui": "Fui"
+    }
+  },
   "identity": {
     "tab": "Perfil",
     "profileTitle": "Tu perfil",
