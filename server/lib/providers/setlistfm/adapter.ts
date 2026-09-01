@@ -33,6 +33,12 @@ export function parseSetlistFmEventDate(eventDate: string): string {
   return utc.toISOString();
 }
 
+export function normalizeSetlistSongTitle(rawName: string | undefined | null): string | null {
+  const trimmed = rawName?.trim() ?? '';
+  if (!trimmed) return null;
+  return trimmed;
+}
+
 export function flattenSetlistSongs(setlist: SetlistFmSetlist): ParsedSetlistSong[] {
   const sets = asArray(setlist.sets?.set);
   const songs: ParsedSetlistSong[] = [];
@@ -41,8 +47,14 @@ export function flattenSetlistSongs(setlist: SetlistFmSetlist): ParsedSetlistSon
   for (const set of sets) {
     const isEncore = Boolean(set.encore && set.encore > 0);
     for (const song of asArray(set.song)) {
+      const title = normalizeSetlistSongTitle(song.name);
+      if (!title) {
+        // Skip intros, interludes, unnamed tape segments, etc.
+        continue;
+      }
+
       songs.push({
-        title: song.name.trim(),
+        title,
         position,
         is_encore: isEncore,
         notes: buildSongNotes(song),
