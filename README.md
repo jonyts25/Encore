@@ -14,11 +14,19 @@ Documentación de diseño: `PROJECT-CONTEXT.md`, `ARCHITECTURE.md`, `EXECUTION-P
 
 ```bash
 npm install
-cp .env.example .env   # opcional — ya apunta a Railway por defecto
+cp .env.example .env   # añade tus credenciales de Supabase
 npm start
 ```
 
-Pantalla inicial: botón **Probar conexión con el backend** → `GET /api/health`.
+Variables requeridas en `.env`:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://tu-proyecto.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+EXPO_PUBLIC_API_URL=https://encore-api-production-5b9a.up.railway.app  # opcional
+```
+
+Pestañas: **Catálogo** (público, invitado), **Inicio** (health check), **Perfil** (auth + datos de `profiles`).
 
 ## Backend local (`/server`)
 
@@ -48,4 +56,4 @@ supabase/migrations/ (vacío por ahora)
 
 ## Estado
 
-**M0 — shell.** Sin auth, catálogo ni lógica de negocio.
+**M1 — identity.** Auth Supabase, perfil, modo invitado, catálogo público mínimo.

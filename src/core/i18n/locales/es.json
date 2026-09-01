@@ -4,6 +4,7 @@
     "loading": "Cargando…"
   },
   "home": {
+    "tab": "Inicio",
     "title": "Encore",
     "subtitle": "Tu compañero de conciertos",
     "checkApi": "Probar conexión con el backend",
@@ -11,6 +12,36 @@
     "apiOk": "Backend respondió: {{status}}",
     "apiError": "No se pudo conectar con el backend",
     "apiUrl": "API: {{url}}"
+  },
+  "catalog": {
+    "tab": "Catálogo",
+    "title": "Catálogo público",
+    "subtitle": "Explora artistas sin necesidad de cuenta.",
+    "emptyTitle": "Aún no hay artistas",
+    "emptySubtitle": "Cuando insertes datos de prueba en Supabase, aparecerán aquí.",
+    "loadError": "No se pudo cargar el catálogo"
+  },
+  "identity": {
+    "tab": "Perfil",
+    "profileTitle": "Tu perfil",
+    "guestHint": "Navega como invitado o crea una cuenta para guardar tu perfil.",
+    "loginTitle": "Iniciar sesión",
+    "registerTitle": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "displayName": "Nombre para mostrar",
+    "locale": "Idioma",
+    "role": "Rol",
+    "submit": "Continuar",
+    "login": "Iniciar sesión",
+    "register": "Registrarse",
+    "logout": "Cerrar sesión",
+    "noAccount": "¿No tienes cuenta?",
+    "hasAccount": "¿Ya tienes cuenta?",
+    "loginSuccess": "Sesión iniciada",
+    "registerSuccess": "Cuenta creada",
+    "confirmEmail": "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.",
+    "authError": "No se pudo completar la autenticación"
   },
   "settings": {
     "language": "Idioma",

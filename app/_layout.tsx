@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 
 import '@/core/i18n';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
+import { SessionProvider } from '@/modules/identity';
 import { useColorScheme } from '@/core/ui/useColorScheme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -37,7 +38,9 @@ export default function RootLayout() {
 
   return (
     <I18nProvider>
-      <RootLayoutNav />
+      <SessionProvider>
+        <RootLayoutNav />
+      </SessionProvider>
     </I18nProvider>
   );
 }

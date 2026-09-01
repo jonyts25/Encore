@@ -1,2 +1,3 @@
-/** Public API for the catalog module — implemented in later milestones. */
-export {};
+export { listPublicArtists } from './api';
+export { PublicCatalogList } from './components/PublicCatalogList';
+export type { Artist } from './types';

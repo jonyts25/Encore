@@ -4,6 +4,7 @@
     "loading": "Loading…"
   },
   "home": {
+    "tab": "Home",
     "title": "Encore",
     "subtitle": "Your concert companion",
     "checkApi": "Test backend connection",
@@ -11,6 +12,36 @@
     "apiOk": "Backend responded: {{status}}",
     "apiError": "Could not reach the backend",
     "apiUrl": "API: {{url}}"
+  },
+  "catalog": {
+    "tab": "Catalog",
+    "title": "Public catalog",
+    "subtitle": "Browse artists without an account.",
+    "emptyTitle": "No artists yet",
+    "emptySubtitle": "When you insert test data in Supabase, it will show up here.",
+    "loadError": "Could not load catalog"
+  },
+  "identity": {
+    "tab": "Profile",
+    "profileTitle": "Your profile",
+    "guestHint": "Browse as a guest or create an account to save your profile.",
+    "loginTitle": "Sign in",
+    "registerTitle": "Create account",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display name",
+    "locale": "Locale",
+    "role": "Role",
+    "submit": "Continue",
+    "login": "Sign in",
+    "register": "Sign up",
+    "logout": "Sign out",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "loginSuccess": "Signed in",
+    "registerSuccess": "Account created",
+    "confirmEmail": "Check your email to confirm your account before signing in.",
+    "authError": "Authentication failed"
   },
   "settings": {
     "language": "Language",

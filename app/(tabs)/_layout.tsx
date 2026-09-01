@@ -17,16 +17,38 @@ export default function TabLayout() {
         headerShown: useClientOnlyValue(false, true),
       }}>
       <Tabs.Screen
-        name="index"
+        name="catalog"
         options={{
-          title: t('common.appName'),
+          title: t('catalog.tab'),
           tabBarIcon: ({ color }) => (
             <SymbolView
-              name={{
-                ios: 'music.note',
-                android: 'music_note',
-                web: 'music_note',
-              }}
+              name={{ ios: 'music.note.list', android: 'queue_music', web: 'queue_music' }}
+              tintColor={color}
+              size={28}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: t('home.tab'),
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{ ios: 'house', android: 'home', web: 'home' }}
+              tintColor={color}
+              size={28}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: t('identity.tab'),
+          tabBarIcon: ({ color }) => (
+            <SymbolView
+              name={{ ios: 'person.circle', android: 'person', web: 'person' }}
               tintColor={color}
               size={28}
             />
