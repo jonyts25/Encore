@@ -137,6 +137,10 @@ async function persistSetlist(
   let showSongsInserted = 0;
 
   for (const item of parsedSongs) {
+    if (!item.title.trim()) {
+      continue;
+    }
+
     const songId = await upsertSong(supabase, artistId, item.title);
     songsUpserted += 1;
 
