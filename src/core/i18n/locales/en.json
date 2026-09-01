@@ -1,0 +1,20 @@
+{
+  "common": {
+    "appName": "Encore",
+    "loading": "Loading…"
+  },
+  "home": {
+    "title": "Encore",
+    "subtitle": "Your concert companion",
+    "checkApi": "Test backend connection",
+    "checking": "Checking…",
+    "apiOk": "Backend responded: {{status}}",
+    "apiError": "Could not reach the backend",
+    "apiUrl": "API: {{url}}"
+  },
+  "settings": {
+    "language": "Language",
+    "spanish": "Español",
+    "english": "English"
+  }
+}
