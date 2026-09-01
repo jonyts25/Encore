@@ -1,14 +1,81 @@
 import { supabase } from '@/core/api/supabase';
 
-import type { Artist } from './types';
+import type { Artist, UserArtist } from './types';
 
-export async function listPublicArtists(limit = 50): Promise<Artist[]> {
+const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
+
+export async function listPublicArtists(limit = 100): Promise<Artist[]> {
   const { data, error } = await supabase
     .from('artists')
-    .select('id, mbid, name, image_url, genres, created_at')
+    .select(ARTIST_COLUMNS)
     .order('name', { ascending: true })
     .limit(limit);
 
   if (error) throw error;
   return (data ?? []) as Artist[];
+}
+
+export async function getArtistById(artistId: string): Promise<Artist | null> {
+  const { data, error } = await supabase
+    .from('artists')
+    .select(ARTIST_COLUMNS)
+    .eq('id', artistId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as Artist | null;
+}
+
+export function filterArtists(artists: Artist[], query: string): Artist[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return artists;
+
+  return artists.filter((artist) => {
+    const nameMatch = artist.name.toLowerCase().includes(normalized);
+    const genreMatch =
+      artist.genres?.some((genre) => genre.toLowerCase().includes(normalized)) ?? false;
+    return nameMatch || genreMatch;
+  });
+}
+
+export async function searchPublicArtists(query: string, limit = 100): Promise<Artist[]> {
+  const artists = await listPublicArtists(limit);
+  return filterArtists(artists, query);
+}
+
+export async function getArtistFollow(
+  userId: string,
+  artistId: string
+): Promise<UserArtist | null> {
+  const { data, error } = await supabase
+    .from('user_artists')
+    .select('user_id, artist_id, followed_at')
+    .eq('user_id', userId)
+    .eq('artist_id', artistId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data as UserArtist | null;
+}
+
+export async function followArtist(userId: string, artistId: string): Promise<UserArtist> {
+  const followedAt = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('user_artists')
+    .insert({ user_id: userId, artist_id: artistId, followed_at: followedAt })
+    .select('user_id, artist_id, followed_at')
+    .single();
+
+  if (error) throw error;
+  return data as UserArtist;
+}
+
+export async function unfollowArtist(userId: string, artistId: string): Promise<void> {
+  const { error } = await supabase
+    .from('user_artists')
+    .delete()
+    .eq('user_id', userId)
+    .eq('artist_id', artistId);
+
+  if (error) throw error;
 }

@@ -6,3 +6,14 @@ export type Artist = {
   genres: string[] | null;
   created_at: string;
 };
+
+export type UserArtist = {
+  user_id: string;
+  artist_id: string;
+  followed_at: string;
+};
+
+export type ArtistFollowState = {
+  isFollowing: boolean;
+  followedAt: string | null;
+};

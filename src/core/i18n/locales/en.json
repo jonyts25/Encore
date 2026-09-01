@@ -17,9 +17,19 @@
     "tab": "Catalog",
     "title": "Public catalog",
     "subtitle": "Browse artists without an account.",
+    "searchPlaceholder": "Search by name or genre…",
     "emptyTitle": "No artists yet",
     "emptySubtitle": "When you insert test data in Supabase, it will show up here.",
-    "loadError": "Could not load catalog"
+    "noResults": "No results for your search",
+    "loadError": "Could not load catalog",
+    "artistDetail": "Artist",
+    "artistNotFound": "Artist not found",
+    "genres": "Genres",
+    "noGenres": "No genres listed",
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "following": "Following",
+    "followRequiresAuth": "Sign in or create an account to follow artists."
   },
   "identity": {
     "tab": "Profile",

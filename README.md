@@ -56,4 +56,4 @@ supabase/migrations/ (vacío por ahora)
 
 ## Estado
 
-**M1 — identity.** Auth Supabase, perfil, modo invitado, catálogo público mínimo.
+**M2 — catalog.** Búsqueda pública de artistas, ficha de detalle, seguir/dejar de seguir (`user_artists`).

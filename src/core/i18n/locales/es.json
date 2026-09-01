@@ -17,9 +17,19 @@
     "tab": "Catálogo",
     "title": "Catálogo público",
     "subtitle": "Explora artistas sin necesidad de cuenta.",
+    "searchPlaceholder": "Buscar por nombre o género…",
     "emptyTitle": "Aún no hay artistas",
     "emptySubtitle": "Cuando insertes datos de prueba en Supabase, aparecerán aquí.",
-    "loadError": "No se pudo cargar el catálogo"
+    "noResults": "Sin resultados para tu búsqueda",
+    "loadError": "No se pudo cargar el catálogo",
+    "artistDetail": "Artista",
+    "artistNotFound": "Artista no encontrado",
+    "genres": "Géneros",
+    "noGenres": "Sin géneros registrados",
+    "follow": "Seguir",
+    "unfollow": "Dejar de seguir",
+    "following": "Siguiendo",
+    "followRequiresAuth": "Inicia sesión o crea una cuenta para seguir artistas."
   },
   "identity": {
     "tab": "Perfil",
