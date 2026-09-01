@@ -26,7 +26,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 EXPO_PUBLIC_API_URL=https://encore-api-production-5b9a.up.railway.app  # opcional
 ```
 
-Pestañas: **Catálogo** (público, invitado), **Inicio** (health check), **Perfil** (auth + datos de `profiles`).
+Pestañas: **Shows** (próximos conciertos vía API Railway), **Catálogo**, **Inicio**, **Perfil**.
 
 ## Backend local (`/server`)
 
@@ -56,4 +56,4 @@ supabase/migrations/ (vacío por ahora)
 
 ## Estado
 
-**M2 — catalog.** Búsqueda pública de artistas, ficha de detalle, seguir/dejar de seguir (`user_artists`).
+**M3 — events (cliente).** Lista y detalle de shows desde Railway; estado voy/interesado con sesión.
