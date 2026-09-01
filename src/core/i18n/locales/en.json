@@ -73,6 +73,59 @@
     "confirmEmail": "Check your email to confirm your account before signing in.",
     "authError": "Authentication failed"
   },
+  "prep": {
+    "sectionTitle": "Show prep",
+    "countdown": {
+      "title": "Countdown",
+      "daysLeft": "{{count}} days to go",
+      "tomorrow": "It's tomorrow!",
+      "today": "It's today!"
+    },
+    "checklist": {
+      "title": "Checklist",
+      "subtitle": "Check off what you've got ready — saved on your device.",
+      "reset": "Reset",
+      "items": {
+        "transport": "Transport / arrival planned",
+        "battery": "Phone charged or power bank packed",
+        "cash": "Cash for merch or snacks",
+        "outfit": "Outfit ready (comfortable and on-brand)"
+      }
+    },
+    "venue": {
+      "title": "Venue"
+    },
+    "venueKind": {
+      "arena": "Arena / stadium tips",
+      "teatro": "Theater / hall tips",
+      "festival": "Festival tips",
+      "generic": "General tips"
+    },
+    "etiquette": {
+      "title": "Good fan tips",
+      "subtitle": "Light reminders, not a rulebook.",
+      "arena": {
+        "tip1": "Sing your heart out, but leave room for the person next to you — not everyone matches your volume.",
+        "tip2": "If you record, keep your phone at eye level, not in front of someone else's view.",
+        "tip3": "Leave early if you can — mass exits plus traffic beat missing the last train."
+      },
+      "teatro": {
+        "tip1": "In an acoustic room, one yell at the wrong moment echoes — save the hype for the choruses.",
+        "tip2": "Flash off, always — the artist and your neighbor will thank you.",
+        "tip3": "Arrive with buffer time — lines, coats, and merch take longer than you'd think."
+      },
+      "festival": {
+        "tip1": "Hydrate and eat something — the sun doesn't negotiate.",
+        "tip2": "Pick a meetup spot with your crew in case signal drops.",
+        "tip3": "Respect the space of people who got there first — it's not a tent, but the line still counts."
+      },
+      "generic": {
+        "tip1": "Enjoy first, document later — a few good clips beat filming the whole show vertically.",
+        "tip2": "Someone going solo isn't your involuntary audience — ask before recording up close.",
+        "tip3": "Save your ticket or entry pass before leaving home — venue WiFi isn't always reliable."
+      }
+    }
+  },
   "settings": {
     "language": "Language",
     "spanish": "Español",
