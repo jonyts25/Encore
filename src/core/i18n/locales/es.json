@@ -73,6 +73,59 @@
     "confirmEmail": "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.",
     "authError": "No se pudo completar la autenticación"
   },
+  "prep": {
+    "sectionTitle": "Prep del show",
+    "countdown": {
+      "title": "Cuenta regresiva",
+      "daysLeft": "Faltan {{count}} días",
+      "tomorrow": "¡Es mañana!",
+      "today": "¡Hoy!"
+    },
+    "checklist": {
+      "title": "Checklist",
+      "subtitle": "Marca lo que ya tienes listo — se guarda en tu teléfono.",
+      "reset": "Restablecer",
+      "items": {
+        "transport": "Transporte / llegada planead",
+        "battery": "Batería cargada o power bank",
+        "cash": "Efectivo para merch o snacks",
+        "outfit": "Outfit listo (cómodo y con estilo)"
+      }
+    },
+    "venue": {
+      "title": "Venue"
+    },
+    "venueKind": {
+      "arena": "Tips para arena / estadio",
+      "teatro": "Tips para teatro / sala",
+      "festival": "Tips para festival",
+      "generic": "Tips generales"
+    },
+    "etiquette": {
+      "title": "Tips del buen fan",
+      "subtitle": "Pequeños recordatorios, cero reglamento.",
+      "arena": {
+        "tip1": "Canta con ganas, pero deja respirar al de al lado — no todos tienen tu mismo volumen.",
+        "tip2": "Si grabas, mantén el teléfono a la altura de tus ojos, no del de quien está enfrente.",
+        "tip3": "Sal con tiempo: salidas masivas + tráfico = mejor salir un tema antes que perder el metro."
+      },
+      "teatro": {
+        "tip1": "En sala acústica, un grito en el momento equivocado se escucha doble — guarda el hype para los coros.",
+        "tip2": "Flash off siempre; el artista y el de al lado te lo agradecen.",
+        "tip3": "Llega con margen: filas, abrigos y merch consumen más tiempo de lo que parece."
+      },
+      "festival": {
+        "tip1": "Hidrátate y come algo — el sol no negocia.",
+        "tip2": "Define un punto de encuentro con tu crew por si se va la señal.",
+        "tip3": "Respeta el espacio de quien llegó antes — no es carpa, pero la fila también cuenta."
+      },
+      "generic": {
+        "tip1": "Disfruta primero, documenta después — un par de videos valen más que todo el show en vertical.",
+        "tip2": "Si alguien va solo, no es tu audiencia involuntaria — pide permiso antes de grabar de cerca.",
+        "tip3": "Guarda el ticket o captura de acceso antes de salir de casa — el WiFi del venue no siempre coopera."
+      }
+    }
+  },
   "settings": {
     "language": "Idioma",
     "spanish": "Español",
