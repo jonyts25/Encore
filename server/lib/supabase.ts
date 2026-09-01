@@ -16,6 +16,10 @@ export function getSupabasePublishableKey(): string {
   return requireEnv('SUPABASE_PUBLISHABLE_KEY');
 }
 
+export function getSupabaseServiceRoleKey(): string {
+  return requireEnv('SUPABASE_SERVICE_ROLE_KEY');
+}
+
 export function createSupabaseClient(accessToken?: string): SupabaseClient {
   const options = accessToken
     ? {
@@ -28,4 +32,14 @@ export function createSupabaseClient(accessToken?: string): SupabaseClient {
     : undefined;
 
   return createClient(getSupabaseUrl(), getSupabasePublishableKey(), options);
+}
+
+/** Bypasses RLS — admin/ingest only. Never expose this key to clients. */
+export function createSupabaseAdminClient(): SupabaseClient {
+  return createClient(getSupabaseUrl(), getSupabaseServiceRoleKey(), {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
 }
