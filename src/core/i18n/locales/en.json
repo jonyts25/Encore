@@ -90,6 +90,7 @@
     "predictionSubtitle": "Based on the artist's historical shows.",
     "confidence": "Confidence: {{pct}}",
     "viewLyrics": "View lyrics",
+    "openLive": "LIVE mode with camera",
     "loadError": "Could not load prediction",
     "insufficientData": "Not enough historical setlists to predict yet.",
     "sampleSize": "{{count}} shows analyzed",

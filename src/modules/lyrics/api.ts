@@ -1,30 +1,57 @@
 import { apiFetch, ApiError } from '@/core/api/client';
 import { getCachedLyrics, setCachedLyrics } from '@/core/db';
 
-import { detectScrollMode } from './scrollLogic';
+import {
+  detectScrollMode,
+  normalizeDurationSeconds,
+  normalizePlainLyrics,
+  normalizeSyncedLines,
+} from './scrollLogic';
 import type { LyricsResult, LyricsSearchResponse } from './types';
 
-function mapResponse(data: LyricsSearchResponse): LyricsResult {
-  const syncedLines = data.lyrics.synced_lines ?? [];
-  const durationSeconds = data.lyrics.duration_seconds ?? null;
+function normalizeLyricsResult(
+  data: LyricsSearchResponse['lyrics'],
+  attribution: string
+): LyricsResult {
+  const syncedLines = normalizeSyncedLines(data.synced_lines);
+  const plainLyrics = normalizePlainLyrics(data.plain_lyrics);
+  const durationSeconds = normalizeDurationSeconds(data.duration_seconds);
 
   return {
-    id: data.lyrics.id,
-    title: data.lyrics.title,
-    artist: data.lyrics.artist,
-    album: data.lyrics.album,
-    plainLyrics: data.lyrics.plain_lyrics,
-    instrumental: data.lyrics.instrumental,
-    attribution: data.attribution,
+    id: data.id,
+    title: data.title,
+    artist: data.artist,
+    album: data.album ?? null,
+    plainLyrics,
+    instrumental: Boolean(data.instrumental),
+    attribution,
     durationSeconds,
     syncedLines,
     scrollMode: detectScrollMode(syncedLines, durationSeconds),
   };
 }
 
+function normalizeCachedResult(cached: LyricsResult): LyricsResult {
+  const syncedLines = normalizeSyncedLines(cached.syncedLines);
+  const plainLyrics = normalizePlainLyrics(cached.plainLyrics);
+  const durationSeconds = normalizeDurationSeconds(cached.durationSeconds);
+
+  return {
+    ...cached,
+    plainLyrics,
+    durationSeconds,
+    syncedLines,
+    scrollMode: detectScrollMode(syncedLines, durationSeconds),
+  };
+}
+
+function mapResponse(data: LyricsSearchResponse): LyricsResult {
+  return normalizeLyricsResult(data.lyrics, data.attribution);
+}
+
 export async function fetchLyrics(artist: string, title: string): Promise<LyricsResult | null> {
   const cached = await getCachedLyrics(artist, title);
-  if (cached) return cached;
+  if (cached) return normalizeCachedResult(cached);
 
   const params = new URLSearchParams({ artist, title });
 

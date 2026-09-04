@@ -10,6 +10,9 @@ export { useLyrics } from './hooks/useLyrics';
 export {
   buildDisplayLines,
   detectScrollMode,
+  normalizeDurationSeconds,
+  normalizePlainLyrics,
+  normalizeSyncedLines,
   resolveActiveLineIndex,
   splitPlainLyricsLines,
 } from './scrollLogic';

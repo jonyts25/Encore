@@ -90,6 +90,7 @@
     "predictionSubtitle": "Basado en shows históricos del artista.",
     "confidence": "Confianza: {{pct}}",
     "viewLyrics": "Ver letra",
+    "openLive": "Modo LIVE con cámara",
     "loadError": "No se pudo cargar la predicción",
     "insufficientData": "Aún no hay suficientes setlists históricos para predecir.",
     "sampleSize": "{{count}} shows analizados",

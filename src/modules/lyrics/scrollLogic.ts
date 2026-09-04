@@ -1,27 +1,45 @@
 import type { LyricsScrollMode, SyncedLine } from './types';
 
+export function normalizeSyncedLines(syncedLines?: SyncedLine[] | null): SyncedLine[] {
+  return Array.isArray(syncedLines) ? syncedLines : [];
+}
+
+export function normalizePlainLyrics(plainLyrics?: string | null): string {
+  return typeof plainLyrics === 'string' ? plainLyrics : '';
+}
+
+export function normalizeDurationSeconds(durationSeconds?: number | null): number | null {
+  return typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds > 0
+    ? durationSeconds
+    : null;
+}
+
 export function splitPlainLyricsLines(plainLyrics: string): string[] {
-  return plainLyrics
+  return normalizePlainLyrics(plainLyrics)
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 }
 
 export function detectScrollMode(
-  syncedLines: SyncedLine[],
-  durationSeconds: number | null
+  syncedLines?: SyncedLine[] | null,
+  durationSeconds?: number | null
 ): LyricsScrollMode {
-  if (syncedLines.length > 0) return 'synced';
-  if (durationSeconds && durationSeconds > 0) return 'estimated';
+  const lines = normalizeSyncedLines(syncedLines);
+  const duration = normalizeDurationSeconds(durationSeconds);
+
+  if (lines.length > 0) return 'synced';
+  if (duration !== null) return 'estimated';
   return 'manual';
 }
 
 export function buildDisplayLines(
-  plainLyrics: string,
-  syncedLines: SyncedLine[]
+  plainLyrics?: string | null,
+  syncedLines?: SyncedLine[] | null
 ): string[] {
-  if (syncedLines.length > 0) {
-    return syncedLines.map((entry) => entry.line);
+  const lines = normalizeSyncedLines(syncedLines);
+  if (lines.length > 0) {
+    return lines.map((entry) => entry.line);
   }
   return splitPlainLyricsLines(plainLyrics);
 }
@@ -30,16 +48,20 @@ export function resolveActiveLineIndex(
   mode: LyricsScrollMode,
   elapsedSeconds: number,
   displayLines: string[],
-  syncedLines: SyncedLine[],
-  durationSeconds: number | null,
+  syncedLines?: SyncedLine[] | null,
+  durationSeconds?: number | null,
   manualLineIntervalSeconds: number
 ): number {
-  if (displayLines.length === 0) return 0;
+  const safeDisplayLines = Array.isArray(displayLines) ? displayLines : [];
+  const safeSyncedLines = normalizeSyncedLines(syncedLines);
+  const safeDuration = normalizeDurationSeconds(durationSeconds);
+
+  if (safeDisplayLines.length === 0) return 0;
 
   if (mode === 'synced') {
     let index = 0;
-    for (let i = 0; i < syncedLines.length; i += 1) {
-      if (syncedLines[i].timestamp_seconds <= elapsedSeconds) {
+    for (let i = 0; i < safeSyncedLines.length; i += 1) {
+      if (safeSyncedLines[i].timestamp_seconds <= elapsedSeconds) {
         index = i;
       } else {
         break;
@@ -48,12 +70,12 @@ export function resolveActiveLineIndex(
     return index;
   }
 
-  if (mode === 'estimated' && durationSeconds && durationSeconds > 0) {
-    const lineDuration = durationSeconds / displayLines.length;
+  if (mode === 'estimated' && safeDuration !== null) {
+    const lineDuration = safeDuration / safeDisplayLines.length;
     const index = Math.floor(elapsedSeconds / lineDuration);
-    return Math.min(Math.max(index, 0), displayLines.length - 1);
+    return Math.min(Math.max(index, 0), safeDisplayLines.length - 1);
   }
 
   const index = Math.floor(elapsedSeconds / manualLineIntervalSeconds);
-  return Math.min(Math.max(index, 0), displayLines.length - 1);
+  return Math.min(Math.max(index, 0), safeDisplayLines.length - 1);
 }

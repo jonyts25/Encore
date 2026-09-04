@@ -4,6 +4,9 @@ import type { LyricsScrollMode, SyncedLine } from '../types';
 import {
   buildDisplayLines,
   detectScrollMode,
+  normalizeDurationSeconds,
+  normalizePlainLyrics,
+  normalizeSyncedLines,
   resolveActiveLineIndex,
 } from '../scrollLogic';
 
@@ -11,9 +14,9 @@ const MANUAL_LINE_INTERVAL_SECONDS = 4;
 const TICK_MS = 100;
 
 type UseLyricsAutoScrollOptions = {
-  plainLyrics: string;
-  syncedLines: SyncedLine[];
-  durationSeconds: number | null;
+  plainLyrics?: string | null;
+  syncedLines?: SyncedLine[] | null;
+  durationSeconds?: number | null;
 };
 
 export function useLyricsAutoScroll({
@@ -21,13 +24,17 @@ export function useLyricsAutoScroll({
   syncedLines,
   durationSeconds,
 }: UseLyricsAutoScrollOptions) {
+  const safePlainLyrics = normalizePlainLyrics(plainLyrics);
+  const safeSyncedLines = normalizeSyncedLines(syncedLines);
+  const safeDurationSeconds = normalizeDurationSeconds(durationSeconds);
+
   const scrollMode = useMemo(
-    () => detectScrollMode(syncedLines, durationSeconds),
-    [durationSeconds, syncedLines]
+    () => detectScrollMode(safeSyncedLines, safeDurationSeconds),
+    [safeDurationSeconds, safeSyncedLines]
   );
   const displayLines = useMemo(
-    () => buildDisplayLines(plainLyrics, syncedLines),
-    [plainLyrics, syncedLines]
+    () => buildDisplayLines(safePlainLyrics, safeSyncedLines),
+    [safePlainLyrics, safeSyncedLines]
   );
 
   const [activeLineIndex, setActiveLineIndex] = useState(0);
@@ -65,7 +72,7 @@ export function useLyricsAutoScroll({
 
   useEffect(() => {
     reset();
-  }, [plainLyrics, syncedLines, durationSeconds, reset]);
+  }, [safePlainLyrics, safeSyncedLines, safeDurationSeconds, reset]);
 
   useEffect(() => {
     if (!isPlaying || displayLines.length === 0) return undefined;
@@ -80,16 +87,16 @@ export function useLyricsAutoScroll({
         scrollMode,
         elapsedSeconds,
         displayLines,
-        syncedLines,
-        durationSeconds,
+        safeSyncedLines,
+        safeDurationSeconds,
         MANUAL_LINE_INTERVAL_SECONDS
       );
       setActiveLineIndex(nextIndex);
 
       if (
         scrollMode === 'estimated' &&
-        durationSeconds &&
-        elapsedSeconds >= durationSeconds
+        safeDurationSeconds !== null &&
+        elapsedSeconds >= safeDurationSeconds
       ) {
         pause();
       }
@@ -100,11 +107,11 @@ export function useLyricsAutoScroll({
     return () => clearInterval(intervalId);
   }, [
     displayLines,
-    durationSeconds,
     isPlaying,
     pause,
+    safeDurationSeconds,
+    safeSyncedLines,
     scrollMode,
-    syncedLines,
   ]);
 
   const modeLabelKey = useMemo((): `lyrics.mode.${LyricsScrollMode}` => {

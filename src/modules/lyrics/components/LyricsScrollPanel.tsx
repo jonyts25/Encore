@@ -1,16 +1,21 @@
 import { useEffect, useRef } from 'react';
-import { ScrollView, StyleSheet, View, type ViewStyle } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useLyricsAutoScroll } from '../hooks/useLyricsAutoScroll';
+import {
+  normalizeDurationSeconds,
+  normalizePlainLyrics,
+  normalizeSyncedLines,
+} from '../scrollLogic';
 import type { SyncedLine } from '../types';
 
 type LyricsScrollPanelProps = {
-  plainLyrics: string;
-  syncedLines: SyncedLine[];
-  durationSeconds: number | null;
+  plainLyrics?: string | null;
+  syncedLines?: SyncedLine[] | null;
+  durationSeconds?: number | null;
   compact?: boolean;
   variant?: 'default' | 'overlay';
   style?: ViewStyle;
@@ -32,6 +37,12 @@ export function LyricsScrollPanel({
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
   const lineHeight = compact ? COMPACT_LINE_HEIGHT : FULL_LINE_HEIGHT;
+  const overlay = variant === 'overlay';
+  const compactControls = compact || overlay;
+
+  const safePlainLyrics = normalizePlainLyrics(plainLyrics);
+  const safeSyncedLines = normalizeSyncedLines(syncedLines);
+  const safeDurationSeconds = normalizeDurationSeconds(durationSeconds);
 
   const {
     scrollMode,
@@ -42,7 +53,11 @@ export function LyricsScrollPanel({
     start,
     reset,
     toggle,
-  } = useLyricsAutoScroll({ plainLyrics, syncedLines, durationSeconds });
+  } = useLyricsAutoScroll({
+    plainLyrics: safePlainLyrics,
+    syncedLines: safeSyncedLines,
+    durationSeconds: safeDurationSeconds,
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -57,8 +72,6 @@ export function LyricsScrollPanel({
       : isPlaying
         ? t('lyrics.pause')
         : t('lyrics.resume');
-
-  const overlay = variant === 'overlay';
 
   return (
     <ThemedView
@@ -102,18 +115,51 @@ export function LyricsScrollPanel({
         })}
       </ScrollView>
 
-      <View style={styles.controls}>
-        <Button
-          title={primaryActionLabel}
-          onPress={() => {
-            if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0) {
-              start();
-            } else {
-              toggle();
-            }
-          }}
-        />
-        <Button title={t('lyrics.restart')} variant="secondary" onPress={reset} />
+      <View style={[styles.controls, compactControls && styles.controlsCompact]}>
+        {compactControls ? (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0) {
+                  start();
+                } else {
+                  toggle();
+                }
+              }}
+              style={({ pressed }) => [
+                styles.compactControl,
+                styles.compactControlPrimary,
+                pressed && styles.compactControlPressed,
+              ]}>
+              <Text style={styles.compactControlPrimaryText}>{primaryActionLabel}</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={reset}
+              style={({ pressed }) => [
+                styles.compactControl,
+                styles.compactControlSecondary,
+                pressed && styles.compactControlPressed,
+              ]}>
+              <Text style={styles.compactControlSecondaryText}>{t('lyrics.restart')}</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Button
+              title={primaryActionLabel}
+              onPress={() => {
+                if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0) {
+                  start();
+                } else {
+                  toggle();
+                }
+              }}
+            />
+            <Button title={t('lyrics.restart')} variant="secondary" onPress={reset} />
+          </>
+        )}
       </View>
     </ThemedView>
   );
@@ -133,6 +179,38 @@ const styles = StyleSheet.create({
   },
   controls: {
     gap: 8,
+  },
+  controlsCompact: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  compactControl: {
+    alignItems: 'center',
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    minHeight: 36,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  compactControlPressed: {
+    opacity: 0.85,
+  },
+  compactControlPrimary: {
+    backgroundColor: '#4DA3FF',
+  },
+  compactControlPrimaryText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  compactControlSecondary: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  compactControlSecondaryText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
   lineRow: {
     borderRadius: 8,

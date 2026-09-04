@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
@@ -28,6 +28,13 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
   const openLyrics = (title: string) => {
     router.push({
       pathname: '/lyrics',
+      params: { artist: artistName, title },
+    });
+  };
+
+  const openLive = (title: string) => {
+    router.push({
+      pathname: '/live',
       params: { artist: artistName, title },
     });
   };
@@ -63,11 +70,22 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
                     </ThemedText>
                   </View>
                 </View>
-                <Button
-                  title={t('setlist.viewLyrics')}
-                  variant="secondary"
-                  onPress={() => openLyrics(song.title)}
-                />
+                <View style={styles.rowActions}>
+                  <View style={styles.lyricsButtonWrap}>
+                    <Button
+                      title={t('setlist.viewLyrics')}
+                      variant="secondary"
+                      onPress={() => openLyrics(song.title)}
+                    />
+                  </View>
+                  <Pressable
+                    accessibilityLabel={t('setlist.openLive')}
+                    accessibilityRole="button"
+                    onPress={() => openLive(song.title)}
+                    style={({ pressed }) => [styles.liveButton, pressed && styles.liveButtonPressed]}>
+                    <Text style={styles.liveIcon}>🎥</Text>
+                  </Pressable>
+                </View>
               </ThemedView>
             ))}
           </View>
@@ -96,6 +114,20 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
+  liveButton: {
+    alignItems: 'center',
+    backgroundColor: '#ECECEC',
+    borderRadius: 12,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  liveButtonPressed: {
+    opacity: 0.85,
+  },
+  liveIcon: {
+    fontSize: 22,
+  },
   meta: {
     fontSize: 13,
     opacity: 0.7,
@@ -112,6 +144,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     gap: 10,
     padding: 12,
+  },
+  rowActions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   rowMain: {
     alignItems: 'flex-start',
