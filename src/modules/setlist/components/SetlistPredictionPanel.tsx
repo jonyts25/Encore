@@ -5,29 +5,69 @@ import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useShowPrediction } from '../hooks/useShowPrediction';
-import type { PredictedSong, SetlistInsufficientReason } from '../types';
+import type { PredictedSong, SetlistPrediction, SetlistPredictionStructure } from '../types';
 
 type SetlistPredictionPanelProps = {
   showId: string;
   artistName: string;
 };
 
+const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
+  'mostly_fixed',
+  'rotating',
+  'no_tour_data_fallback',
+];
+
 function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
 
 function sortByConfidence(songs: PredictedSong[]): PredictedSong[] {
-  return [...songs].sort((a, b) => b.confidence - a.confidence);
+  return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 }
 
-function insufficientMessageKey(reason?: SetlistInsufficientReason | null): string {
-  if (reason === 'insufficient_tour_shows') return 'setlist.insufficientTourData';
-  if (reason === 'no_tour') return 'setlist.noTourData';
-  return 'setlist.insufficientData';
+function sortBySetlistOrder(songs: PredictedSong[]): PredictedSong[] {
+  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
+}
+
+function formatReferenceDate(isoDate: string, locale: string): string {
+  const date = new Date(isoDate);
+  const tag = locale.startsWith('en') ? 'en-US' : 'es-MX';
+  return new Intl.DateTimeFormat(tag, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+function formatReferenceDates(dates: string[], locale: string): string {
+  return dates.map((date) => formatReferenceDate(date, locale)).join(', ');
+}
+
+function getDisclaimerKey(structure: SetlistPredictionStructure): string | null {
+  if (structure === 'single_show_reference') return 'setlist.referenceSingleShow';
+  if (structure === 'limited_tour_data') return 'setlist.referenceLimitedTour';
+  if (structure === 'no_tour_data_fallback') return 'setlist.fallbackNoTour';
+  return null;
+}
+
+function getDisclaimerParams(
+  prediction: SetlistPrediction,
+  locale: string
+): Record<string, string> | undefined {
+  const dates = prediction.reference_show_dates ?? [];
+  if (prediction.structure === 'single_show_reference' && dates[0]) {
+    return { date: formatReferenceDate(dates[0], locale) };
+  }
+  if (prediction.structure === 'limited_tour_data' && dates.length > 0) {
+    return { dates: formatReferenceDates(dates, locale) };
+  }
+  return undefined;
 }
 
 export function SetlistPredictionPanel({ showId, artistName }: SetlistPredictionPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language;
   const router = useRouter();
   const { prediction, isLoading, error } = useShowPrediction(showId);
 
@@ -45,6 +85,18 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
     });
   };
 
+  const showConfidence = prediction
+    ? CONFIDENCE_STRUCTURES.includes(prediction.structure)
+    : false;
+  const disclaimerKey = prediction ? getDisclaimerKey(prediction.structure) : null;
+  const disclaimerParams = prediction ? getDisclaimerParams(prediction, locale) : undefined;
+  const sortedSongs =
+    prediction && showConfidence
+      ? sortByConfidence(prediction.songs)
+      : prediction
+        ? sortBySetlistOrder(prediction.songs)
+        : [];
+
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.sectionLabel}>{t('setlist.predictionTitle')}</ThemedText>
@@ -55,27 +107,42 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
       {!isLoading && error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
 
       {!isLoading && !error && prediction?.structure === 'insufficient_data' ? (
-        <ThemedText style={styles.empty}>
-          {t(insufficientMessageKey(prediction.insufficient_reason))}
-        </ThemedText>
+        <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
       ) : null}
 
       {!isLoading && !error && prediction && prediction.songs.length > 0 ? (
         <>
-          <ThemedText style={styles.meta}>
-            {t(`setlist.structure.${prediction.structure}`)} ·{' '}
-            {t('setlist.sampleSize', { count: prediction.sample_size })}
-          </ThemedText>
+          {disclaimerKey ? (
+            <ThemedText style={styles.disclaimer}>
+              {t(disclaimerKey, disclaimerParams)}
+            </ThemedText>
+          ) : null}
+
+          {showConfidence && prediction.structure !== 'no_tour_data_fallback' ? (
+            <ThemedText style={styles.meta}>
+              {t(`setlist.structure.${prediction.structure}`)} ·{' '}
+              {t('setlist.sampleSize', { count: prediction.sample_size })}
+            </ThemedText>
+          ) : null}
+
+          {prediction.structure === 'no_tour_data_fallback' ? (
+            <ThemedText style={styles.meta}>
+              {t('setlist.sampleSize', { count: prediction.sample_size })}
+            </ThemedText>
+          ) : null}
+
           <View style={styles.list}>
-            {sortByConfidence(prediction.songs).map((song, index) => (
+            {sortedSongs.map((song, index) => (
               <ThemedView key={song.song_id} style={styles.row}>
                 <View style={styles.rowMain}>
                   <ThemedText style={styles.rank}>{index + 1}</ThemedText>
                   <View style={styles.rowText}>
                     <ThemedText style={styles.songTitle}>{song.title}</ThemedText>
-                    <ThemedText style={styles.confidence}>
-                      {t('setlist.confidence', { pct: formatConfidence(song.confidence) })}
-                    </ThemedText>
+                    {showConfidence && song.confidence != null ? (
+                      <ThemedText style={styles.confidence}>
+                        {t('setlist.confidence', { pct: formatConfidence(song.confidence) })}
+                      </ThemedText>
+                    ) : null}
                   </View>
                 </View>
                 <View style={styles.rowActions}>
@@ -111,6 +178,11 @@ const styles = StyleSheet.create({
   container: {
     gap: 8,
     marginTop: 8,
+  },
+  disclaimer: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    opacity: 0.85,
   },
   empty: {
     opacity: 0.75,

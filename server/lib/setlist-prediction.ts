@@ -1,31 +1,36 @@
 import { createSupabaseClient } from './supabase';
 
 const DEFAULT_SAMPLE_SIZE = 10;
-const MIN_TOUR_SHOWS = 3;
 const WILDCARD_MIN = 0.25;
 const WILDCARD_MAX = 0.85;
 const FIXED_SONG_THRESHOLD = 0.9;
 
-export type SetlistInsufficientReason = 'no_tour' | 'insufficient_tour_shows' | 'no_history';
-
 export type PredictedSong = {
   song_id: string;
   title: string;
-  confidence: number;
-  frequency_pct: number;
+  confidence: number | null;
+  frequency_pct: number | null;
   avg_position: number | null;
   is_wildcard: boolean;
   appeared_in_shows: number;
   total_shows: number;
 };
 
+export type SetlistPredictionStructure =
+  | 'mostly_fixed'
+  | 'rotating'
+  | 'insufficient_data'
+  | 'single_show_reference'
+  | 'limited_tour_data'
+  | 'no_tour_data_fallback';
+
 export type SetlistPrediction = {
   show_id: string;
   artist_id: string;
   tour_id: string | null;
   sample_size: number;
-  structure: 'mostly_fixed' | 'rotating' | 'insufficient_data';
-  insufficient_reason?: SetlistInsufficientReason | null;
+  structure: SetlistPredictionStructure;
+  reference_show_dates?: string[];
   songs: PredictedSong[];
   generated_at: string;
 };
@@ -34,6 +39,11 @@ type ShowRow = {
   id: string;
   artist_id: string;
   tour_id: string | null;
+  show_date: string;
+};
+
+type PriorShowRow = {
+  id: string;
   show_date: string;
 };
 
@@ -60,28 +70,83 @@ export async function generateShowPrediction(
   if (!show) return null;
 
   const target = show as ShowRow;
+  const tourPriorShows = target.tour_id
+    ? await listPriorShows(supabase, {
+        tourId: target.tour_id,
+        excludeShowId: target.id,
+        beforeDate: target.show_date,
+        limit: sampleSize,
+      })
+    : [];
 
-  if (!target.tour_id) {
-    return finishInsufficient(supabase, target, 0, 'no_tour');
+  const tourShowCount = tourPriorShows.length;
+
+  if (tourShowCount >= 3) {
+    return buildStatisticalPrediction(supabase, target, tourPriorShows, tourShowCount);
   }
 
-  const { data: historicalShows, error: historyError } = await supabase
+  if (tourShowCount === 1 || tourShowCount === 2) {
+    const structure = tourShowCount === 1 ? 'single_show_reference' : 'limited_tour_data';
+    return buildReferenceSetlist(supabase, target, tourPriorShows, structure);
+  }
+
+  const artistPriorShows = await listPriorShows(supabase, {
+    artistId: target.artist_id,
+    excludeShowId: target.id,
+    beforeDate: target.show_date,
+    limit: sampleSize,
+  });
+
+  if (artistPriorShows.length === 0) {
+    return finishInsufficient(supabase, target);
+  }
+
+  return buildStatisticalPrediction(
+    supabase,
+    target,
+    artistPriorShows,
+    artistPriorShows.length,
+    'no_tour_data_fallback'
+  );
+}
+
+async function listPriorShows(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  params: {
+    tourId?: string;
+    artistId?: string;
+    excludeShowId: string;
+    beforeDate: string;
+    limit: number;
+  }
+): Promise<PriorShowRow[]> {
+  let query = supabase
     .from('shows')
     .select('id, show_date')
-    .eq('tour_id', target.tour_id)
-    .neq('id', target.id)
-    .lt('show_date', target.show_date)
+    .neq('id', params.excludeShowId)
+    .lt('show_date', params.beforeDate)
     .order('show_date', { ascending: false })
-    .limit(sampleSize);
+    .limit(params.limit);
 
-  if (historyError) throw historyError;
-
-  const showIds = (historicalShows ?? []).map((row) => row.id as string);
-  const totalShows = showIds.length;
-
-  if (totalShows < MIN_TOUR_SHOWS) {
-    return finishInsufficient(supabase, target, totalShows, 'insufficient_tour_shows');
+  if (params.tourId) {
+    query = query.eq('tour_id', params.tourId);
+  } else if (params.artistId) {
+    query = query.eq('artist_id', params.artistId);
   }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as PriorShowRow[];
+}
+
+async function buildStatisticalPrediction(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  target: ShowRow,
+  priorShows: PriorShowRow[],
+  sampleSize: number,
+  structureOverride?: 'no_tour_data_fallback'
+): Promise<SetlistPrediction> {
+  const showIds = priorShows.map((row) => row.id);
 
   const { data: showSongRows, error: songsError } = await supabase
     .from('show_songs')
@@ -90,26 +155,73 @@ export async function generateShowPrediction(
 
   if (songsError) throw songsError;
 
-  const stats = aggregateSongStats((showSongRows ?? []) as HistoricalShowSong[], totalShows);
-  const structure = detectStructure(stats, totalShows);
-  const songs = buildPredictedSongs(stats, totalShows);
+  const stats = aggregateSongStats((showSongRows ?? []) as HistoricalShowSong[], sampleSize);
+  const structure =
+    structureOverride ?? detectStructure(stats, sampleSize);
+  const songs = buildPredictedSongs(stats, sampleSize);
 
   const avgConfidence =
     songs.length > 0
-      ? songs.reduce((sum, song) => sum + song.confidence, 0) / songs.length
+      ? songs.reduce((sum, song) => sum + (song.confidence ?? 0), 0) / songs.length
       : 0;
 
   const prediction: SetlistPrediction = {
     show_id: target.id,
     artist_id: target.artist_id,
     tour_id: target.tour_id,
-    sample_size: totalShows,
+    sample_size: sampleSize,
     structure,
     songs,
     generated_at: new Date().toISOString(),
   };
 
   await cachePrediction(supabase, target.id, prediction, avgConfidence);
+  return prediction;
+}
+
+async function buildReferenceSetlist(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  target: ShowRow,
+  priorShows: PriorShowRow[],
+  structure: 'single_show_reference' | 'limited_tour_data'
+): Promise<SetlistPrediction> {
+  const sortedShows = [...priorShows].sort((a, b) => b.show_date.localeCompare(a.show_date));
+  const referenceShow = sortedShows[0];
+
+  const { data: showSongRows, error: songsError } = await supabase
+    .from('show_songs')
+    .select('song_id, position, songs(id, title)')
+    .eq('show_id', referenceShow.id)
+    .order('position', { ascending: true });
+
+  if (songsError) throw songsError;
+
+  const songs: PredictedSong[] = ((showSongRows ?? []) as HistoricalShowSong[]).map((row) => {
+    const song = Array.isArray(row.songs) ? row.songs[0] : row.songs;
+    return {
+      song_id: row.song_id,
+      title: song?.title ?? 'Unknown',
+      confidence: null,
+      frequency_pct: null,
+      avg_position: row.position,
+      is_wildcard: false,
+      appeared_in_shows: 1,
+      total_shows: 1,
+    };
+  });
+
+  const prediction: SetlistPrediction = {
+    show_id: target.id,
+    artist_id: target.artist_id,
+    tour_id: target.tour_id,
+    sample_size: priorShows.length,
+    structure,
+    reference_show_dates: sortedShows.map((row) => row.show_date),
+    songs,
+    generated_at: new Date().toISOString(),
+  };
+
+  await cachePrediction(supabase, target.id, prediction, 0);
   return prediction;
 }
 
@@ -176,9 +288,7 @@ function buildPredictedSongs(stats: SongAggregate[], totalShows: number): Predic
 function detectStructure(
   stats: SongAggregate[],
   totalShows: number
-): SetlistPrediction['structure'] {
-  if (totalShows === 0) return 'insufficient_data';
-
+): Exclude<SetlistPredictionStructure, 'insufficient_data' | 'single_show_reference' | 'limited_tour_data' | 'no_tour_data_fallback'> {
   const coreSongs = stats.filter((item) => item.appearances / totalShows >= FIXED_SONG_THRESHOLD);
   if (coreSongs.length >= 5) {
     return 'mostly_fixed';
@@ -194,17 +304,14 @@ function detectStructure(
 
 async function finishInsufficient(
   supabase: ReturnType<typeof createSupabaseClient>,
-  target: ShowRow,
-  sampleSize: number,
-  reason: SetlistInsufficientReason
+  target: ShowRow
 ): Promise<SetlistPrediction> {
   const empty: SetlistPrediction = {
     show_id: target.id,
     artist_id: target.artist_id,
     tour_id: target.tour_id,
-    sample_size: sampleSize,
+    sample_size: 0,
     structure: 'insufficient_data',
-    insufficient_reason: reason,
     songs: [],
     generated_at: new Date().toISOString(),
   };
@@ -229,7 +336,6 @@ async function cachePrediction(
   );
 
   if (error) {
-    // Cache failure should not block serving the prediction.
     console.error('Failed to cache setlist prediction', error.message);
   }
 }

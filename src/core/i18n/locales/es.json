@@ -111,13 +111,17 @@
     "openLive": "Modo LIVE con cámara",
     "loadError": "No se pudo cargar la predicción",
     "insufficientData": "Aún no hay suficientes setlists históricos para predecir.",
-    "insufficientTourData": "Aún no hay suficientes shows de esta gira para predecir el setlist.",
-    "noTourData": "Este show no está asociado a una gira; no podemos predecir el setlist aún.",
+    "referenceSingleShow": "Basado en el show anterior de esta gira ({{date}}) — el setlist real puede variar.",
+    "referenceLimitedTour": "Basado en shows anteriores de esta gira ({{dates}}) — el setlist real puede variar.",
+    "fallbackNoTour": "Aún no hay shows registrados de esta gira — esto es su repertorio general, podría no reflejar el show real.",
     "sampleSize": "{{count}} shows analizados",
     "structure": {
       "mostly_fixed": "Setlist mayormente fijo",
       "rotating": "Setlist con rotación",
-      "insufficient_data": "Datos insuficientes"
+      "insufficient_data": "Datos insuficientes",
+      "single_show_reference": "Referencia de show anterior",
+      "limited_tour_data": "Referencia limitada de la gira",
+      "no_tour_data_fallback": "Repertorio general del artista"
     }
   },
   "lyrics": {

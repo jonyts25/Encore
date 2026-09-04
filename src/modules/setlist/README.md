@@ -17,17 +17,17 @@ Predicción de setlist en la ficha del show.
 
 Backend: `GET /api/shows/[id]/prediction` (Railway).
 
-## Regla de predicción (tour-strict)
+## Regla de predicción (3 niveles)
 
-El motor **solo** usa shows previos de la **misma gira** (`tour_id`). No mezcla giras distintas ni el historial completo del artista.
+El motor usa shows previos de la **misma gira** cuando existen; si no, cae al repertorio general del artista.
 
-| Condición | Resultado |
-|---|---|
-| Show sin `tour_id` | `insufficient_data` + mensaje "no gira asignada" |
-| Misma gira pero &lt; 3 shows previos | `insufficient_data` + "Aún no hay suficientes shows de esta gira…" |
-| ≥ 3 shows previos en la gira | Predicción con confianza por canción |
-
-Tras cambios en ingesta, re-correr `POST /api/admin/setlist-ingest/[artistId]` para que los shows históricos queden con `tour_id` (setlist.fm expone `tour.name`).
+| Shows previos en la gira | `structure` | Qué muestra |
+|---|---|---|
+| ≥ 3 | `mostly_fixed` / `rotating` | Predicción con % de confianza |
+| 1 | `single_show_reference` | Setlist real del show anterior + fecha |
+| 2 | `limited_tour_data` | Setlist del show más reciente + fechas de referencia |
+| 0 | `no_tour_data_fallback` | Repertorio general del artista con % (puede no reflejar la gira) |
+| Sin historial alguno | `insufficient_data` | Mensaje vacío |
 
 ## Does NOT
 

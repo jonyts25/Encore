@@ -43,11 +43,9 @@ npm start
   - Upserts `tours (artist_id, name)` and assigns `shows.tour_id` (null when setlist has no tour)
   - Response includes `shows_with_tour` — how many ingested shows were linked to a tour
 - `GET /api/shows/[id]/prediction` — predicted setlist with per-song confidence (public)
-  - **Tour-strict:** sample is only prior shows with the same `tour_id` as the target show
-  - Requires at least **3** past shows on that tour; never falls back to other tours or artist-wide history
-  - Returns `structure: "insufficient_data"` with `insufficient_reason`:
-    - `no_tour` — target show has no `tour_id`
-    - `insufficient_tour_shows` — same tour but fewer than 3 prior shows ingested
+  - **≥ 3 prior shows on same tour:** statistical prediction with confidence % (`mostly_fixed` / `rotating`)
+  - **1–2 prior shows on same tour:** actual setlist from reference show(s), no confidence (`single_show_reference` / `limited_tour_data` + `reference_show_dates`)
+  - **0 prior shows on tour:** artist-wide history fallback (`no_tour_data_fallback` + confidence %)
 
 ### M5 — Lyrics (basic)
 - `GET /api/lyrics/search?artist=X&title=Y` — proxy to LRCLIB (never stored in Supabase)

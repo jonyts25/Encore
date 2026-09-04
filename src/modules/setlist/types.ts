@@ -1,17 +1,21 @@
 export type PredictedSong = {
   song_id: string;
   title: string;
-  confidence: number;
-  frequency_pct: number;
+  confidence: number | null;
+  frequency_pct: number | null;
   avg_position: number | null;
   is_wildcard: boolean;
   appeared_in_shows: number;
   total_shows: number;
 };
 
-export type SetlistPredictionStructure = 'mostly_fixed' | 'rotating' | 'insufficient_data';
-
-export type SetlistInsufficientReason = 'no_tour' | 'insufficient_tour_shows' | 'no_history';
+export type SetlistPredictionStructure =
+  | 'mostly_fixed'
+  | 'rotating'
+  | 'insufficient_data'
+  | 'single_show_reference'
+  | 'limited_tour_data'
+  | 'no_tour_data_fallback';
 
 export type SetlistPrediction = {
   show_id: string;
@@ -19,7 +23,7 @@ export type SetlistPrediction = {
   tour_id: string | null;
   sample_size: number;
   structure: SetlistPredictionStructure;
-  insufficient_reason?: SetlistInsufficientReason | null;
+  reference_show_dates?: string[];
   songs: PredictedSong[];
   generated_at: string;
 };
