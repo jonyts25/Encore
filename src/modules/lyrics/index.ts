@@ -1,2 +1,8 @@
-/** Public API for the lyrics module — implemented in later milestones. */
-export {};
+export {
+  buildGeniusSearchUrl,
+  buildSpotifySearchUrl,
+  fetchLyrics,
+} from './api';
+export { LyricsScreenContent } from './components/LyricsScreenContent';
+export { useLyrics } from './hooks/useLyrics';
+export type { LyricsResult, LyricsSearchResponse } from './types';

@@ -84,5 +84,28 @@
     "language": "Language",
     "spanish": "Español",
     "english": "English"
+  },
+  "setlist": {
+    "predictionTitle": "Predicted setlist",
+    "predictionSubtitle": "Based on the artist's historical shows.",
+    "confidence": "Confidence: {{pct}}",
+    "viewLyrics": "View lyrics",
+    "loadError": "Could not load prediction",
+    "insufficientData": "Not enough historical setlists to predict yet.",
+    "sampleSize": "{{count}} shows analyzed",
+    "structure": {
+      "mostly_fixed": "Mostly fixed setlist",
+      "rotating": "Rotating setlist",
+      "insufficient_data": "Insufficient data"
+    }
+  },
+  "lyrics": {
+    "screenTitle": "Lyrics",
+    "loadError": "Could not load lyrics",
+    "notFoundTitle": "Lyrics not available",
+    "notFoundSubtitle": "LRCLIB does not have this song. You can search on Genius or Spotify.",
+    "openGenius": "Search on Genius",
+    "openSpotify": "Search on Spotify",
+    "instrumental": "Instrumental"
   }
 }

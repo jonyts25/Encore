@@ -4,6 +4,8 @@ import { Image, ScrollView, StyleSheet } from 'react-native';
 import { useTranslation } from '@/core/i18n';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
+import { SetlistPredictionPanel } from '@/modules/setlist';
+
 import { fetchShowById, formatShowDate, formatShowVenueLine } from '../api';
 import { ShowStatusButtons } from './ShowStatusButtons';
 import type { Show } from '../types';
@@ -78,6 +80,8 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             <ThemedText style={styles.genres}>{show.artist.genres.join(' · ')}</ThemedText>
           </>
         ) : null}
+
+        <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} />
 
         <ThemedText style={styles.sectionLabel}>{t('events.yourStatus')}</ThemedText>
         <ShowStatusButtons showId={show.id} />

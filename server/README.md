@@ -39,6 +39,9 @@ npm start
 - `POST /api/admin/setlist-ingest/[artistId]` — ingest historical setlists from setlist.fm (admin)
 - `GET /api/shows/[id]/prediction` — predicted setlist with per-song confidence (public)
 
+### M5 — Lyrics (basic)
+- `GET /api/lyrics/search?artist=X&title=Y` — proxy to LRCLIB (never stored in Supabase)
+
 Body for status:
 
 ```json

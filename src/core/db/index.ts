@@ -1,2 +1,2 @@
-/** Local SQLite schema and helpers — M0 placeholder. */
-export {};
+export { getCachedLyrics, setCachedLyrics } from './lyricsCache';
+export type { CachedLyricsRecord } from './lyricsCache';
