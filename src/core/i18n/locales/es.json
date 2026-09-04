@@ -71,6 +71,7 @@
     "loginSuccess": "Sesión iniciada",
     "registerSuccess": "Cuenta creada",
     "confirmEmail": "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.",
+    "emailAlreadyRegistered": "Este correo ya tiene cuenta. Intenta iniciar sesión.",
     "authError": "No se pudo completar la autenticación"
   },
   "settings": {

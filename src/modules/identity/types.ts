@@ -16,4 +16,5 @@ export type EntitlementFeature =
 
 export type SignUpResult = {
   needsEmailConfirmation: boolean;
+  emailAlreadyRegistered?: boolean;
 };

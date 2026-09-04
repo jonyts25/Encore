@@ -71,6 +71,7 @@
     "loginSuccess": "Signed in",
     "registerSuccess": "Account created",
     "confirmEmail": "Check your email to confirm your account before signing in.",
+    "emailAlreadyRegistered": "This email already has an account. Try signing in.",
     "authError": "Authentication failed"
   },
   "settings": {

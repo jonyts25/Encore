@@ -1,4 +1,4 @@
-import type { Session, User } from '@supabase/supabase-js';
+import type { AuthError, Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '@/core/api/supabase';
 
@@ -41,6 +41,16 @@ async function ensureProfileForUser(user: User) {
   return fetchProfile(user.id);
 }
 
+function isDuplicateEmailError(error: AuthError): boolean {
+  const message = error.message.toLowerCase();
+  return (
+    error.code === 'user_already_exists' ||
+    message.includes('already registered') ||
+    message.includes('already been registered') ||
+    message.includes('user already exists')
+  );
+}
+
 export async function signUpWithPassword(
   email: string,
   password: string,
@@ -56,7 +66,16 @@ export async function signUpWithPassword(
       },
     },
   });
-  if (error) throw error;
+  if (error) {
+    if (isDuplicateEmailError(error)) {
+      return { needsEmailConfirmation: false, emailAlreadyRegistered: true };
+    }
+    throw error;
+  }
+
+  if (data.user && (!data.user.identities || data.user.identities.length === 0)) {
+    return { needsEmailConfirmation: false, emailAlreadyRegistered: true };
+  }
 
   if (data.session && data.user) {
     await upsertProfile(data.user.id, {

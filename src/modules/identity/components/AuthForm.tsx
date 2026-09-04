@@ -33,7 +33,9 @@ export function AuthForm() {
         setMessage(t('identity.loginSuccess'));
       } else {
         const result = await signUp(email.trim(), password, displayName.trim());
-        if (result.needsEmailConfirmation) {
+        if (result.emailAlreadyRegistered) {
+          setError(t('identity.emailAlreadyRegistered'));
+        } else if (result.needsEmailConfirmation) {
           setMessage(t('identity.confirmEmail'));
         } else {
           setMessage(t('identity.registerSuccess'));
