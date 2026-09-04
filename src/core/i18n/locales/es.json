@@ -106,6 +106,32 @@
     "notFoundSubtitle": "LRCLIB no tiene esta canción. Puedes buscarla en Genius o Spotify.",
     "openGenius": "Buscar en Genius",
     "openSpotify": "Buscar en Spotify",
-    "instrumental": "Instrumental"
+    "instrumental": "Instrumental",
+    "start": "Empezar",
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "restart": "Reiniciar",
+    "mode": {
+      "synced": "Scroll automático (timestamps reales)",
+      "estimated": "Scroll automático (ritmo estimado)",
+      "manual": "Scroll manual (4 s por línea)"
+    }
+  },
+  "live": {
+    "screenTitle": "LIVE",
+    "openMode": "Modo LIVE (cámara)",
+    "requestingPermissions": "Solicitando permisos…",
+    "permissionsRequired": "Se necesitan cámara y micrófono",
+    "permissionsHint": "Encore solo pide permisos al entrar al modo LIVE.",
+    "retryPermissions": "Reintentar permisos",
+    "back": "Volver",
+    "recording": "Grabando…",
+    "startRecording": "Grabar",
+    "stopRecording": "Detener",
+    "saving": "Guardando en el carrete…",
+    "savedToCameraRoll": "Video guardado en el carrete (solo en tu dispositivo).",
+    "recordFailed": "No se pudo grabar el video.",
+    "mediaPermissionDenied": "Permiso denegado para guardar en el carrete.",
+    "lyricsUnavailable": "Letra no disponible para el overlay."
   }
 }

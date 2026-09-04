@@ -1,3 +1,7 @@
+import type { SyncedLine } from './lrc';
+
+export type { SyncedLine };
+
 export type LyricsMatch = {
   id: string;
   title: string;
@@ -6,6 +10,7 @@ export type LyricsMatch = {
   duration: number | null;
   instrumental: boolean;
   hasPlainLyrics: boolean;
+  hasSyncedLyrics: boolean;
 };
 
 export type Lyrics = {
@@ -15,12 +20,15 @@ export type Lyrics = {
   album: string | null;
   plainLyrics: string;
   instrumental: boolean;
+  durationSeconds: number | null;
   attribution: string;
 };
 
 export type SyncedLyrics = {
   id: string;
   lrc: string;
+  lines: SyncedLine[];
+  durationSeconds: number | null;
   attribution: string;
 };
 

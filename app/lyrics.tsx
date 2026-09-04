@@ -1,5 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 
+import { ScrollView } from 'react-native';
+
 import { useTranslation } from '@/core/i18n';
 import { ThemedView } from '@/core/ui/Themed';
 import { LyricsScreenContent } from '@/modules/lyrics';
@@ -13,9 +15,11 @@ export default function LyricsScreen() {
   return (
     <>
       <Stack.Screen options={{ title: t('lyrics.screenTitle') }} />
-      <ThemedView style={{ flex: 1 }}>
-        <LyricsScreenContent artist={artist} title={title} />
-      </ThemedView>
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        <ThemedView style={{ flexGrow: 1 }}>
+          <LyricsScreenContent artist={artist} title={title} />
+        </ThemedView>
+      </ScrollView>
     </>
   );
 }

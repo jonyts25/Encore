@@ -41,6 +41,7 @@ npm start
 
 ### M5 — Lyrics (basic)
 - `GET /api/lyrics/search?artist=X&title=Y` — proxy to LRCLIB (never stored in Supabase)
+  - Returns `plain_lyrics`, `synced_lines` (`[{ timestamp_seconds, line }]`), `duration_seconds` when available
 
 Body for status:
 

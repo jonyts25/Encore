@@ -1,9 +1,13 @@
 import { apiFetch, ApiError } from '@/core/api/client';
 import { getCachedLyrics, setCachedLyrics } from '@/core/db';
 
+import { detectScrollMode } from './scrollLogic';
 import type { LyricsResult, LyricsSearchResponse } from './types';
 
 function mapResponse(data: LyricsSearchResponse): LyricsResult {
+  const syncedLines = data.lyrics.synced_lines ?? [];
+  const durationSeconds = data.lyrics.duration_seconds ?? null;
+
   return {
     id: data.lyrics.id,
     title: data.lyrics.title,
@@ -12,6 +16,9 @@ function mapResponse(data: LyricsSearchResponse): LyricsResult {
     plainLyrics: data.lyrics.plain_lyrics,
     instrumental: data.lyrics.instrumental,
     attribution: data.attribution,
+    durationSeconds,
+    syncedLines,
+    scrollMode: detectScrollMode(syncedLines, durationSeconds),
   };
 }
 

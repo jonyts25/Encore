@@ -1,17 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 
+import type { LyricsResult } from '@/modules/lyrics/types';
+
 const DB_NAME = 'encore.db';
 const LYRICS_TTL_MS = 24 * 60 * 60 * 1000;
 
-export type CachedLyricsRecord = {
-  id: string;
-  title: string;
-  artist: string;
-  album: string | null;
-  plainLyrics: string;
-  instrumental: boolean;
-  attribution: string;
-};
+export type CachedLyricsRecord = LyricsResult;
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 

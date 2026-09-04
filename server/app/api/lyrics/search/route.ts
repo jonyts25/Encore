@@ -19,8 +19,13 @@ export async function GET(request: Request) {
       return jsonError('Lyrics not found', 404, { matches });
     }
 
-    const bestMatch = withLyrics[0];
+    const bestMatch =
+      withLyrics.find((match) => match.hasSyncedLyrics) ??
+      withLyrics.find((match) => match.duration !== null) ??
+      withLyrics[0];
+
     const lyrics = await provider.fetch(bestMatch.id);
+    const synced = await provider.fetchSynced(bestMatch.id);
 
     return jsonOk({
       lyrics: {
@@ -30,6 +35,8 @@ export async function GET(request: Request) {
         album: lyrics.album,
         plain_lyrics: lyrics.plainLyrics,
         instrumental: lyrics.instrumental,
+        duration_seconds: synced?.durationSeconds ?? lyrics.durationSeconds,
+        synced_lines: synced?.lines ?? [],
       },
       attribution: provider.attribution,
       matches: withLyrics,

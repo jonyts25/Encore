@@ -29,6 +29,22 @@
       "expo-localization",
       "expo-sqlite",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Encore uses the camera for LIVE mode during concerts.",
+          "microphonePermission": "Encore uses the microphone to record LIVE videos.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Encore saves LIVE recordings to your camera roll.",
+          "savePhotosPermission": "Encore saves LIVE recordings to your camera roll.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",

@@ -1,2 +1,1 @@
-/** Types for the live module. */
-export type LiveModulePlaceholder = never;
+export type LiveRecordingState = 'idle' | 'recording' | 'saving';

@@ -1,3 +1,4 @@
+import { parseLrc } from './lrc';
 import type { Lyrics, LyricsMatch, LyricsProvider, SyncedLyrics } from './types';
 
 const BASE_URL = 'https://lrclib.net/api';
@@ -15,15 +16,20 @@ type LrclibRecord = {
   syncedLyrics?: string | null;
 };
 
+function readDuration(record: LrclibRecord): number | null {
+  return typeof record.duration === 'number' && record.duration > 0 ? record.duration : null;
+}
+
 function mapMatch(record: LrclibRecord): LyricsMatch {
   return {
     id: String(record.id),
     title: record.trackName ?? record.name ?? 'Unknown',
     artist: record.artistName ?? 'Unknown',
     album: record.albumName ?? null,
-    duration: typeof record.duration === 'number' ? record.duration : null,
+    duration: readDuration(record),
     instrumental: Boolean(record.instrumental),
     hasPlainLyrics: Boolean(record.plainLyrics?.trim()),
+    hasSyncedLyrics: Boolean(record.syncedLyrics?.trim()),
   };
 }
 
@@ -40,6 +46,7 @@ function mapLyrics(record: LrclibRecord): Lyrics {
     album: record.albumName ?? null,
     plainLyrics,
     instrumental: Boolean(record.instrumental),
+    durationSeconds: readDuration(record),
     attribution: LRCLIB_ATTRIBUTION,
   };
 }
@@ -62,6 +69,10 @@ async function lrclibRequest<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+async function fetchRecord(id: string): Promise<LrclibRecord> {
+  return lrclibRequest<LrclibRecord>(`/get/${encodeURIComponent(id)}`);
+}
+
 export class LrclibProvider implements LyricsProvider {
   readonly attribution = LRCLIB_ATTRIBUTION;
   readonly allowsCommercialUse = false;
@@ -77,18 +88,23 @@ export class LrclibProvider implements LyricsProvider {
   }
 
   async fetch(id: string): Promise<Lyrics> {
-    const record = await lrclibRequest<LrclibRecord>(`/get/${encodeURIComponent(id)}`);
+    const record = await fetchRecord(id);
     return mapLyrics(record);
   }
 
   async fetchSynced(id: string): Promise<SyncedLyrics | null> {
-    const record = await lrclibRequest<LrclibRecord>(`/get/${encodeURIComponent(id)}`);
+    const record = await fetchRecord(id);
     const lrc = record.syncedLyrics?.trim();
     if (!lrc) return null;
+
+    const lines = parseLrc(lrc);
+    if (lines.length === 0) return null;
 
     return {
       id: String(record.id),
       lrc,
+      lines,
+      durationSeconds: readDuration(record),
       attribution: this.attribution,
     };
   }

@@ -1,29 +1,36 @@
-# M5 — Lyrics (cliente, básico)
+# M5 — Lyrics (cliente)
 
-Letras con scroll manual — versión mínima para demo en vivo.
+Letras con scroll automático o manual — base del modo LIVE.
 
 ## Public API
 
-- `LyricsScreenContent` — texto plano, scroll manual
-- `useLyrics(artist, title)`
+- `LyricsScreenContent` — pantalla de letra con auto-scroll
+- `LyricsScrollPanel` — panel reutilizable (también en LIVE overlay)
+- `useLyrics(artist, title)` / `useLyricsAutoScroll(...)`
 - `fetchLyrics(artist, title)` — cache SQLite local (TTL 24h)
-- `buildGeniusSearchUrl`, `buildSpotifySearchUrl` — fallbacks externos
 
-## Flujo en la app (para validar con Expo)
+## Modos de scroll (Fase A / M8 base)
 
-1. Desde **Setlist predicho** en un show → **Ver letra** en cualquier canción.
-2. Pantalla `/lyrics?artist=…&title=…` carga vía `GET /api/lyrics/search`.
-3. Si LRCLIB tiene la letra → texto con scroll manual + atribución.
-4. Si no → mensaje claro + botones **Genius** / **Spotify** (navegador).
-5. Segunda visita a la misma canción → cache local (sin red, si TTL vigente).
+1. **synced** — timestamps LRC reales desde LRCLIB
+2. **estimated** — reparte `duration_seconds` entre líneas
+3. **manual** — botón **Empezar**, 4 s por línea
+
+Siempre: **Pausar**, **Reanudar**, **Reiniciar**.
+
+## Flujo en la app
+
+1. Setlist predicho → **Ver letra**
+2. Auto-scroll según datos disponibles
+3. **Modo LIVE (cámara)** → `/live?artist=…&title=…`
+
+Backend: `GET /api/lyrics/search` devuelve `plain_lyrics`, `synced_lines[]`, `duration_seconds`.
 
 ## Reglas
 
-- Letras **nunca** en Supabase — solo proxy backend + cache en dispositivo.
-- Sin cámara, sin sync automático (intencional para el sábado).
+- Letras **nunca** en Supabase
+- Cache solo en dispositivo
 
 ## Does NOT
 
-- Letras sincronizadas (LRC)
 - Musixmatch licenciado
-- Modo offline completo pre-show
+- Sync por micrófono (M8 avanzado)

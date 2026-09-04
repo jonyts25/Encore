@@ -1,2 +1,3 @@
 export { getLyricsProvider, LrclibProvider, LRCLIB_PROVIDER } from './lrclib';
-export type { Lyrics, LyricsMatch, LyricsProvider, SyncedLyrics } from './types';
+export { parseLrc } from './lrc';
+export type { Lyrics, LyricsMatch, LyricsProvider, SyncedLine, SyncedLyrics } from './types';

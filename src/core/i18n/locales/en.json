@@ -106,6 +106,32 @@
     "notFoundSubtitle": "LRCLIB does not have this song. You can search on Genius or Spotify.",
     "openGenius": "Search on Genius",
     "openSpotify": "Search on Spotify",
-    "instrumental": "Instrumental"
+    "instrumental": "Instrumental",
+    "start": "Start",
+    "pause": "Pause",
+    "resume": "Resume",
+    "restart": "Restart",
+    "mode": {
+      "synced": "Auto-scroll (real timestamps)",
+      "estimated": "Auto-scroll (estimated pace)",
+      "manual": "Manual scroll (4s per line)"
+    }
+  },
+  "live": {
+    "screenTitle": "LIVE",
+    "openMode": "LIVE mode (camera)",
+    "requestingPermissions": "Requesting permissions…",
+    "permissionsRequired": "Camera and microphone required",
+    "permissionsHint": "Encore only asks for permissions when you enter LIVE mode.",
+    "retryPermissions": "Retry permissions",
+    "back": "Back",
+    "recording": "Recording…",
+    "startRecording": "Record",
+    "stopRecording": "Stop",
+    "saving": "Saving to camera roll…",
+    "savedToCameraRoll": "Video saved to camera roll (device only).",
+    "recordFailed": "Could not record video.",
+    "mediaPermissionDenied": "Permission denied to save to camera roll.",
+    "lyricsUnavailable": "Lyrics unavailable for overlay."
   }
 }

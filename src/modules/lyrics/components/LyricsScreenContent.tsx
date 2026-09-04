@@ -1,10 +1,12 @@
+import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { buildGeniusSearchUrl, buildSpotifySearchUrl } from '../api';
+import { LyricsScrollPanel } from '../components/LyricsScrollPanel';
 import { useLyrics } from '../hooks/useLyrics';
 
 type LyricsScreenContentProps = {
@@ -18,58 +20,74 @@ async function openExternalUrl(url: string) {
 
 export function LyricsScreenContent({ artist, title }: LyricsScreenContentProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { lyrics, isLoading, error, notFound } = useLyrics(artist, title);
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <ThemedView style={styles.container}>
-        <ThemedText style={styles.title}>{title}</ThemedText>
-        <ThemedText style={styles.artist}>{artist}</ThemedText>
+    <ThemedView style={styles.container}>
+      <ThemedText style={styles.title}>{title}</ThemedText>
+      <ThemedText style={styles.artist}>{artist}</ThemedText>
 
-        {isLoading ? (
-          <ThemedView style={styles.centered}>
-            <ThemedText>{t('common.loading')}</ThemedText>
-          </ThemedView>
-        ) : null}
+      {isLoading ? (
+        <ThemedView style={styles.centered}>
+          <ThemedText>{t('common.loading')}</ThemedText>
+        </ThemedView>
+      ) : null}
 
-        {!isLoading && error ? (
-          <ThemedView style={styles.centered}>
-            <ThemedText style={styles.error}>{error}</ThemedText>
-          </ThemedView>
-        ) : null}
+      {!isLoading && error ? (
+        <ThemedView style={styles.centered}>
+          <ThemedText style={styles.error}>{error}</ThemedText>
+        </ThemedView>
+      ) : null}
 
-        {!isLoading && notFound ? (
-          <ThemedView style={styles.centered}>
-            <ThemedText style={styles.emptyTitle}>{t('lyrics.notFoundTitle')}</ThemedText>
-            <ThemedText style={styles.emptySubtitle}>{t('lyrics.notFoundSubtitle')}</ThemedText>
+      {!isLoading && notFound ? (
+        <ThemedView style={styles.centered}>
+          <ThemedText style={styles.emptyTitle}>{t('lyrics.notFoundTitle')}</ThemedText>
+          <ThemedText style={styles.emptySubtitle}>{t('lyrics.notFoundSubtitle')}</ThemedText>
+          <Button
+            title={t('lyrics.openGenius')}
+            variant="secondary"
+            onPress={() => {
+              void openExternalUrl(buildGeniusSearchUrl(artist, title));
+            }}
+          />
+          <Button
+            title={t('lyrics.openSpotify')}
+            variant="secondary"
+            onPress={() => {
+              void openExternalUrl(buildSpotifySearchUrl(artist, title));
+            }}
+          />
+        </ThemedView>
+      ) : null}
+
+      {!isLoading && lyrics ? (
+        <>
+          {lyrics.instrumental ? (
+            <ThemedText style={styles.instrumental}>{t('lyrics.instrumental')}</ThemedText>
+          ) : null}
+
+          <LyricsScrollPanel
+            durationSeconds={lyrics.durationSeconds}
+            plainLyrics={lyrics.plainLyrics}
+            syncedLines={lyrics.syncedLines}
+          />
+
+          <View style={styles.footer}>
             <Button
-              title={t('lyrics.openGenius')}
-              variant="secondary"
+              title={t('live.openMode')}
               onPress={() => {
-                void openExternalUrl(buildGeniusSearchUrl(artist, title));
+                router.push({
+                  pathname: '/live',
+                  params: { artist, title },
+                });
               }}
             />
-            <Button
-              title={t('lyrics.openSpotify')}
-              variant="secondary"
-              onPress={() => {
-                void openExternalUrl(buildSpotifySearchUrl(artist, title));
-              }}
-            />
-          </ThemedView>
-        ) : null}
-
-        {!isLoading && lyrics ? (
-          <>
-            {lyrics.instrumental ? (
-              <ThemedText style={styles.instrumental}>{t('lyrics.instrumental')}</ThemedText>
-            ) : null}
-            <ThemedText style={styles.lyricsBody}>{lyrics.plainLyrics}</ThemedText>
             <ThemedText style={styles.attribution}>{lyrics.attribution}</ThemedText>
-          </>
-        ) : null}
-      </ThemedView>
-    </ScrollView>
+          </View>
+        </>
+      ) : null}
+    </ThemedView>
   );
 }
 
@@ -81,7 +99,6 @@ const styles = StyleSheet.create({
   },
   attribution: {
     fontSize: 12,
-    marginTop: 24,
     opacity: 0.6,
     textAlign: 'center',
   },
@@ -91,7 +108,7 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   container: {
-    flexGrow: 1,
+    flex: 1,
     padding: 24,
   },
   emptySubtitle: {
@@ -107,17 +124,14 @@ const styles = StyleSheet.create({
     color: '#D64545',
     textAlign: 'center',
   },
+  footer: {
+    gap: 12,
+    marginTop: 16,
+  },
   instrumental: {
     fontStyle: 'italic',
     marginBottom: 12,
     opacity: 0.8,
-  },
-  lyricsBody: {
-    fontSize: 17,
-    lineHeight: 28,
-  },
-  scroll: {
-    flexGrow: 1,
   },
   title: {
     fontSize: 28,

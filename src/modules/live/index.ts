@@ -1,2 +1,2 @@
-/** Public API for the live module — implemented in later milestones. */
-export {};
+export { LiveCameraContent } from './components/LiveCameraContent';
+export type { LiveRecordingState } from './types';
