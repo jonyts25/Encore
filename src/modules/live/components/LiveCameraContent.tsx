@@ -3,16 +3,22 @@ import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText } from '@/core/ui/Themed';
-import { LyricsScrollPanel, useLyrics } from '@/modules/lyrics';
+import { useLyrics } from '@/modules/lyrics';
+
+import { usePinchZoom } from '../hooks/usePinchZoom';
+import { LiveLyricsOverlay } from './LiveLyricsOverlay';
 
 type LiveCameraContentProps = {
   artist: string;
   title: string;
 };
+
+const TOP_BAR_CONTENT_HEIGHT = 44;
 
 export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
   const { t } = useTranslation();
@@ -23,6 +29,10 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
   const [permissionsRequested, setPermissionsRequested] = useState(false);
+
+  const [facing, setFacing] = useState<'back' | 'front'>('back');
+  const [torchOn, setTorchOn] = useState(false);
+  const { zoom, pinchGesture } = usePinchZoom();
 
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,7 +66,15 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
     requestMicPermission,
   ]);
 
+  useEffect(() => {
+    if (facing === 'front') {
+      setTorchOn(false);
+    }
+  }, [facing]);
+
   const permissionsGranted = Boolean(cameraPermission?.granted && micPermission?.granted);
+  const lyricsUnavailable = Boolean(lyricsError || notFound || !lyrics);
+  const headerOffset = insets.top + TOP_BAR_CONTENT_HEIGHT;
 
   const handleToggleRecording = async () => {
     setErrorMessage(null);
@@ -128,37 +146,63 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
 
   return (
     <View style={styles.root}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} mode="video" facing="back" />
+      <GestureDetector gesture={pinchGesture}>
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          mode="video"
+          facing={facing}
+          zoom={zoom}
+          enableTorch={facing === 'back' && torchOn}
+        />
+      </GestureDetector>
+
+      <LiveLyricsOverlay
+        contentTopInset={headerOffset}
+        durationSeconds={lyrics?.durationSeconds}
+        isLoading={lyricsLoading}
+        isUnavailable={lyricsUnavailable}
+        plainLyrics={lyrics?.plainLyrics}
+        syncedLines={lyrics?.syncedLines}
+      />
 
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>{t('live.back')}</Text>
-        </Pressable>
+        <View style={styles.topBarLeading}>
+          <Pressable onPress={() => router.back()} style={styles.iconButton}>
+            <Text style={styles.iconButtonText}>{t('live.back')}</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel={t('live.flipCamera')}
+            accessibilityRole="button"
+            disabled={isRecording}
+            onPress={() => {
+              setFacing((current) => (current === 'back' ? 'front' : 'back'));
+            }}
+            style={[styles.iconButton, styles.iconButtonRound, isRecording && styles.iconButtonDisabled]}>
+            <Text style={styles.iconGlyph}>⟲</Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.songLabel} numberOfLines={1}>
           {title} · {artist}
         </Text>
-      </View>
 
-      <View style={styles.overlayStrip}>
-        {lyricsLoading ? (
-          <Text style={styles.overlayMessage}>{t('common.loading')}</Text>
-        ) : null}
-
-        {!lyricsLoading && (lyricsError || notFound || !lyrics) ? (
-          <Text style={styles.overlayMessage}>{t('live.lyricsUnavailable')}</Text>
-        ) : null}
-
-        {!lyricsLoading && lyrics ? (
-          <LyricsScrollPanel
-            compact
-            showModeLabel={false}
-            variant="overlay"
-            durationSeconds={lyrics.durationSeconds}
-            plainLyrics={lyrics.plainLyrics}
-            syncedLines={lyrics.syncedLines}
-            style={styles.overlayPanel}
-          />
-        ) : null}
+        <Pressable
+          accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
+          accessibilityRole="button"
+          disabled={facing === 'front'}
+          onPress={() => {
+            setTorchOn((current) => !current);
+          }}
+          style={[
+            styles.iconButton,
+            styles.iconButtonRound,
+            torchOn && styles.iconButtonActive,
+            facing === 'front' && styles.iconButtonDisabled,
+          ]}>
+          <Text style={[styles.iconGlyph, torchOn && styles.iconGlyphActive]}>⚡</Text>
+        </Pressable>
       </View>
 
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
@@ -187,16 +231,6 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
 }
 
 const styles = StyleSheet.create({
-  backButton: {
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   bottomControls: {
     alignItems: 'center',
     bottom: 0,
@@ -204,6 +238,7 @@ const styles = StyleSheet.create({
     left: 0,
     position: 'absolute',
     right: 0,
+    zIndex: 20,
   },
   centered: {
     alignItems: 'center',
@@ -216,23 +251,36 @@ const styles = StyleSheet.create({
     color: '#ffb4b4',
     textAlign: 'center',
   },
-  overlayMessage: {
-    color: '#fff',
-    padding: 16,
-    textAlign: 'center',
-  },
-  overlayPanel: {
-    flex: 1,
-  },
-  overlayStrip: {
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
-    bottom: '14%',
-    height: '30%',
-    left: 0,
-    paddingHorizontal: 12,
+  iconButton: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    position: 'absolute',
-    right: 0,
+  },
+  iconButtonActive: {
+    backgroundColor: 'rgba(255, 214, 10, 0.35)',
+  },
+  iconButtonDisabled: {
+    opacity: 0.35,
+  },
+  iconButtonRound: {
+    alignItems: 'center',
+    height: 40,
+    justifyContent: 'center',
+    paddingHorizontal: 0,
+    width: 40,
+  },
+  iconButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  iconGlyph: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  iconGlyphActive: {
+    color: '#ffe566',
   },
   permissionSubtitle: {
     opacity: 0.75,
@@ -279,8 +327,9 @@ const styles = StyleSheet.create({
   songLabel: {
     color: '#fff',
     flex: 1,
+    fontSize: 13,
     fontWeight: '600',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   statusMessage: {
     color: '#b8ffb8',
@@ -289,11 +338,17 @@ const styles = StyleSheet.create({
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
     left: 0,
     paddingHorizontal: 16,
     position: 'absolute',
     right: 0,
     top: 0,
+    zIndex: 30,
+  },
+  topBarLeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
 });

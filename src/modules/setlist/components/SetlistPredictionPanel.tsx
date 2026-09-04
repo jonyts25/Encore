@@ -128,6 +128,9 @@ const styles = StyleSheet.create({
   liveIcon: {
     fontSize: 22,
   },
+  lyricsButtonWrap: {
+    flex: 1,
+  },
   meta: {
     fontSize: 13,
     opacity: 0.7,

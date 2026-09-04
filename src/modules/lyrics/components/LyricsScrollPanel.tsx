@@ -11,13 +11,14 @@ import {
   normalizeSyncedLines,
 } from '../scrollLogic';
 import type { SyncedLine } from '../types';
+import { LyricsOutlineText } from './LyricsOutlineText';
 
 type LyricsScrollPanelProps = {
   plainLyrics?: string | null;
   syncedLines?: SyncedLine[] | null;
   durationSeconds?: number | null;
   compact?: boolean;
-  variant?: 'default' | 'overlay';
+  variant?: 'default' | 'overlay' | 'overlayTopFade';
   style?: ViewStyle;
   showModeLabel?: boolean;
 };
@@ -37,7 +38,8 @@ export function LyricsScrollPanel({
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
   const lineHeight = compact ? COMPACT_LINE_HEIGHT : FULL_LINE_HEIGHT;
-  const overlay = variant === 'overlay';
+  const overlayTopFade = variant === 'overlayTopFade';
+  const overlay = variant === 'overlay' || overlayTopFade;
   const compactControls = compact || overlay;
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
@@ -78,7 +80,8 @@ export function LyricsScrollPanel({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        overlay && styles.containerOverlay,
+        overlay && !overlayTopFade && styles.containerOverlay,
+        overlayTopFade && styles.containerTopFade,
         style,
       ]}>
       {showModeLabel ? (
@@ -98,18 +101,30 @@ export function LyricsScrollPanel({
         {displayLines.map((line, index) => {
           const isActive = index === activeLineIndex;
           return (
-            <View key={`${index}-${line}`} style={[styles.lineRow, isActive && (overlay ? styles.lineRowActiveOverlay : styles.lineRowActive)]}>
-              <ThemedText
-                lightColor={overlay ? '#FFFFFF' : undefined}
-                darkColor={overlay ? '#FFFFFF' : undefined}
-                style={[
-                  styles.lineText,
-                  compact && styles.lineTextCompact,
-                  overlay && styles.lineTextOverlay,
-                  isActive && styles.lineTextActive,
-                ]}>
-                {line}
-              </ThemedText>
+            <View
+              key={`${index}-${line}`}
+              style={[
+                styles.lineRow,
+                isActive && !overlayTopFade && (overlay ? styles.lineRowActiveOverlay : styles.lineRowActive),
+                isActive && overlayTopFade && styles.lineRowActiveTopFade,
+              ]}>
+              {overlayTopFade ? (
+                <LyricsOutlineText active={isActive} compact={compact}>
+                  {line}
+                </LyricsOutlineText>
+              ) : (
+                <ThemedText
+                  lightColor={overlay ? '#FFFFFF' : undefined}
+                  darkColor={overlay ? '#FFFFFF' : undefined}
+                  style={[
+                    styles.lineText,
+                    compact && styles.lineTextCompact,
+                    overlay && styles.lineTextOverlay,
+                    isActive && styles.lineTextActive,
+                  ]}>
+                  {line}
+                </ThemedText>
+              )}
             </View>
           );
         })}
@@ -177,6 +192,10 @@ const styles = StyleSheet.create({
   containerOverlay: {
     backgroundColor: 'transparent',
   },
+  containerTopFade: {
+    backgroundColor: 'transparent',
+    marginTop: 0,
+  },
   controls: {
     gap: 8,
   },
@@ -222,6 +241,9 @@ const styles = StyleSheet.create({
   },
   lineRowActiveOverlay: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  lineRowActiveTopFade: {
+    transform: [{ scale: 1.02 }],
   },
   lineText: {
     fontSize: 17,

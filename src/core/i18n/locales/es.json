@@ -133,6 +133,9 @@
     "savedToCameraRoll": "Video guardado en el carrete (solo en tu dispositivo).",
     "recordFailed": "No se pudo grabar el video.",
     "mediaPermissionDenied": "Permiso denegado para guardar en el carrete.",
-    "lyricsUnavailable": "Letra no disponible para el overlay."
+    "lyricsUnavailable": "Letra no disponible para el overlay.",
+    "flashOn": "Linterna encendida",
+    "flashOff": "Linterna apagada",
+    "flipCamera": "Cambiar cámara"
   }
 }

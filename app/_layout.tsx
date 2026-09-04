@@ -1,7 +1,9 @@
+import 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
 
 import '@/core/i18n';
@@ -37,11 +39,13 @@ export default function RootLayout() {
   }
 
   return (
-    <I18nProvider>
-      <SessionProvider>
-        <RootLayoutNav />
-      </SessionProvider>
-    </I18nProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <I18nProvider>
+        <SessionProvider>
+          <RootLayoutNav />
+        </SessionProvider>
+      </I18nProvider>
+    </GestureHandlerRootView>
   );
 }
 

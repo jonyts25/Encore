@@ -133,6 +133,9 @@
     "savedToCameraRoll": "Video saved to camera roll (device only).",
     "recordFailed": "Could not record video.",
     "mediaPermissionDenied": "Permission denied to save to camera roll.",
-    "lyricsUnavailable": "Lyrics unavailable for overlay."
+    "lyricsUnavailable": "Lyrics unavailable for overlay.",
+    "flashOn": "Flash on",
+    "flashOff": "Flash off",
+    "flipCamera": "Flip camera"
   }
 }
