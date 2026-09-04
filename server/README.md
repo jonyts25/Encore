@@ -31,6 +31,7 @@ npm start
 
 ### M3 — Events (shows)
 - `GET /api/shows/upcoming` — upcoming shows with artist + venue (public)
+- `GET /api/shows/upcoming?followed=true` — upcoming shows for followed artists only (requires auth)
 - `GET /api/shows/[id]` — show detail (public)
 - `POST /api/shows/[id]/status` — set `interesado` \| `voy` \| `fui` for authenticated user
 

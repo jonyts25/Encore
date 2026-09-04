@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 import { createSupabaseClient } from './supabase';
 import type { ShowStatus, ShowWithRelations, UserShow } from './types';
 
@@ -26,15 +28,35 @@ const SHOW_SELECT = `
   )
 `;
 
-export async function listUpcomingShows(): Promise<ShowWithRelations[]> {
-  const supabase = createSupabaseClient();
+export async function listUpcomingShows(options?: {
+  followedOnly?: boolean;
+  supabase?: SupabaseClient;
+  userId?: string;
+}): Promise<ShowWithRelations[]> {
+  const supabase = options?.supabase ?? createSupabaseClient();
   const now = new Date().toISOString();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('shows')
     .select(SHOW_SELECT)
     .gte('show_date', now)
     .order('show_date', { ascending: true });
+
+  if (options?.followedOnly && options.userId) {
+    const { data: follows, error: followError } = await supabase
+      .from('user_artists')
+      .select('artist_id')
+      .eq('user_id', options.userId);
+
+    if (followError) throw followError;
+
+    const artistIds = (follows ?? []).map((row) => row.artist_id);
+    if (artistIds.length === 0) return [];
+
+    query = query.in('artist_id', artistIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as unknown as ShowWithRelations[];

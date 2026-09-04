@@ -7,6 +7,11 @@ type UpcomingShowsResponse = {
   shows: Show[];
 };
 
+type FetchUpcomingShowsOptions = {
+  followed?: boolean;
+  accessToken?: string;
+};
+
 type ShowDetailResponse = {
   show: Show;
 };
@@ -15,8 +20,21 @@ type SetShowStatusResponse = {
   user_show: UserShow;
 };
 
-export async function fetchUpcomingShows(): Promise<Show[]> {
-  const data = await apiFetch<UpcomingShowsResponse>('/api/shows/upcoming');
+export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): Promise<Show[]> {
+  const params = new URLSearchParams();
+  if (options?.followed) {
+    params.set('followed', 'true');
+  }
+
+  const query = params.toString();
+  const path = query ? `/api/shows/upcoming?${query}` : '/api/shows/upcoming';
+  const headers: Record<string, string> = {};
+
+  if (options?.followed && options.accessToken) {
+    headers.Authorization = `Bearer ${options.accessToken}`;
+  }
+
+  const data = await apiFetch<UpcomingShowsResponse>(path, { headers });
   return data.shows;
 }
 
