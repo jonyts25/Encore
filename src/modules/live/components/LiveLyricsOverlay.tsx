@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
@@ -28,14 +27,7 @@ export function LiveLyricsOverlay({
 
   return (
     <View pointerEvents="box-none" style={[styles.container, style]}>
-      <LinearGradient
-        colors={['rgba(0,0,0,0.78)', 'rgba(0,0,0,0.42)', 'rgba(0,0,0,0)']}
-        locations={[0, 0.45, 1]}
-        pointerEvents="none"
-        style={styles.gradient}
-      />
-
-      <View pointerEvents="box-none" style={[styles.content, { paddingTop: contentTopInset }]}>
+      <View style={[styles.content, { paddingTop: contentTopInset }]}>
         {isLoading ? (
           <Text style={styles.message}>{t('common.loading')}</Text>
         ) : null}
@@ -46,9 +38,10 @@ export function LiveLyricsOverlay({
 
         {!isLoading && !isUnavailable ? (
           <LyricsScrollPanel
+            autoStart
             compact
             showModeLabel={false}
-            variant="overlayTopFade"
+            variant="overlay"
             durationSeconds={durationSeconds}
             plainLyrics={plainLyrics}
             syncedLines={syncedLines}
@@ -62,6 +55,7 @@ export function LiveLyricsOverlay({
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
     height: '40%',
     left: 0,
     position: 'absolute',
@@ -72,10 +66,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingBottom: 8,
-    paddingHorizontal: 14,
-  },
-  gradient: {
-    ...StyleSheet.absoluteFill,
+    paddingHorizontal: 12,
   },
   message: {
     color: '#fff',
@@ -83,9 +74,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingTop: 12,
     textAlign: 'center',
-    textShadowColor: '#000',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
   },
   panel: {
     flex: 1,

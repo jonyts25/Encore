@@ -1,6 +1,7 @@
+import { apiFetch } from '@/core/api/client';
 import { supabase } from '@/core/api/supabase';
 
-import type { Artist, UserArtist } from './types';
+import type { Artist, ArtistLink, UserArtist } from './types';
 
 const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
 
@@ -78,4 +79,21 @@ export async function unfollowArtist(userId: string, artistId: string): Promise<
     .eq('artist_id', artistId);
 
   if (error) throw error;
+}
+
+export async function fetchArtistLinks(artistId: string): Promise<ArtistLink[]> {
+  const { data, error } = await supabase
+    .from('artist_links')
+    .select('artist_id, platform, url, source, created_at')
+    .eq('artist_id', artistId)
+    .order('platform');
+
+  if (error) {
+    if (error.code === '42P01' || error.message.includes('does not exist')) {
+      return [];
+    }
+    throw error;
+  }
+
+  return (data ?? []) as ArtistLink[];
 }

@@ -1,9 +1,12 @@
 import { createSupabaseClient } from './supabase';
 
 const DEFAULT_SAMPLE_SIZE = 10;
+const MIN_TOUR_SHOWS = 3;
 const WILDCARD_MIN = 0.25;
 const WILDCARD_MAX = 0.85;
 const FIXED_SONG_THRESHOLD = 0.9;
+
+export type SetlistInsufficientReason = 'no_tour' | 'insufficient_tour_shows' | 'no_history';
 
 export type PredictedSong = {
   song_id: string;
@@ -22,6 +25,7 @@ export type SetlistPrediction = {
   tour_id: string | null;
   sample_size: number;
   structure: 'mostly_fixed' | 'rotating' | 'insufficient_data';
+  insufficient_reason?: SetlistInsufficientReason | null;
   songs: PredictedSong[];
   generated_at: string;
 };
@@ -57,38 +61,26 @@ export async function generateShowPrediction(
 
   const target = show as ShowRow;
 
-  let historyQuery = supabase
+  if (!target.tour_id) {
+    return finishInsufficient(supabase, target, 0, 'no_tour');
+  }
+
+  const { data: historicalShows, error: historyError } = await supabase
     .from('shows')
     .select('id, show_date')
+    .eq('tour_id', target.tour_id)
     .neq('id', target.id)
     .lt('show_date', target.show_date)
     .order('show_date', { ascending: false })
     .limit(sampleSize);
 
-  if (target.tour_id) {
-    historyQuery = historyQuery.eq('tour_id', target.tour_id);
-  } else {
-    historyQuery = historyQuery.eq('artist_id', target.artist_id);
-  }
-
-  const { data: historicalShows, error: historyError } = await historyQuery;
   if (historyError) throw historyError;
 
   const showIds = (historicalShows ?? []).map((row) => row.id as string);
   const totalShows = showIds.length;
 
-  if (totalShows === 0) {
-    const empty: SetlistPrediction = {
-      show_id: target.id,
-      artist_id: target.artist_id,
-      tour_id: target.tour_id,
-      sample_size: 0,
-      structure: 'insufficient_data',
-      songs: [],
-      generated_at: new Date().toISOString(),
-    };
-    await cachePrediction(supabase, target.id, empty, 0);
-    return empty;
+  if (totalShows < MIN_TOUR_SHOWS) {
+    return finishInsufficient(supabase, target, totalShows, 'insufficient_tour_shows');
   }
 
   const { data: showSongRows, error: songsError } = await supabase
@@ -198,6 +190,26 @@ function detectStructure(
   });
 
   return rotatingCandidates.length >= 3 ? 'rotating' : 'mostly_fixed';
+}
+
+async function finishInsufficient(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  target: ShowRow,
+  sampleSize: number,
+  reason: SetlistInsufficientReason
+): Promise<SetlistPrediction> {
+  const empty: SetlistPrediction = {
+    show_id: target.id,
+    artist_id: target.artist_id,
+    tour_id: target.tour_id,
+    sample_size: sampleSize,
+    structure: 'insufficient_data',
+    insufficient_reason: reason,
+    songs: [],
+    generated_at: new Date().toISOString(),
+  };
+  await cachePrediction(supabase, target.id, empty, 0);
+  return empty;
 }
 
 async function cachePrediction(

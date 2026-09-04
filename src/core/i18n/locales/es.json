@@ -7,6 +7,17 @@
     "tab": "Inicio",
     "title": "Encore",
     "subtitle": "Tu compañero de conciertos",
+    "guestTitle": "Inicia sesión para ver tus shows",
+    "guestSubtitle": "Marca conciertos como «Voy» o «Me interesa» y sigue artistas para recomendaciones.",
+    "goToProfile": "Ir a Perfil",
+    "sections": {
+      "going": "Mis shows",
+      "goingEmpty": "Marca «Voy» en un show para verlo aquí.",
+      "interested": "Me interesa",
+      "interestedEmpty": "Marca «Me interesa» en shows que quieras explorar.",
+      "forYou": "Para ti",
+      "forYouEmpty": "Sigue artistas en el Catálogo para ver sus shows aquí."
+    },
     "checkApi": "Probar conexión con el backend",
     "checking": "Consultando…",
     "apiOk": "Backend respondió: {{status}}",
@@ -29,7 +40,14 @@
     "follow": "Seguir",
     "unfollow": "Dejar de seguir",
     "following": "Siguiendo",
-    "followRequiresAuth": "Inicia sesión o crea una cuenta para seguir artistas."
+    "followRequiresAuth": "Inicia sesión o crea una cuenta para seguir artistas.",
+    "links": "Enlaces",
+    "upcomingShows": "Próximos shows",
+    "artistShowsYours": "Tus shows con este artista",
+    "artistShowsYoursEmpty": "Marca «Voy» o «Me interesa» en un show de este artista.",
+    "artistShowsOther": "Otros shows anunciados",
+    "artistShowsOtherEmpty": "No hay más fechas anunciadas por ahora.",
+    "artistShowsEmpty": "No hay shows próximos para este artista."
   },
   "events": {
     "tab": "Shows",
@@ -87,12 +105,14 @@
   },
   "setlist": {
     "predictionTitle": "Setlist predicho",
-    "predictionSubtitle": "Basado en shows históricos del artista.",
+    "predictionSubtitle": "Basado en shows de la misma gira.",
     "confidence": "Confianza: {{pct}}",
     "viewLyrics": "Ver letra",
     "openLive": "Modo LIVE con cámara",
     "loadError": "No se pudo cargar la predicción",
     "insufficientData": "Aún no hay suficientes setlists históricos para predecir.",
+    "insufficientTourData": "Aún no hay suficientes shows de esta gira para predecir el setlist.",
+    "noTourData": "Este show no está asociado a una gira; no podemos predecir el setlist aún.",
     "sampleSize": "{{count}} shows analizados",
     "structure": {
       "mostly_fixed": "Setlist mayormente fijo",
@@ -136,6 +156,7 @@
     "lyricsUnavailable": "Letra no disponible para el overlay.",
     "flashOn": "Linterna encendida",
     "flashOff": "Linterna apagada",
-    "flipCamera": "Cambiar cámara"
+    "flipCamera": "Cambiar cámara",
+    "flashTip": "Tip: el flash puede distraer a otros en el show 💡"
   }
 }

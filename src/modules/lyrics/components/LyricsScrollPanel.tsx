@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
@@ -11,20 +11,48 @@ import {
   normalizeSyncedLines,
 } from '../scrollLogic';
 import type { SyncedLine } from '../types';
-import { LyricsOutlineText } from './LyricsOutlineText';
 
 type LyricsScrollPanelProps = {
   plainLyrics?: string | null;
   syncedLines?: SyncedLine[] | null;
   durationSeconds?: number | null;
   compact?: boolean;
-  variant?: 'default' | 'overlay' | 'overlayTopFade';
+  variant?: 'default' | 'overlay';
+  autoStart?: boolean;
   style?: ViewStyle;
   showModeLabel?: boolean;
 };
 
-const COMPACT_LINE_HEIGHT = 28;
-const FULL_LINE_HEIGHT = 34;
+// Fallback strides until onLayout measures each row (incl. multi-line wrap).
+const SCROLL_LINE_GAP = 4;
+const OVERLAY_COMPACT_LINE_HEIGHT = 46;
+const COMPACT_LINE_HEIGHT = 38;
+const FULL_LINE_HEIGHT = 46;
+
+function scrollOffsetForLine(
+  activeIndex: number,
+  lineHeights: number[],
+  fallbackLineHeight: number,
+  pinActiveToTop: boolean
+): number {
+  if (activeIndex <= 0) return 0;
+
+  const lineStride = (index: number) => (lineHeights[index] ?? fallbackLineHeight) + SCROLL_LINE_GAP;
+
+  if (pinActiveToTop) {
+    let offset = 0;
+    for (let i = 0; i < activeIndex; i += 1) {
+      offset += lineStride(i);
+    }
+    return offset;
+  }
+
+  let offset = 0;
+  for (let i = 0; i < activeIndex - 1; i += 1) {
+    offset += lineStride(i);
+  }
+  return offset;
+}
 
 export function LyricsScrollPanel({
   plainLyrics,
@@ -32,14 +60,18 @@ export function LyricsScrollPanel({
   durationSeconds,
   compact = false,
   variant = 'default',
+  autoStart = false,
   style,
   showModeLabel = true,
 }: LyricsScrollPanelProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
-  const lineHeight = compact ? COMPACT_LINE_HEIGHT : FULL_LINE_HEIGHT;
-  const overlayTopFade = variant === 'overlayTopFade';
-  const overlay = variant === 'overlay' || overlayTopFade;
+  const lineHeightsRef = useRef<number[]>([]);
+  const activeLineIndexRef = useRef(0);
+  const overlay = variant === 'overlay';
+  const fallbackLineHeight =
+    overlay && compact ? OVERLAY_COMPACT_LINE_HEIGHT : compact ? COMPACT_LINE_HEIGHT : FULL_LINE_HEIGHT;
+  const pinActiveToTop = overlay && compact;
   const compactControls = compact || overlay;
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
@@ -59,14 +91,39 @@ export function LyricsScrollPanel({
     plainLyrics: safePlainLyrics,
     syncedLines: safeSyncedLines,
     durationSeconds: safeDurationSeconds,
+    autoStart,
   });
 
+  activeLineIndexRef.current = activeLineIndex;
+
+  const scrollToActiveLine = useCallback(
+    (index: number) => {
+      scrollRef.current?.scrollTo({
+        y: scrollOffsetForLine(index, lineHeightsRef.current, fallbackLineHeight, pinActiveToTop),
+        animated: true,
+      });
+    },
+    [fallbackLineHeight, pinActiveToTop]
+  );
+
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      y: Math.max(activeLineIndex * lineHeight - lineHeight, 0),
-      animated: true,
-    });
-  }, [activeLineIndex, lineHeight]);
+    lineHeightsRef.current = [];
+  }, [displayLines.length, safePlainLyrics, safeSyncedLines]);
+
+  useEffect(() => {
+    scrollToActiveLine(activeLineIndex);
+  }, [activeLineIndex, scrollToActiveLine]);
+
+  const handleLineLayout = useCallback(
+    (index: number, height: number) => {
+      if (lineHeightsRef.current[index] === height) return;
+      lineHeightsRef.current[index] = height;
+      if (index <= activeLineIndexRef.current) {
+        scrollToActiveLine(activeLineIndexRef.current);
+      }
+    },
+    [scrollToActiveLine]
+  );
 
   const primaryActionLabel =
     scrollMode === 'manual' && !isPlaying && activeLineIndex === 0
@@ -80,8 +137,7 @@ export function LyricsScrollPanel({
       style={[
         styles.container,
         compact && styles.containerCompact,
-        overlay && !overlayTopFade && styles.containerOverlay,
-        overlayTopFade && styles.containerTopFade,
+        overlay && styles.containerOverlay,
         style,
       ]}>
       {showModeLabel ? (
@@ -95,7 +151,7 @@ export function LyricsScrollPanel({
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, overlay && styles.scrollContentOverlay]}
         nestedScrollEnabled
         showsVerticalScrollIndicator={!compact}>
         {displayLines.map((line, index) => {
@@ -103,28 +159,26 @@ export function LyricsScrollPanel({
           return (
             <View
               key={`${index}-${line}`}
+              onLayout={(event) => {
+                handleLineLayout(index, event.nativeEvent.layout.height);
+              }}
               style={[
                 styles.lineRow,
-                isActive && !overlayTopFade && (overlay ? styles.lineRowActiveOverlay : styles.lineRowActive),
-                isActive && overlayTopFade && styles.lineRowActiveTopFade,
+                overlay && styles.lineRowOverlay,
+                isActive && (overlay ? styles.lineRowActiveOverlay : styles.lineRowActive),
               ]}>
-              {overlayTopFade ? (
-                <LyricsOutlineText active={isActive} compact={compact}>
-                  {line}
-                </LyricsOutlineText>
-              ) : (
-                <ThemedText
-                  lightColor={overlay ? '#FFFFFF' : undefined}
-                  darkColor={overlay ? '#FFFFFF' : undefined}
-                  style={[
-                    styles.lineText,
-                    compact && styles.lineTextCompact,
-                    overlay && styles.lineTextOverlay,
-                    isActive && styles.lineTextActive,
-                  ]}>
-                  {line}
-                </ThemedText>
-              )}
+              <ThemedText
+                lightColor={overlay ? '#FFFFFF' : undefined}
+                darkColor={overlay ? '#FFFFFF' : undefined}
+                style={[
+                  styles.lineText,
+                  compact && !overlay && styles.lineTextCompact,
+                  overlay && styles.lineTextOverlay,
+                  overlay && compact && styles.lineTextOverlayCompact,
+                  isActive && styles.lineTextActive,
+                ]}>
+                {line}
+              </ThemedText>
             </View>
           );
         })}
@@ -192,10 +246,6 @@ const styles = StyleSheet.create({
   containerOverlay: {
     backgroundColor: 'transparent',
   },
-  containerTopFade: {
-    backgroundColor: 'transparent',
-    marginTop: 0,
-  },
   controls: {
     gap: 8,
   },
@@ -236,14 +286,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
   },
+  lineRowOverlay: {
+    alignItems: 'center',
+  },
   lineRowActive: {
     backgroundColor: 'rgba(77, 163, 255, 0.18)',
   },
   lineRowActiveOverlay: {
     backgroundColor: 'rgba(255, 255, 255, 0.12)',
-  },
-  lineRowActiveTopFade: {
-    transform: [{ scale: 1.02 }],
   },
   lineText: {
     fontSize: 17,
@@ -252,6 +302,12 @@ const styles = StyleSheet.create({
   },
   lineTextOverlay: {
     opacity: 0.75,
+  },
+  lineTextOverlayCompact: {
+    alignSelf: 'stretch',
+    fontSize: 21,
+    lineHeight: 30,
+    textAlign: 'center',
   },
   lineTextActive: {
     fontWeight: '700',
@@ -273,7 +329,10 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   scrollContent: {
-    gap: 4,
+    gap: SCROLL_LINE_GAP,
     paddingBottom: 8,
+  },
+  scrollContentOverlay: {
+    alignItems: 'center',
   },
 });

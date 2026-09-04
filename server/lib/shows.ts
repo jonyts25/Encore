@@ -62,6 +62,107 @@ export async function listUpcomingShows(options?: {
   return (data ?? []) as unknown as ShowWithRelations[];
 }
 
+async function listShowsByIds(
+  showIds: string[],
+  supabase: SupabaseClient = createSupabaseClient()
+): Promise<ShowWithRelations[]> {
+  if (showIds.length === 0) return [];
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('shows')
+    .select(SHOW_SELECT)
+    .in('id', showIds)
+    .gte('show_date', now)
+    .order('show_date', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as ShowWithRelations[];
+}
+
+async function listUpcomingShowsForArtist(
+  artistId: string,
+  supabase: SupabaseClient = createSupabaseClient()
+): Promise<ShowWithRelations[]> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('shows')
+    .select(SHOW_SELECT)
+    .eq('artist_id', artistId)
+    .gte('show_date', now)
+    .order('show_date', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as ShowWithRelations[];
+}
+
+export type HomeShowSections = {
+  going: ShowWithRelations[];
+  interested: ShowWithRelations[];
+  forYou: ShowWithRelations[];
+};
+
+export async function getHomeShowSections(params: {
+  userId: string;
+  supabase?: SupabaseClient;
+}): Promise<HomeShowSections> {
+  const supabase = params.supabase ?? createSupabaseClient();
+
+  const { data: userShows, error: userShowsError } = await supabase
+    .from('user_shows')
+    .select('show_id, status')
+    .eq('user_id', params.userId);
+
+  if (userShowsError) throw userShowsError;
+
+  const rows = userShows ?? [];
+  const showIdsWithAnyStatus = new Set(rows.map((row) => row.show_id));
+  const goingIds = rows.filter((row) => row.status === 'voy').map((row) => row.show_id);
+  const interestedIds = rows.filter((row) => row.status === 'interesado').map((row) => row.show_id);
+
+  const [going, interested, followedShows] = await Promise.all([
+    listShowsByIds(goingIds, supabase),
+    listShowsByIds(interestedIds, supabase),
+    listUpcomingShows({ followedOnly: true, supabase, userId: params.userId }),
+  ]);
+
+  const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
+
+  return { going, interested, forYou };
+}
+
+export type ArtistShowSections = {
+  yours: ShowWithRelations[];
+  other: ShowWithRelations[];
+};
+
+export async function getArtistShowSections(params: {
+  artistId: string;
+  userId?: string | null;
+  supabase?: SupabaseClient;
+}): Promise<ArtistShowSections> {
+  const supabase = params.supabase ?? createSupabaseClient();
+  const upcomingForArtist = await listUpcomingShowsForArtist(params.artistId, supabase);
+
+  if (!params.userId) {
+    return { yours: [], other: upcomingForArtist };
+  }
+
+  const { data: userShows, error: userShowsError } = await supabase
+    .from('user_shows')
+    .select('show_id, status')
+    .eq('user_id', params.userId)
+    .in('status', ['voy', 'interesado']);
+
+  if (userShowsError) throw userShowsError;
+
+  const yoursIds = new Set((userShows ?? []).map((row) => row.show_id));
+  const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
+  const other = upcomingForArtist.filter((show) => !yoursIds.has(show.id));
+
+  return { yours, other };
+}
+
 export async function getShowById(showId: string): Promise<ShowWithRelations | null> {
   const supabase = createSupabaseClient();
 
@@ -72,7 +173,12 @@ export async function getShowById(showId: string): Promise<ShowWithRelations | n
     .maybeSingle();
 
   if (error) throw error;
-  return (data as unknown as ShowWithRelations | null) ?? null;
+  const show = (data as unknown as ShowWithRelations | null) ?? null;
+  if (!show) return null;
+
+  const { ensureVenuePhotoUrl } = await import('./venue-photos');
+  show.venue = await ensureVenuePhotoUrl(show.venue);
+  return show;
 }
 
 export async function upsertUserShowStatus(params: {

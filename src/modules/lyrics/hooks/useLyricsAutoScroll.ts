@@ -17,12 +17,14 @@ type UseLyricsAutoScrollOptions = {
   plainLyrics?: string | null;
   syncedLines?: SyncedLine[] | null;
   durationSeconds?: number | null;
+  autoStart?: boolean;
 };
 
 export function useLyricsAutoScroll({
   plainLyrics,
   syncedLines,
   durationSeconds,
+  autoStart = false,
 }: UseLyricsAutoScrollOptions) {
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
   const safeSyncedLines = normalizeSyncedLines(syncedLines);
@@ -73,6 +75,11 @@ export function useLyricsAutoScroll({
   useEffect(() => {
     reset();
   }, [safePlainLyrics, safeSyncedLines, safeDurationSeconds, reset]);
+
+  useEffect(() => {
+    if (!autoStart || displayLines.length === 0) return;
+    start();
+  }, [autoStart, displayLines.length, safePlainLyrics, safeSyncedLines, safeDurationSeconds, start]);
 
   useEffect(() => {
     if (!isPlaying || displayLines.length === 0) return undefined;

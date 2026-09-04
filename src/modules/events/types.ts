@@ -15,6 +15,7 @@ export type VenueSummary = {
   lat: number | null;
   lng: number | null;
   capacity: number | null;
+  photo_url?: string | null;
 };
 
 export type Show = {
@@ -40,4 +41,15 @@ export type UserShow = {
 
 export type ShowStatusState = {
   status: ShowStatus | null;
+};
+
+export type HomeShowSections = {
+  going: Show[];
+  interested: Show[];
+  forYou: Show[];
+};
+
+export type ArtistShowSections = {
+  yours: Show[];
+  other: Show[];
 };

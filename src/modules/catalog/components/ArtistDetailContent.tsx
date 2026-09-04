@@ -6,6 +6,8 @@ import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { getArtistById } from '../api';
 import { FollowArtistButton } from './FollowArtistButton';
+import { ArtistLinksRow } from './ArtistLinksRow';
+import { ArtistShowsSection } from './ArtistShowsSection';
 import type { Artist } from '../types';
 
 type ArtistDetailContentProps = {
@@ -76,6 +78,11 @@ export function ArtistDetailContent({ artistId }: ArtistDetailContentProps) {
         </ThemedText>
 
         <FollowArtistButton artistId={artist.id} />
+
+        <ArtistLinksRow artistId={artist.id} />
+
+        <ThemedText style={styles.sectionLabel}>{t('catalog.upcomingShows')}</ThemedText>
+        <ArtistShowsSection artistId={artist.id} />
       </ThemedView>
     </ScrollView>
   );

@@ -7,6 +7,17 @@
     "tab": "Home",
     "title": "Encore",
     "subtitle": "Your concert companion",
+    "guestTitle": "Sign in to see your shows",
+    "guestSubtitle": "Mark concerts as Going or Interested and follow artists for recommendations.",
+    "goToProfile": "Go to Profile",
+    "sections": {
+      "going": "My shows",
+      "goingEmpty": "Mark Going on a show to see it here.",
+      "interested": "Interested",
+      "interestedEmpty": "Mark Interested on shows you want to explore.",
+      "forYou": "For you",
+      "forYouEmpty": "Follow artists in Catalog to see their shows here."
+    },
     "checkApi": "Test backend connection",
     "checking": "Checking…",
     "apiOk": "Backend responded: {{status}}",
@@ -29,7 +40,14 @@
     "follow": "Follow",
     "unfollow": "Unfollow",
     "following": "Following",
-    "followRequiresAuth": "Sign in or create an account to follow artists."
+    "followRequiresAuth": "Sign in or create an account to follow artists.",
+    "links": "Links",
+    "upcomingShows": "Upcoming shows",
+    "artistShowsYours": "Your shows with this artist",
+    "artistShowsYoursEmpty": "Mark Going or Interested on a show by this artist.",
+    "artistShowsOther": "Other announced shows",
+    "artistShowsOtherEmpty": "No other announced dates for now.",
+    "artistShowsEmpty": "No upcoming shows for this artist."
   },
   "events": {
     "tab": "Shows",
@@ -87,12 +105,14 @@
   },
   "setlist": {
     "predictionTitle": "Predicted setlist",
-    "predictionSubtitle": "Based on the artist's historical shows.",
+    "predictionSubtitle": "Based on shows from the same tour.",
     "confidence": "Confidence: {{pct}}",
     "viewLyrics": "View lyrics",
     "openLive": "LIVE mode with camera",
     "loadError": "Could not load prediction",
     "insufficientData": "Not enough historical setlists to predict yet.",
+    "insufficientTourData": "Not enough shows from this tour to predict the setlist yet.",
+    "noTourData": "This show is not linked to a tour; we cannot predict the setlist yet.",
     "sampleSize": "{{count}} shows analyzed",
     "structure": {
       "mostly_fixed": "Mostly fixed setlist",
@@ -136,6 +156,7 @@
     "lyricsUnavailable": "Lyrics unavailable for overlay.",
     "flashOn": "Flash on",
     "flashOff": "Flash off",
-    "flipCamera": "Flip camera"
+    "flipCamera": "Flip camera",
+    "flashTip": "Tip: the flash can distract others at the show 💡"
   }
 }

@@ -17,6 +17,7 @@ export type VenueSummary = {
   lat: number | null;
   lng: number | null;
   capacity: number | null;
+  photo_url?: string | null;
 };
 
 export type ShowWithRelations = {

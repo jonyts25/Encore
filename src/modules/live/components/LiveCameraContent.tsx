@@ -3,14 +3,12 @@ import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText } from '@/core/ui/Themed';
 import { useLyrics } from '@/modules/lyrics';
 
-import { usePinchZoom } from '../hooks/usePinchZoom';
 import { LiveLyricsOverlay } from './LiveLyricsOverlay';
 
 type LiveCameraContentProps = {
@@ -32,7 +30,8 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
 
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [torchOn, setTorchOn] = useState(false);
-  const { zoom, pinchGesture } = usePinchZoom();
+  const [flashTip, setFlashTip] = useState<string | null>(null);
+  const flashTipShownRef = useRef(false);
 
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,6 +70,27 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
       setTorchOn(false);
     }
   }, [facing]);
+
+  useEffect(() => {
+    if (!flashTip) return undefined;
+    const timeoutId = setTimeout(() => {
+      setFlashTip(null);
+    }, 4500);
+    return () => clearTimeout(timeoutId);
+  }, [flashTip]);
+
+  const handleToggleTorch = () => {
+    if (facing === 'front') return;
+
+    setTorchOn((current) => {
+      const next = !current;
+      if (next && !flashTipShownRef.current) {
+        flashTipShownRef.current = true;
+        setFlashTip(t('live.flashTip'));
+      }
+      return next;
+    });
+  };
 
   const permissionsGranted = Boolean(cameraPermission?.granted && micPermission?.granted);
   const lyricsUnavailable = Boolean(lyricsError || notFound || !lyrics);
@@ -146,16 +166,13 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
 
   return (
     <View style={styles.root}>
-      <GestureDetector gesture={pinchGesture}>
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          mode="video"
-          facing={facing}
-          zoom={zoom}
-          enableTorch={facing === 'back' && torchOn}
-        />
-      </GestureDetector>
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        mode="video"
+        facing={facing}
+        enableTorch={facing === 'back' && torchOn}
+      />
 
       <LiveLyricsOverlay
         contentTopInset={headerOffset}
@@ -167,11 +184,21 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
       />
 
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.topBarLeading}>
-          <Pressable onPress={() => router.back()} style={styles.iconButton}>
-            <Text style={styles.iconButtonText}>{t('live.back')}</Text>
-          </Pressable>
+        <Pressable onPress={() => router.back()} style={styles.iconButton}>
+          <Text style={styles.iconButtonText}>{t('live.back')}</Text>
+        </Pressable>
 
+        <Text style={styles.songLabel} numberOfLines={1}>
+          {title} · {artist}
+        </Text>
+      </View>
+
+      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
+        {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+        {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
+        {flashTip ? <Text style={styles.flashTip}>{flashTip}</Text> : null}
+
+        <View style={styles.bottomControlRow}>
           <Pressable
             accessibilityLabel={t('live.flipCamera')}
             accessibilityRole="button"
@@ -182,42 +209,32 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
             style={[styles.iconButton, styles.iconButtonRound, isRecording && styles.iconButtonDisabled]}>
             <Text style={styles.iconGlyph}>⟲</Text>
           </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={isSaving}
+            onPress={() => {
+              void handleToggleRecording();
+            }}
+            style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
+            <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
+            accessibilityRole="button"
+            disabled={facing === 'front'}
+            onPress={handleToggleTorch}
+            style={[
+              styles.iconButton,
+              styles.iconButtonRound,
+              torchOn && styles.iconButtonActive,
+              facing === 'front' && styles.iconButtonDisabled,
+            ]}>
+            <Text style={[styles.iconGlyph, torchOn && styles.iconGlyphActive]}>⚡</Text>
+          </Pressable>
         </View>
 
-        <Text style={styles.songLabel} numberOfLines={1}>
-          {title} · {artist}
-        </Text>
-
-        <Pressable
-          accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
-          accessibilityRole="button"
-          disabled={facing === 'front'}
-          onPress={() => {
-            setTorchOn((current) => !current);
-          }}
-          style={[
-            styles.iconButton,
-            styles.iconButtonRound,
-            torchOn && styles.iconButtonActive,
-            facing === 'front' && styles.iconButtonDisabled,
-          ]}>
-          <Text style={[styles.iconGlyph, torchOn && styles.iconGlyphActive]}>⚡</Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
-        {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
-        {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={isSaving}
-          onPress={() => {
-            void handleToggleRecording();
-          }}
-          style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
-          <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
-        </Pressable>
         <Text style={styles.recordLabel}>
           {isSaving
             ? t('live.saving')
@@ -231,6 +248,12 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
 }
 
 const styles = StyleSheet.create({
+  bottomControlRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 36,
+    justifyContent: 'center',
+  },
   bottomControls: {
     alignItems: 'center',
     bottom: 0,
@@ -251,6 +274,17 @@ const styles = StyleSheet.create({
     color: '#ffb4b4',
     textAlign: 'center',
   },
+  flashTip: {
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    borderRadius: 10,
+    color: '#fff6cc',
+    fontSize: 13,
+    lineHeight: 18,
+    maxWidth: 320,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    textAlign: 'center',
+  },
   iconButton: {
     backgroundColor: 'rgba(0,0,0,0.45)',
     borderRadius: 999,
@@ -265,10 +299,10 @@ const styles = StyleSheet.create({
   },
   iconButtonRound: {
     alignItems: 'center',
-    height: 40,
+    height: 48,
     justifyContent: 'center',
     paddingHorizontal: 0,
-    width: 40,
+    width: 48,
   },
   iconButtonText: {
     color: '#fff',
@@ -329,7 +363,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    textAlign: 'center',
+    textAlign: 'right',
   },
   statusMessage: {
     color: '#b8ffb8',
@@ -338,17 +372,12 @@ const styles = StyleSheet.create({
   topBar: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     left: 0,
     paddingHorizontal: 16,
     position: 'absolute',
     right: 0,
     top: 0,
     zIndex: 30,
-  },
-  topBarLeading: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 8,
   },
 });

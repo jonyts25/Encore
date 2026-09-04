@@ -4,6 +4,7 @@ import {
   getSetlistFmProvider,
   parseSetlistFmEventDate,
   resolveArtistMbid,
+  type SetlistFmProvider,
   type SetlistFmSetlist,
 } from './providers/setlistfm';
 
@@ -26,6 +27,7 @@ export type SetlistIngestResult = {
   pages_fetched: number;
   setlists_processed: number;
   shows_upserted: number;
+  shows_with_tour: number;
   songs_upserted: number;
   show_songs_inserted: number;
   skipped: number;
@@ -79,14 +81,16 @@ export async function ingestArtistSetlists(
   const pagesFetched = limitedSetlists.length === 0 ? 0 : page;
 
   let showsUpserted = 0;
+  let showsWithTour = 0;
   let songsUpserted = 0;
   let showSongsInserted = 0;
   let skipped = 0;
 
   for (const setlist of limitedSetlists) {
     try {
-      const stats = await persistSetlist(supabase, artistRow.id, setlist);
+      const stats = await persistSetlist(supabase, artistRow.id, setlist, provider);
       showsUpserted += stats.showUpserted ? 1 : 0;
+      showsWithTour += stats.tourLinked ? 1 : 0;
       songsUpserted += stats.songsUpserted;
       showSongsInserted += stats.showSongsInserted;
     } catch {
@@ -102,6 +106,7 @@ export async function ingestArtistSetlists(
     pages_fetched: pagesFetched,
     setlists_processed: limitedSetlists.length,
     shows_upserted: showsUpserted,
+    shows_with_tour: showsWithTour,
     songs_upserted: songsUpserted,
     show_songs_inserted: showSongsInserted,
     skipped,
@@ -113,10 +118,12 @@ type SupabaseAdmin = ReturnType<typeof createSupabaseAdminClient>;
 async function persistSetlist(
   supabase: SupabaseAdmin,
   artistId: string,
-  setlist: SetlistFmSetlist
+  setlist: SetlistFmSetlist,
+  provider: SetlistFmProvider
 ) {
+  const tourName = await resolveTourName(setlist, provider);
   const venueId = await upsertVenue(supabase, setlist);
-  const tourId = await upsertTour(supabase, artistId, setlist.tour?.name ?? null);
+  const tourId = await upsertTour(supabase, artistId, tourName, setlist.eventDate);
   const showDate = parseSetlistFmEventDate(setlist.eventDate);
   const showId = await upsertShow(supabase, {
     artistId,
@@ -128,7 +135,12 @@ async function persistSetlist(
 
   const parsedSongs = flattenSetlistSongs(setlist);
   if (parsedSongs.length === 0) {
-    return { showUpserted: Boolean(showId), songsUpserted: 0, showSongsInserted: 0 };
+    return {
+      showUpserted: Boolean(showId),
+      tourLinked: Boolean(tourId),
+      songsUpserted: 0,
+      showSongsInserted: 0,
+    };
   }
 
   await supabase.from('show_songs').delete().eq('show_id', showId);
@@ -152,7 +164,19 @@ async function persistSetlist(
     showSongsInserted += 1;
   }
 
-  return { showUpserted: true, songsUpserted, showSongsInserted };
+  return { showUpserted: true, tourLinked: Boolean(tourId), songsUpserted, showSongsInserted };
+}
+
+async function resolveTourName(
+  setlist: SetlistFmSetlist,
+  provider: SetlistFmProvider
+): Promise<string | null> {
+  const fromList = setlist.tour?.name?.trim();
+  if (fromList) return fromList;
+
+  // Artist setlist pages often omit `tour`; fetch the full setlist when needed.
+  const full = await provider.getSetlist(setlist.id);
+  return full.tour?.name?.trim() || null;
 }
 
 async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): Promise<string> {
@@ -194,12 +218,15 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
 async function upsertTour(
   supabase: SupabaseAdmin,
   artistId: string,
-  tourName: string | null
+  tourName: string | null,
+  eventDate: string
 ): Promise<string | null> {
-  if (!tourName?.trim()) return null;
+  if (!tourName) return null;
 
-  const name = tourName.trim();
-  const year = new Date().getUTCFullYear();
+  const name = tourName;
+  const [, month, year] = eventDate.split('-').map(Number);
+  const tourYear = year || new Date().getUTCFullYear();
+  void month;
 
   const { data: existing, error: findError } = await supabase
     .from('tours')
@@ -216,7 +243,7 @@ async function upsertTour(
     .insert({
       artist_id: artistId,
       name,
-      year,
+      year: tourYear,
       start_date: null,
       end_date: null,
     })

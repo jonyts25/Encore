@@ -5,7 +5,7 @@ import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useShowPrediction } from '../hooks/useShowPrediction';
-import type { PredictedSong } from '../types';
+import type { PredictedSong, SetlistInsufficientReason } from '../types';
 
 type SetlistPredictionPanelProps = {
   showId: string;
@@ -18,6 +18,12 @@ function formatConfidence(confidence: number): string {
 
 function sortByConfidence(songs: PredictedSong[]): PredictedSong[] {
   return [...songs].sort((a, b) => b.confidence - a.confidence);
+}
+
+function insufficientMessageKey(reason?: SetlistInsufficientReason | null): string {
+  if (reason === 'insufficient_tour_shows') return 'setlist.insufficientTourData';
+  if (reason === 'no_tour') return 'setlist.noTourData';
+  return 'setlist.insufficientData';
 }
 
 export function SetlistPredictionPanel({ showId, artistName }: SetlistPredictionPanelProps) {
@@ -49,7 +55,9 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
       {!isLoading && error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
 
       {!isLoading && !error && prediction?.structure === 'insufficient_data' ? (
-        <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
+        <ThemedText style={styles.empty}>
+          {t(insufficientMessageKey(prediction.insufficient_reason))}
+        </ThemedText>
       ) : null}
 
       {!isLoading && !error && prediction && prediction.songs.length > 0 ? (

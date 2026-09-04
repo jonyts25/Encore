@@ -36,8 +36,18 @@ npm start
 - `POST /api/shows/[id]/status` — set `interesado` \| `voy` \| `fui` for authenticated user
 
 ### M4 — Setlist Intelligence
+
 - `POST /api/admin/setlist-ingest/[artistId]` — ingest historical setlists from setlist.fm (admin)
+  - Extracts `tour.name` from each setlist.fm record when present
+  - If the artist setlist list omits `tour`, fetches the full setlist detail before persisting
+  - Upserts `tours (artist_id, name)` and assigns `shows.tour_id` (null when setlist has no tour)
+  - Response includes `shows_with_tour` — how many ingested shows were linked to a tour
 - `GET /api/shows/[id]/prediction` — predicted setlist with per-song confidence (public)
+  - **Tour-strict:** sample is only prior shows with the same `tour_id` as the target show
+  - Requires at least **3** past shows on that tour; never falls back to other tours or artist-wide history
+  - Returns `structure: "insufficient_data"` with `insufficient_reason`:
+    - `no_tour` — target show has no `tour_id`
+    - `insufficient_tour_shows` — same tour but fewer than 3 prior shows ingested
 
 ### M5 — Lyrics (basic)
 - `GET /api/lyrics/search?artist=X&title=Y` — proxy to LRCLIB (never stored in Supabase)

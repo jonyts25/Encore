@@ -11,12 +11,15 @@ export type PredictedSong = {
 
 export type SetlistPredictionStructure = 'mostly_fixed' | 'rotating' | 'insufficient_data';
 
+export type SetlistInsufficientReason = 'no_tour' | 'insufficient_tour_shows' | 'no_history';
+
 export type SetlistPrediction = {
   show_id: string;
   artist_id: string;
   tour_id: string | null;
   sample_size: number;
   structure: SetlistPredictionStructure;
+  insufficient_reason?: SetlistInsufficientReason | null;
   songs: PredictedSong[];
   generated_at: string;
 };

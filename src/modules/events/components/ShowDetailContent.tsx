@@ -70,6 +70,10 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           </ThemedView>
         )}
 
+        {show.venue.photo_url ? (
+          <Image source={{ uri: show.venue.photo_url }} style={styles.venueImage} />
+        ) : null}
+
         <ThemedText style={styles.artist}>{show.artist.name}</ThemedText>
         <ThemedText style={styles.venue}>{formatShowVenueLine(show.venue)}</ThemedText>
         <ThemedText style={styles.date}>{formatShowDate(show.show_date, i18n.language)}</ThemedText>
@@ -150,5 +154,11 @@ const styles = StyleSheet.create({
   venue: {
     fontSize: 18,
     opacity: 0.8,
+  },
+  venueImage: {
+    borderRadius: 12,
+    height: 160,
+    marginBottom: 8,
+    width: '100%',
   },
 });
