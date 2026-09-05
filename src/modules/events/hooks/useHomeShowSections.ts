@@ -12,6 +12,7 @@ const EMPTY_SECTIONS: HomeShowSections = {
   going: [],
   interested: [],
   forYou: [],
+  attended: [],
 };
 
 export function useHomeShowSections(options: UseHomeShowSectionsOptions = {}) {

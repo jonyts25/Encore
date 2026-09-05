@@ -82,6 +82,11 @@ export function HomeShowsContent() {
               shows={sections.forYou}
               emptyMessage={t('home.sections.forYouEmpty')}
             />
+            <ShowSection
+              title={t('home.sections.attended')}
+              shows={sections.attended}
+              emptyMessage={t('home.sections.attendedEmpty')}
+            />
           </>
         ) : null}
       </ThemedView>

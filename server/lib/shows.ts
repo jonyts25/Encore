@@ -64,17 +64,21 @@ export async function listUpcomingShows(options?: {
 
 async function listShowsByIds(
   showIds: string[],
-  supabase: SupabaseClient = createSupabaseClient()
+  supabase: SupabaseClient = createSupabaseClient(),
+  options?: { upcomingOnly?: boolean }
 ): Promise<ShowWithRelations[]> {
   if (showIds.length === 0) return [];
 
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('shows')
-    .select(SHOW_SELECT)
-    .in('id', showIds)
-    .gte('show_date', now)
-    .order('show_date', { ascending: true });
+  let query = supabase.from('shows').select(SHOW_SELECT).in('id', showIds);
+
+  if (options?.upcomingOnly !== false) {
+    const now = new Date().toISOString();
+    query = query.gte('show_date', now).order('show_date', { ascending: true });
+  } else {
+    query = query.order('show_date', { ascending: false });
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as unknown as ShowWithRelations[];
@@ -100,6 +104,7 @@ export type HomeShowSections = {
   going: ShowWithRelations[];
   interested: ShowWithRelations[];
   forYou: ShowWithRelations[];
+  attended: ShowWithRelations[];
 };
 
 export async function getHomeShowSections(params: {
@@ -119,21 +124,24 @@ export async function getHomeShowSections(params: {
   const showIdsWithAnyStatus = new Set(rows.map((row) => row.show_id));
   const goingIds = rows.filter((row) => row.status === 'voy').map((row) => row.show_id);
   const interestedIds = rows.filter((row) => row.status === 'interesado').map((row) => row.show_id);
+  const attendedIds = rows.filter((row) => row.status === 'fui').map((row) => row.show_id);
 
-  const [going, interested, followedShows] = await Promise.all([
+  const [going, interested, attended, followedShows] = await Promise.all([
     listShowsByIds(goingIds, supabase),
     listShowsByIds(interestedIds, supabase),
+    listShowsByIds(attendedIds, supabase, { upcomingOnly: false }),
     listUpcomingShows({ followedOnly: true, supabase, userId: params.userId }),
   ]);
 
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
 
-  return { going, interested, forYou };
+  return { going, interested, forYou, attended };
 }
 
 export type ArtistShowSections = {
   yours: ShowWithRelations[];
   other: ShowWithRelations[];
+  attended: ShowWithRelations[];
 };
 
 export async function getArtistShowSections(params: {
@@ -145,22 +153,30 @@ export async function getArtistShowSections(params: {
   const upcomingForArtist = await listUpcomingShowsForArtist(params.artistId, supabase);
 
   if (!params.userId) {
-    return { yours: [], other: upcomingForArtist };
+    return { yours: [], other: upcomingForArtist, attended: [] };
   }
 
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
     .eq('user_id', params.userId)
-    .in('status', ['voy', 'interesado']);
+    .in('status', ['voy', 'interesado', 'fui']);
 
   if (userShowsError) throw userShowsError;
 
-  const yoursIds = new Set((userShows ?? []).map((row) => row.show_id));
+  const activeRows = (userShows ?? []).filter((row) => row.status !== 'fui');
+  const attendedIds = (userShows ?? [])
+    .filter((row) => row.status === 'fui')
+    .map((row) => row.show_id);
+
+  const yoursIds = new Set(activeRows.map((row) => row.show_id));
   const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
   const other = upcomingForArtist.filter((show) => !yoursIds.has(show.id));
 
-  return { yours, other };
+  const attendedShows = await listShowsByIds(attendedIds, supabase, { upcomingOnly: false });
+  const attended = attendedShows.filter((show) => show.artist_id === params.artistId);
+
+  return { yours, other, attended };
 }
 
 export async function getShowById(showId: string): Promise<ShowWithRelations | null> {

@@ -20,6 +20,7 @@ export async function GET(request: Request, context: RouteContext) {
     return jsonOk({
       yours: sections.yours,
       other: sections.other,
+      attended: sections.attended,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load artist shows';

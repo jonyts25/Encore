@@ -33,8 +33,9 @@ npm start
 - `GET /api/artists/search?q={name}` — local artist search; if empty, resolves via MusicBrainz when confidence is high, otherwise returns ambiguous candidates
 - `POST /api/artists/resolve-confirm` — body `{ "mbid": "..." }` persists the user-selected MusicBrainz artist (links + optional Apple Music photo)
 
+- `POST /api/admin/artists/enrich-backfill` — backfill missing artist photos (Apple Music) and links (MusicBrainz) for existing catalog rows
+
 ### M3 — Events (shows)
-- `GET /api/shows/upcoming` — upcoming shows with artist + venue (public)
 - `GET /api/shows/upcoming?followed=true` — upcoming shows for followed artists only (requires auth)
 - `GET /api/shows/[id]` — show detail (public)
 - `POST /api/shows/[id]/status` — set `interesado` \| `voy` \| `fui` for authenticated user

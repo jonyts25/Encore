@@ -12,6 +12,7 @@ type UseArtistShowSectionsOptions = {
 const EMPTY_SECTIONS: ArtistShowSections = {
   yours: [],
   other: [],
+  attended: [],
 };
 
 export function useArtistShowSections(options: UseArtistShowSectionsOptions) {

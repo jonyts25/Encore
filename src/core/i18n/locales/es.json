@@ -17,7 +17,9 @@
       "interested": "Me interesa",
       "interestedEmpty": "Marca «Me interesa» en shows que quieras explorar.",
       "forYou": "Para ti",
-      "forYouEmpty": "Sigue artistas en el Catálogo para ver sus shows aquí."
+      "forYouEmpty": "Sigue artistas en el Catálogo para ver sus shows aquí.",
+      "attended": "Historial",
+      "attendedEmpty": "Shows que marcaste como «Fui» aparecerán aquí."
     },
     "checkApi": "Probar conexión con el backend",
     "checking": "Consultando…",
@@ -61,6 +63,8 @@
     "artistShowsYoursEmpty": "Marca «Voy» o «Me interesa» en un show de este artista.",
     "artistShowsOther": "Otros shows anunciados",
     "artistShowsOtherEmpty": "No hay más fechas anunciadas por ahora.",
+    "artistShowsAttended": "Ya fui",
+    "artistShowsAttendedEmpty": "Marca «Fui» en un show de este artista para verlo aquí.",
     "artistShowsEmpty": "No hay shows próximos para este artista."
   },
   "events": {

@@ -47,9 +47,11 @@ export type HomeShowSections = {
   going: Show[];
   interested: Show[];
   forYou: Show[];
+  attended: Show[];
 };
 
 export type ArtistShowSections = {
   yours: Show[];
   other: Show[];
+  attended: Show[];
 };

@@ -160,18 +160,10 @@ export async function unfollowArtist(userId: string, artistId: string): Promise<
 }
 
 export async function fetchArtistLinks(artistId: string): Promise<ArtistLink[]> {
-  const { data, error } = await supabase
-    .from('artist_links')
-    .select('artist_id, platform, url, source, created_at')
-    .eq('artist_id', artistId)
-    .order('platform');
-
-  if (error) {
-    if (error.code === '42P01' || error.message.includes('does not exist')) {
-      return [];
-    }
-    throw error;
+  try {
+    const data = await apiFetch<{ links: ArtistLink[] }>(`/api/artists/${artistId}/links`);
+    return data.links ?? [];
+  } catch {
+    return [];
   }
-
-  return (data ?? []) as ArtistLink[];
 }

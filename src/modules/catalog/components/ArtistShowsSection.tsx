@@ -33,8 +33,9 @@ export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
 
   const hasYours = !isGuest && sections.yours.length > 0;
   const hasOther = sections.other.length > 0;
+  const hasAttended = !isGuest && sections.attended.length > 0;
 
-  if (!hasYours && !hasOther) {
+  if (!hasYours && !hasOther && !hasAttended) {
     return <ThemedText style={styles.empty}>{t('catalog.artistShowsEmpty')}</ThemedText>;
   }
 
@@ -52,6 +53,13 @@ export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
         shows={sections.other}
         emptyMessage={t('catalog.artistShowsOtherEmpty')}
       />
+      {!isGuest ? (
+        <ShowSection
+          title={t('catalog.artistShowsAttended')}
+          shows={sections.attended}
+          emptyMessage={t('catalog.artistShowsAttendedEmpty')}
+        />
+      ) : null}
     </ThemedView>
   );
 }

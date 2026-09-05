@@ -17,7 +17,9 @@
       "interested": "Interested",
       "interestedEmpty": "Mark Interested on shows you want to explore.",
       "forYou": "For you",
-      "forYouEmpty": "Follow artists in Catalog to see their shows here."
+      "forYouEmpty": "Follow artists in Catalog to see their shows here.",
+      "attended": "History",
+      "attendedEmpty": "Shows you marked as Went will appear here."
     },
     "checkApi": "Test backend connection",
     "checking": "Checking…",
@@ -61,6 +63,8 @@
     "artistShowsYoursEmpty": "Mark Going or Interested on a show by this artist.",
     "artistShowsOther": "Other announced shows",
     "artistShowsOtherEmpty": "No other announced dates for now.",
+    "artistShowsAttended": "Already went",
+    "artistShowsAttendedEmpty": "Mark Went on a show by this artist to see it here.",
     "artistShowsEmpty": "No upcoming shows for this artist."
   },
   "events": {

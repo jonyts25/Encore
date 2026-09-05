@@ -45,16 +45,22 @@ const SHOW_SELECT = `
   )
 `;
 
-async function listShowsByIdsFromSupabase(showIds: string[]): Promise<Show[]> {
+async function listShowsByIdsFromSupabase(
+  showIds: string[],
+  options?: { upcomingOnly?: boolean }
+): Promise<Show[]> {
   if (showIds.length === 0) return [];
 
-  const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('shows')
-    .select(SHOW_SELECT)
-    .in('id', showIds)
-    .gte('show_date', now)
-    .order('show_date', { ascending: true });
+  let query = supabase.from('shows').select(SHOW_SELECT).in('id', showIds);
+
+  if (options?.upcomingOnly !== false) {
+    const now = new Date().toISOString();
+    query = query.gte('show_date', now).order('show_date', { ascending: true });
+  } else {
+    query = query.order('show_date', { ascending: false });
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as Show[];
@@ -114,16 +120,18 @@ export async function fetchHomeShowSections(accessToken: string): Promise<HomeSh
   const interestedIds = rows
     .filter((row) => row.status === 'interesado')
     .map((row) => row.show_id);
+  const attendedIds = rows.filter((row) => row.status === 'fui').map((row) => row.show_id);
 
-  const [going, interested, followedShows] = await Promise.all([
+  const [going, interested, attended, followedShows] = await Promise.all([
     listShowsByIdsFromSupabase(goingIds),
     listShowsByIdsFromSupabase(interestedIds),
+    listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false }),
     fetchUpcomingShows({ followed: true, accessToken }),
   ]);
 
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
 
-  return { going, interested, forYou };
+  return { going, interested, forYou, attended };
 }
 
 export async function fetchArtistShowSections(
@@ -137,22 +145,30 @@ export async function fetchArtistShowSections(
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return { yours: [], other: upcomingForArtist };
+    return { yours: [], other: upcomingForArtist, attended: [] };
   }
 
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
     .eq('user_id', user.id)
-    .in('status', ['voy', 'interesado']);
+    .in('status', ['voy', 'interesado', 'fui']);
 
   if (userShowsError) throw userShowsError;
 
-  const yoursIds = new Set((userShows ?? []).map((row) => row.show_id));
+  const activeRows = (userShows ?? []).filter((row) => row.status !== 'fui');
+  const attendedIds = (userShows ?? [])
+    .filter((row) => row.status === 'fui')
+    .map((row) => row.show_id);
+
+  const yoursIds = new Set(activeRows.map((row) => row.show_id));
   const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
   const other = upcomingForArtist.filter((show) => !yoursIds.has(show.id));
 
-  return { yours, other };
+  const attendedShows = await listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false });
+  const attended = attendedShows.filter((show) => show.artist_id === artistId);
+
+  return { yours, other, attended };
 }
 
 export async function fetchShowById(showId: string): Promise<Show | null> {
