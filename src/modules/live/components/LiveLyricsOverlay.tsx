@@ -4,6 +4,8 @@ import { useTranslation } from '@/core/i18n';
 import { LyricsScrollPanel } from '@/modules/lyrics';
 import type { SyncedLine } from '@/modules/lyrics';
 
+import type { LiveLayoutMode } from '../types';
+
 type LiveLyricsOverlayProps = {
   contentTopInset: number;
   isLoading: boolean;
@@ -11,6 +13,7 @@ type LiveLyricsOverlayProps = {
   plainLyrics?: string;
   syncedLines?: SyncedLine[] | null;
   durationSeconds?: number | null;
+  layout?: LiveLayoutMode;
   style?: ViewStyle;
 };
 
@@ -21,13 +24,21 @@ export function LiveLyricsOverlay({
   plainLyrics,
   syncedLines,
   durationSeconds,
+  layout = 'overlay',
   style,
 }: LiveLyricsOverlayProps) {
   const { t } = useTranslation();
 
+  const containerStyle =
+    layout === 'split'
+      ? styles.splitContainer
+      : layout === 'floating'
+        ? styles.floatingContainer
+        : styles.overlayContainer;
+
   return (
-    <View pointerEvents="box-none" style={[styles.container, style]}>
-      <View style={[styles.content, { paddingTop: contentTopInset }]}>
+    <View pointerEvents="box-none" style={[containerStyle, style]}>
+      <View style={[styles.content, layout === 'overlay' && { paddingTop: contentTopInset }]}>
         {isLoading ? (
           <Text style={styles.message}>{t('common.loading')}</Text>
         ) : null}
@@ -54,19 +65,14 @@ export function LiveLyricsOverlay({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
-    height: '40%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    zIndex: 10,
-  },
   content: {
     flex: 1,
     paddingBottom: 8,
     paddingHorizontal: 12,
+  },
+  floatingContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    flex: 1,
   },
   message: {
     color: '#fff',
@@ -75,7 +81,20 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     textAlign: 'center',
   },
+  overlayContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
+    height: '40%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 10,
+  },
   panel: {
+    flex: 1,
+  },
+  splitContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.88)',
     flex: 1,
   },
 });

@@ -7,6 +7,7 @@ import { useSession } from '@/modules/identity';
 
 import { useHomeShowSections } from '../hooks/useHomeShowSections';
 import { ShowSection } from './ShowSection';
+import { getTodayGoingShow, TodayShowCta } from './TodayShowCta';
 
 export function HomeShowsContent() {
   const { t } = useTranslation();
@@ -42,11 +43,15 @@ export function HomeShowsContent() {
     );
   }
 
+  const todayShow = getTodayGoingShow(sections.going);
+
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
       <ThemedView style={styles.container}>
         <ThemedText style={styles.title}>{t('home.title')}</ThemedText>
         <ThemedText style={styles.subtitle}>{t('home.subtitle')}</ThemedText>
+
+        {!isLoading && !error && todayShow ? <TodayShowCta show={todayShow} /> : null}
 
         {isLoading ? (
           <ThemedView style={styles.centered}>

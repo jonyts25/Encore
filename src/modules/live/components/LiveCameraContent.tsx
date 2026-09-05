@@ -1,24 +1,35 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText } from '@/core/ui/Themed';
 import { useLyrics } from '@/modules/lyrics';
+import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 
+import type { LiveFloatingHeight, LiveLayoutMode, LiveZoomPreset } from '../types';
+import { LiveFloatingLyrics } from './LiveFloatingLyrics';
+import { LiveLayoutMenu } from './LiveLayoutMenu';
 import { LiveLyricsOverlay } from './LiveLyricsOverlay';
+import { LiveSongPickerModal } from './LiveSongPickerModal';
+import { LiveZoomChips, zoomPresetToValue } from './LiveZoomChips';
 
 type LiveCameraContentProps = {
   artist: string;
   title: string;
+  showId?: string;
 };
 
 const TOP_BAR_CONTENT_HEIGHT = 44;
 
-export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
+function sortSongsForPicker<T extends { title: string; confidence: number | null }>(songs: T[]) {
+  return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+}
+
+export function LiveCameraContent({ artist, title, showId }: LiveCameraContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -33,12 +44,41 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
   const [flashTip, setFlashTip] = useState<string | null>(null);
   const flashTipShownRef = useRef(false);
 
+  const [zoomPreset, setZoomPreset] = useState<LiveZoomPreset>(1);
+  const [layoutMode, setLayoutMode] = useState<LiveLayoutMode>('overlay');
+  const [lyricsVisible, setLyricsVisible] = useState(true);
+  const [floatingHeight, setFloatingHeight] = useState<LiveFloatingHeight>(200);
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const [songPickerOpen, setSongPickerOpen] = useState(false);
+
+  const [activeTitle, setActiveTitle] = useState(title);
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const { lyrics, isLoading: lyricsLoading, error: lyricsError, notFound } = useLyrics(artist, title);
+  const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
+  const pickerSongs = useMemo(
+    () => sortSongsForPicker(prediction?.songs ?? []),
+    [prediction?.songs]
+  );
+
+  useEffect(() => {
+    if (title.trim()) {
+      setActiveTitle(title);
+    }
+  }, [title]);
+
+  useEffect(() => {
+    if (!title.trim() && pickerSongs[0]?.title) {
+      setActiveTitle(pickerSongs[0].title);
+    }
+  }, [title, pickerSongs]);
+
+  const { lyrics, isLoading: lyricsLoading, error: lyricsError, notFound } = useLyrics(
+    artist,
+    activeTitle
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -95,6 +135,15 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
   const permissionsGranted = Boolean(cameraPermission?.granted && micPermission?.granted);
   const lyricsUnavailable = Boolean(lyricsError || notFound || !lyrics);
   const headerOffset = insets.top + TOP_BAR_CONTENT_HEIGHT;
+  const showLyricsPanel = lyricsVisible;
+  const lyricsProps = {
+    contentTopInset: headerOffset,
+    durationSeconds: lyrics?.durationSeconds,
+    isLoading: lyricsLoading,
+    isUnavailable: lyricsUnavailable,
+    plainLyrics: lyrics?.plainLyrics,
+    syncedLines: lyrics?.syncedLines,
+  };
 
   const handleToggleRecording = async () => {
     setErrorMessage(null);
@@ -164,23 +213,46 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
     );
   }
 
+  const cameraNode = (
+    <CameraView
+      ref={cameraRef}
+      style={layoutMode === 'split' ? StyleSheet.absoluteFill : StyleSheet.absoluteFill}
+      mode="video"
+      facing={facing}
+      enableTorch={facing === 'back' && torchOn}
+      zoom={zoomPresetToValue(zoomPreset)}
+    />
+  );
+
   return (
     <View style={styles.root}>
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        mode="video"
-        facing={facing}
-        enableTorch={facing === 'back' && torchOn}
-      />
+      {layoutMode === 'split' ? (
+        <View style={styles.splitCameraPane}>{cameraNode}</View>
+      ) : (
+        cameraNode
+      )}
 
-      <LiveLyricsOverlay
-        contentTopInset={headerOffset}
-        durationSeconds={lyrics?.durationSeconds}
-        isLoading={lyricsLoading}
-        isUnavailable={lyricsUnavailable}
-        plainLyrics={lyrics?.plainLyrics}
-        syncedLines={lyrics?.syncedLines}
+      {showLyricsPanel && layoutMode === 'overlay' ? (
+        <LiveLyricsOverlay {...lyricsProps} layout="overlay" />
+      ) : null}
+
+      {showLyricsPanel && layoutMode === 'split' ? (
+        <View style={styles.splitLyricsPane}>
+          <LiveLyricsOverlay {...lyricsProps} contentTopInset={12} layout="split" />
+        </View>
+      ) : null}
+
+      {showLyricsPanel && layoutMode === 'floating' ? (
+        <LiveFloatingLyrics
+          {...lyricsProps}
+          height={floatingHeight}
+        />
+      ) : null}
+
+      <LiveZoomChips
+        preset={zoomPreset}
+        topInset={headerOffset}
+        onChange={setZoomPreset}
       />
 
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
@@ -188,10 +260,38 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
           <Text style={styles.iconButtonText}>{t('live.back')}</Text>
         </Pressable>
 
-        <Text style={styles.songLabel} numberOfLines={1}>
-          {title} · {artist}
-        </Text>
+        <View style={styles.topBarActions}>
+          {showId ? (
+            <Pressable
+              accessibilityLabel={t('live.openSongPicker')}
+              accessibilityRole="button"
+              onPress={() => setSongPickerOpen(true)}
+              style={styles.iconButtonRound}>
+              <Text style={styles.iconGlyph}>☰</Text>
+            </Pressable>
+          ) : null}
+
+          <Pressable
+            accessibilityLabel={lyricsVisible ? t('live.hideLyrics') : t('live.showLyrics')}
+            accessibilityRole="button"
+            onPress={() => setLyricsVisible((current) => !current)}
+            style={styles.iconButtonRound}>
+            <Text style={styles.iconGlyph}>{lyricsVisible ? '👁' : '🚫'}</Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel={t('live.openLayoutMenu')}
+            accessibilityRole="button"
+            onPress={() => setLayoutMenuOpen(true)}
+            style={styles.iconButtonRound}>
+            <Text style={styles.iconGlyph}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
+
+      <Text style={[styles.songLabel, { top: insets.top + 8 }]} numberOfLines={1}>
+        {activeTitle} · {artist}
+      </Text>
 
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
         {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
@@ -243,6 +343,25 @@ export function LiveCameraContent({ artist, title }: LiveCameraContentProps) {
               : t('live.startRecording')}
         </Text>
       </View>
+
+      <LiveSongPickerModal
+        activeTitle={activeTitle}
+        songs={pickerSongs}
+        visible={songPickerOpen}
+        onClose={() => setSongPickerOpen(false)}
+        onSelect={setActiveTitle}
+      />
+
+      <LiveLayoutMenu
+        floatingHeight={floatingHeight}
+        layoutMode={layoutMode}
+        lyricsVisible={lyricsVisible}
+        visible={layoutMenuOpen}
+        onClose={() => setLayoutMenuOpen(false)}
+        onFloatingHeightChange={setFloatingHeight}
+        onLayoutChange={setLayoutMode}
+        onLyricsVisibleChange={setLyricsVisible}
+      />
     </View>
   );
 }
@@ -299,10 +418,10 @@ const styles = StyleSheet.create({
   },
   iconButtonRound: {
     alignItems: 'center',
-    height: 48,
+    height: 40,
     justifyContent: 'center',
     paddingHorizontal: 0,
-    width: 48,
+    width: 40,
   },
   iconButtonText: {
     color: '#fff',
@@ -310,7 +429,7 @@ const styles = StyleSheet.create({
   },
   iconGlyph: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
   },
   iconGlyphActive: {
@@ -360,10 +479,27 @@ const styles = StyleSheet.create({
   },
   songLabel: {
     color: '#fff',
-    flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    textAlign: 'right',
+    left: 96,
+    opacity: 0.85,
+    position: 'absolute',
+    right: 72,
+    textAlign: 'center',
+    zIndex: 28,
+  },
+  splitCameraPane: {
+    height: '50%',
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  splitLyricsPane: {
+    bottom: 0,
+    height: '50%',
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    zIndex: 12,
   },
   statusMessage: {
     color: '#b8ffb8',
@@ -373,11 +509,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
+    justifyContent: 'space-between',
     left: 0,
     paddingHorizontal: 16,
     position: 'absolute',
     right: 0,
     top: 0,
     zIndex: 30,
+  },
+  topBarActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
 });

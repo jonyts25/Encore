@@ -1,7 +1,8 @@
 {
   "common": {
     "appName": "Encore",
-    "loading": "Cargando…"
+    "loading": "Cargando…",
+    "close": "Cerrar"
   },
   "home": {
     "tab": "Inicio",
@@ -22,7 +23,12 @@
     "checking": "Consultando…",
     "apiOk": "Backend respondió: {{status}}",
     "apiError": "No se pudo conectar con el backend",
-    "apiUrl": "API: {{url}}"
+    "apiUrl": "API: {{url}}",
+    "todayShow": {
+      "kicker": "Hoy",
+      "title": "Tu show es hoy — {{show}}",
+      "openLive": "Abrir LIVE"
+    }
   },
   "catalog": {
     "tab": "Catálogo",
@@ -96,7 +102,9 @@
     "registerSuccess": "Cuenta creada",
     "confirmEmail": "Revisa tu correo para confirmar la cuenta antes de iniciar sesión.",
     "emailAlreadyRegistered": "Este correo ya tiene cuenta. Intenta iniciar sesión.",
-    "authError": "No se pudo completar la autenticación"
+    "authError": "No se pudo completar la autenticación",
+    "authCallbackLoading": "Confirmando tu cuenta…",
+    "authCallbackFailed": "No se pudo completar la confirmación. Intenta iniciar sesión manualmente."
   },
   "settings": {
     "language": "Idioma",
@@ -161,6 +169,22 @@
     "flashOn": "Linterna encendida",
     "flashOff": "Linterna apagada",
     "flipCamera": "Cambiar cámara",
-    "flashTip": "Tip: el flash puede distraer a otros en el show 💡"
+    "flashTip": "Tip: el flash puede distraer a otros en el show 💡",
+    "zoomLevel": "Zoom {{level}}x",
+    "openSongPicker": "Elegir canción del setlist",
+    "songPickerTitle": "Canciones del setlist",
+    "songPickerSubtitle": "Cambia la letra sin salir de LIVE.",
+    "songPickerEmpty": "No hay canciones predichas para este show.",
+    "openLayoutMenu": "Configurar layout",
+    "layoutMenuTitle": "Layout LIVE",
+    "layoutSection": "Disposición",
+    "floatingSize": "Tamaño flotante",
+    "hideLyrics": "Ocultar letra",
+    "showLyrics": "Mostrar letra",
+    "layout": {
+      "overlay": "Franja superior",
+      "split": "Split 50/50",
+      "floating": "Overlay flotante"
+    }
   }
 }

@@ -18,6 +18,7 @@ import {
   signUpWithPassword,
   subscribeToAuthChanges,
 } from './api';
+import { useAuthDeepLink } from './useAuthDeepLink';
 import type { SignUpResult, SystemRole } from './types';
 
 type SessionContextValue = {
@@ -44,6 +45,8 @@ function currentAppLocale(): SupportedLocale {
 export function SessionProvider({ children }: SessionProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useAuthDeepLink();
 
   useEffect(() => {
     let mounted = true;

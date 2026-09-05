@@ -1,2 +1,2 @@
 export { LiveCameraContent } from './components/LiveCameraContent';
-export type { LiveRecordingState } from './types';
+export type { LiveLayoutMode, LiveRecordingState, LiveZoomPreset } from './types';

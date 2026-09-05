@@ -5,13 +5,25 @@ import { useTranslation } from '@/core/i18n';
 import { fetchShowPrediction } from '../api';
 import type { SetlistPrediction } from '../types';
 
-export function useShowPrediction(showId: string) {
+type UseShowPredictionOptions = {
+  enabled?: boolean;
+};
+
+export function useShowPrediction(showId: string, options: UseShowPredictionOptions = {}) {
+  const { enabled = true } = options;
   const { t } = useTranslation();
   const [prediction, setPrediction] = useState<SetlistPrediction | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refetch = useCallback(async () => {
+    if (!enabled || !showId) {
+      setPrediction(null);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     try {
@@ -23,7 +35,7 @@ export function useShowPrediction(showId: string) {
     } finally {
       setIsLoading(false);
     }
-  }, [showId, t]);
+  }, [enabled, showId, t]);
 
   useEffect(() => {
     void refetch();

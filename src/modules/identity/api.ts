@@ -61,6 +61,7 @@ export async function signUpWithPassword(
     email,
     password,
     options: {
+      emailRedirectTo: 'encore://auth-callback',
       data: {
         display_name: displayName,
       },

@@ -1,7 +1,8 @@
 {
   "common": {
     "appName": "Encore",
-    "loading": "Loading…"
+    "loading": "Loading…",
+    "close": "Close"
   },
   "home": {
     "tab": "Home",
@@ -22,7 +23,12 @@
     "checking": "Checking…",
     "apiOk": "Backend responded: {{status}}",
     "apiError": "Could not reach the backend",
-    "apiUrl": "API: {{url}}"
+    "apiUrl": "API: {{url}}",
+    "todayShow": {
+      "kicker": "Today",
+      "title": "Your show is today — {{show}}",
+      "openLive": "Open LIVE"
+    }
   },
   "catalog": {
     "tab": "Catalog",
@@ -96,7 +102,9 @@
     "registerSuccess": "Account created",
     "confirmEmail": "Check your email to confirm your account before signing in.",
     "emailAlreadyRegistered": "This email already has an account. Try signing in.",
-    "authError": "Authentication failed"
+    "authError": "Authentication failed",
+    "authCallbackLoading": "Confirming your account…",
+    "authCallbackFailed": "Could not complete confirmation. Try signing in manually."
   },
   "settings": {
     "language": "Language",
@@ -161,6 +169,22 @@
     "flashOn": "Flash on",
     "flashOff": "Flash off",
     "flipCamera": "Flip camera",
-    "flashTip": "Tip: the flash can distract others at the show 💡"
+    "flashTip": "Tip: the flash can distract others at the show 💡",
+    "zoomLevel": "Zoom {{level}}x",
+    "openSongPicker": "Pick a setlist song",
+    "songPickerTitle": "Setlist songs",
+    "songPickerSubtitle": "Change lyrics without leaving LIVE.",
+    "songPickerEmpty": "No predicted songs for this show.",
+    "openLayoutMenu": "Configure layout",
+    "layoutMenuTitle": "LIVE layout",
+    "layoutSection": "Layout",
+    "floatingSize": "Floating size",
+    "hideLyrics": "Hide lyrics",
+    "showLyrics": "Show lyrics",
+    "layout": {
+      "overlay": "Top band",
+      "split": "Split 50/50",
+      "floating": "Floating overlay"
+    }
   }
 }
