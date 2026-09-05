@@ -38,6 +38,7 @@
     "emptyTitle": "Aún no hay artistas",
     "emptySubtitle": "Cuando insertes datos de prueba en Supabase, aparecerán aquí.",
     "noResults": "Sin resultados para tu búsqueda",
+    "resolvingArtist": "Buscando información de este artista…",
     "loadError": "No se pudo cargar el catálogo",
     "artistDetail": "Artista",
     "artistNotFound": "Artista no encontrado",

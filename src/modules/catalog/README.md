@@ -10,6 +10,15 @@ Artistas canónicos, búsqueda pública y seguimiento por usuario.
 - `ArtistShowsSection` — shows del artista (`GET /api/artists/[id]/shows`)
 - `useArtistFollow(artistId)` — estado de seguimiento (`user_artists`)
 
+## Resolución automática de artistas
+
+Si la búsqueda local no encuentra resultados, el cliente llama a `GET /api/artists/search?q={name}`:
+
+1. Busca en `artists` (Supabase)
+2. Si no hay match, resuelve vía MusicBrainz (MBID + tags/géneros + url-rels → `artist_links`)
+3. Intenta foto con Apple Music (`ensureArtistImageUrl`) sin bloquear si falla
+4. Persiste el artista — la siguiente búsqueda es local/instantánea
+
 ## Artist links (MusicBrainz)
 
 Tabla Supabase: `artist_links (artist_id, platform, url, source)`.

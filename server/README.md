@@ -29,6 +29,9 @@ npm start
 ### Health
 - `GET /api/health` → `{ "status": "ok" }`
 
+### M2 — Catalog
+- `GET /api/artists/search?q={name}` — local artist search; if empty, resolves via MusicBrainz (mbid, links, optional Apple Music photo) and persists to Supabase
+
 ### M3 — Events (shows)
 - `GET /api/shows/upcoming` — upcoming shows with artist + venue (public)
 - `GET /api/shows/upcoming?followed=true` — upcoming shows for followed artists only (requires auth)

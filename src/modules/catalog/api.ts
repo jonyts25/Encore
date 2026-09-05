@@ -39,9 +39,43 @@ export function filterArtists(artists: Artist[], query: string): Artist[] {
   });
 }
 
+export async function searchLocalArtists(query: string, limit = 100): Promise<Artist[]> {
+  const normalized = query.trim();
+  if (!normalized) return listPublicArtists(limit);
+
+  const { data: byName, error: byNameError } = await supabase
+    .from('artists')
+    .select(ARTIST_COLUMNS)
+    .ilike('name', `%${normalized}%`)
+    .order('name', { ascending: true })
+    .limit(limit);
+
+  if (byNameError) throw byNameError;
+  if ((byName ?? []).length > 0) return (byName ?? []) as Artist[];
+
+  return filterArtists(await listPublicArtists(limit), normalized);
+}
+
 export async function searchPublicArtists(query: string, limit = 100): Promise<Artist[]> {
-  const artists = await listPublicArtists(limit);
-  return filterArtists(artists, query);
+  return searchLocalArtists(query, limit);
+}
+
+type ArtistSearchResponse = {
+  artists: Artist[];
+  source: 'local' | 'resolved' | 'none';
+};
+
+export async function searchArtistsWithResolution(query: string, limit = 100): Promise<Artist[]> {
+  const normalized = query.trim();
+  if (!normalized) return listPublicArtists(limit);
+
+  const localMatches = await searchLocalArtists(normalized, limit);
+  if (localMatches.length > 0) return localMatches;
+
+  const response = await apiFetch<ArtistSearchResponse>(
+    `/api/artists/search?q=${encodeURIComponent(normalized)}`
+  );
+  return response.artists ?? [];
 }
 
 export async function getArtistFollow(

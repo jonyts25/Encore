@@ -8,7 +8,7 @@ import { ArtistListItem } from './ArtistListItem';
 
 export function CatalogScreenContent() {
   const { t } = useTranslation();
-  const { query, setQuery, artists, isLoading, error } = useArtistCatalogSearch();
+  const { query, setQuery, artists, isLoading, isResolving, error } = useArtistCatalogSearch();
 
   return (
     <ThemedView style={styles.container}>
@@ -31,13 +31,19 @@ export function CatalogScreenContent() {
         </ThemedView>
       ) : null}
 
-      {!isLoading && error ? (
+      {!isLoading && isResolving ? (
+        <ThemedView style={styles.centered}>
+          <ThemedText>{t('catalog.resolvingArtist')}</ThemedText>
+        </ThemedView>
+      ) : null}
+
+      {!isLoading && !isResolving && error ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.error}>{error}</ThemedText>
         </ThemedView>
       ) : null}
 
-      {!isLoading && !error && artists.length === 0 ? (
+      {!isLoading && !isResolving && !error && artists.length === 0 ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.emptyTitle}>
             {query.trim() ? t('catalog.noResults') : t('catalog.emptyTitle')}
@@ -48,7 +54,7 @@ export function CatalogScreenContent() {
         </ThemedView>
       ) : null}
 
-      {!isLoading && !error && artists.length > 0 ? (
+      {!isLoading && !isResolving && !error && artists.length > 0 ? (
         <View style={styles.list}>
           {artists.map((artist) => (
             <ArtistListItem key={artist.id} artist={artist} />
