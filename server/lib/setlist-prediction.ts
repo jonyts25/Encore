@@ -1,4 +1,4 @@
-import { createSupabaseClient } from './supabase';
+import { createSupabaseAdminClient, createSupabaseClient } from './supabase';
 
 const DEFAULT_SAMPLE_SIZE = 10;
 const WILDCARD_MIN = 0.25;
@@ -175,7 +175,7 @@ async function buildStatisticalPrediction(
     generated_at: new Date().toISOString(),
   };
 
-  await cachePrediction(supabase, target.id, prediction, avgConfidence);
+  await cachePrediction(target.id, prediction, avgConfidence);
   return prediction;
 }
 
@@ -221,7 +221,7 @@ async function buildReferenceSetlist(
     generated_at: new Date().toISOString(),
   };
 
-  await cachePrediction(supabase, target.id, prediction, 0);
+  await cachePrediction(target.id, prediction, 0);
   return prediction;
 }
 
@@ -315,16 +315,17 @@ async function finishInsufficient(
     songs: [],
     generated_at: new Date().toISOString(),
   };
-  await cachePrediction(supabase, target.id, empty, 0);
+  await cachePrediction(target.id, empty, 0);
   return empty;
 }
 
 async function cachePrediction(
-  supabase: ReturnType<typeof createSupabaseClient>,
   showId: string,
   prediction: SetlistPrediction,
   confidence: number
 ) {
+  const supabase = createSupabaseAdminClient();
+
   const { error } = await supabase.from('setlist_predictions').upsert(
     {
       show_id: showId,
