@@ -1,14 +1,25 @@
+import { useEffect, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
-import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
+import { useSession } from '@/modules/identity';
 
-import { useArtistCatalogSearch } from '../hooks/useArtistCatalogSearch';
+import { useArtistCatalogSearch, type CatalogViewMode } from '../hooks/useArtistCatalogSearch';
 import { ArtistDisambiguationList } from './ArtistDisambiguationList';
 import { ArtistListItem } from './ArtistListItem';
 
 export function CatalogScreenContent() {
   const { t } = useTranslation();
+  const { isGuest, user, isLoading: sessionLoading } = useSession();
+  const [viewMode, setViewMode] = useState<CatalogViewMode>('all');
+
+  useEffect(() => {
+    if (isGuest && viewMode === 'followed') {
+      setViewMode('all');
+    }
+  }, [isGuest, viewMode]);
+
   const {
     query,
     setQuery,
@@ -19,12 +30,41 @@ export function CatalogScreenContent() {
     isConfirming,
     error,
     confirmCandidate,
-  } = useArtistCatalogSearch();
+    followedOnly,
+  } = useArtistCatalogSearch({
+    viewMode: isGuest ? 'all' : viewMode,
+    userId: user?.id ?? null,
+    enabled: !sessionLoading,
+  });
+
+  const showBusy = isLoading || sessionLoading;
+  const showFollowedEmpty =
+    followedOnly && !showBusy && !isResolving && !isConfirming && !error && artists.length === 0;
 
   return (
     <ThemedView style={styles.container}>
       <ThemedText style={styles.title}>{t('catalog.title')}</ThemedText>
       <ThemedText style={styles.subtitle}>{t('catalog.subtitle')}</ThemedText>
+
+      <ThemedView style={styles.filterRow}>
+        <Button
+          title={t('catalog.filterAll')}
+          variant={viewMode === 'all' ? 'primary' : 'secondary'}
+          style={styles.filterButton}
+          onPress={() => setViewMode('all')}
+        />
+        <Button
+          title={t('catalog.filterFollowed')}
+          variant={viewMode === 'followed' ? 'primary' : 'secondary'}
+          style={styles.filterButton}
+          disabled={isGuest}
+          onPress={() => setViewMode('followed')}
+        />
+      </ThemedView>
+
+      {isGuest ? (
+        <ThemedText style={styles.guestHint}>{t('catalog.followedRequiresAuth')}</ThemedText>
+      ) : null}
 
       <TextInput
         autoCapitalize="none"
@@ -36,25 +76,25 @@ export function CatalogScreenContent() {
         onChangeText={setQuery}
       />
 
-      {isLoading ? (
+      {showBusy ? (
         <ThemedView style={styles.centered}>
           <ThemedText>{t('common.loading')}</ThemedText>
         </ThemedView>
       ) : null}
 
-      {!isLoading && isResolving ? (
+      {!showBusy && isResolving ? (
         <ThemedView style={styles.centered}>
           <ThemedText>{t('catalog.resolvingArtist')}</ThemedText>
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && !isConfirming && error ? (
+      {!showBusy && !isResolving && !isConfirming && error ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.error}>{error}</ThemedText>
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && !isConfirming && !error && candidates.length > 0 ? (
+      {!showBusy && !isResolving && !isConfirming && !error && candidates.length > 0 ? (
         <ArtistDisambiguationList
           candidates={candidates}
           isConfirming={isConfirming}
@@ -62,7 +102,20 @@ export function CatalogScreenContent() {
         />
       ) : null}
 
-      {!isLoading && !isResolving && !isConfirming && !error && candidates.length === 0 && artists.length === 0 ? (
+      {showFollowedEmpty ? (
+        <ThemedView style={styles.centered}>
+          <ThemedText style={styles.emptyTitle}>{t('catalog.followedEmptyTitle')}</ThemedText>
+          <ThemedText style={styles.emptySubtitle}>{t('catalog.followedEmptySubtitle')}</ThemedText>
+        </ThemedView>
+      ) : null}
+
+      {!showBusy &&
+      !isResolving &&
+      !isConfirming &&
+      !error &&
+      !showFollowedEmpty &&
+      candidates.length === 0 &&
+      artists.length === 0 ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.emptyTitle}>
             {query.trim() ? t('catalog.noResults') : t('catalog.emptyTitle')}
@@ -73,7 +126,7 @@ export function CatalogScreenContent() {
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && !isConfirming && !error && artists.length > 0 ? (
+      {!showBusy && !isResolving && !isConfirming && !error && artists.length > 0 ? (
         <View style={styles.list}>
           {artists.map((artist) => (
             <ArtistListItem key={artist.id} artist={artist} />
@@ -109,6 +162,19 @@ const styles = StyleSheet.create({
   error: {
     color: '#D64545',
     textAlign: 'center',
+  },
+  filterButton: {
+    flex: 1,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  guestHint: {
+    fontSize: 13,
+    marginTop: 8,
+    opacity: 0.75,
   },
   list: {
     flex: 1,

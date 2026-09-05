@@ -4,13 +4,24 @@ import { useTranslation } from '@/core/i18n';
 
 import {
   confirmArtistResolution,
+  listFollowedArtists,
   listPublicArtists,
   searchArtistsWithResolution,
+  searchFollowedArtists,
   searchLocalArtists,
 } from '../api';
 import type { Artist, ArtistResolutionCandidate } from '../types';
 
-export function useArtistCatalogSearch() {
+export type CatalogViewMode = 'all' | 'followed';
+
+type UseArtistCatalogSearchOptions = {
+  viewMode: CatalogViewMode;
+  userId: string | null;
+  enabled?: boolean;
+};
+
+export function useArtistCatalogSearch(options: UseArtistCatalogSearchOptions) {
+  const { viewMode, userId, enabled = true } = options;
   const { t } = useTranslation();
   const [artists, setArtists] = useState<Artist[]>([]);
   const [candidates, setCandidates] = useState<ArtistResolutionCandidate[]>([]);
@@ -19,6 +30,8 @@ export function useArtistCatalogSearch() {
   const [isResolving, setIsResolving] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const followedOnly = viewMode === 'followed' && Boolean(userId);
 
   const load = useCallback(
     async (searchQuery: string) => {
@@ -30,6 +43,15 @@ export function useArtistCatalogSearch() {
 
       try {
         const trimmedQuery = searchQuery.trim();
+
+        if (followedOnly && userId) {
+          const data = trimmedQuery
+            ? await searchFollowedArtists(userId, trimmedQuery)
+            : await listFollowedArtists(userId);
+          setArtists(data);
+          return;
+        }
+
         if (trimmedQuery) {
           const localMatches = await searchLocalArtists(trimmedQuery);
           if (localMatches.length > 0) {
@@ -56,7 +78,7 @@ export function useArtistCatalogSearch() {
         setIsResolving(false);
       }
     },
-    [t]
+    [followedOnly, t, userId]
   );
 
   const confirmCandidate = useCallback(
@@ -78,12 +100,14 @@ export function useArtistCatalogSearch() {
   );
 
   useEffect(() => {
+    if (!enabled) return;
+
     const handle = setTimeout(() => {
       void load(query);
     }, 250);
 
     return () => clearTimeout(handle);
-  }, [load, query]);
+  }, [enabled, load, query]);
 
   const results = useMemo(() => artists, [artists]);
 
@@ -97,6 +121,7 @@ export function useArtistCatalogSearch() {
     isConfirming,
     error,
     confirmCandidate,
+    followedOnly,
     refetch: () => load(query),
   };
 }

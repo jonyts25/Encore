@@ -56,6 +56,30 @@ export async function searchLocalArtists(query: string, limit = 100): Promise<Ar
   return filterArtists(await listPublicArtists(limit), normalized);
 }
 
+export async function listFollowedArtists(userId: string, limit = 100): Promise<Artist[]> {
+  const { data, error } = await supabase
+    .from('user_artists')
+    .select(`followed_at, artist:artists (${ARTIST_COLUMNS})`)
+    .eq('user_id', userId)
+    .order('followed_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  return (data ?? [])
+    .map((row) => row.artist as Artist | Artist[] | null)
+    .flatMap((artist) => (Array.isArray(artist) ? artist : artist ? [artist] : []));
+}
+
+export async function searchFollowedArtists(
+  userId: string,
+  query: string,
+  limit = 100
+): Promise<Artist[]> {
+  const followed = await listFollowedArtists(userId, limit);
+  return filterArtists(followed, query);
+}
+
 export async function searchPublicArtists(query: string, limit = 100): Promise<Artist[]> {
   return searchLocalArtists(query, limit);
 }
