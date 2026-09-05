@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import { bootLog } from '@/core/bootLog';
 import { i18n, setLocale, type SupportedLocale } from '@/core/i18n';
 
 import {
@@ -51,7 +52,9 @@ export function SessionProvider({ children }: SessionProviderProps) {
   useEffect(() => {
     let mounted = true;
 
+    bootLog('[BOOT 10] before SessionProvider getCurrentSession');
     void getCurrentSession().then((initialSession) => {
+      bootLog('[BOOT 11] after SessionProvider getCurrentSession');
       if (!mounted) return;
       setSession(initialSession);
       setIsLoading(false);
