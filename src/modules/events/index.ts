@@ -7,6 +7,7 @@ export {
   formatShowVenueLine,
   getUserShowStatus,
   setShowStatus,
+  removeShowStatus,
 } from './api';
 export { HomeShowsContent } from './components/HomeShowsContent';
 export { ShowDetailContent } from './components/ShowDetailContent';

@@ -209,3 +209,19 @@ export async function upsertUserShowStatus(params: {
   if (error) throw error;
   return data as UserShow;
 }
+
+export async function deleteUserShowStatus(params: {
+  supabase: ReturnType<typeof createSupabaseClient>;
+  userId: string;
+  showId: string;
+}): Promise<void> {
+  const { supabase, userId, showId } = params;
+
+  const { error } = await supabase
+    .from('user_shows')
+    .delete()
+    .eq('user_id', userId)
+    .eq('show_id', showId);
+
+  if (error) throw error;
+}

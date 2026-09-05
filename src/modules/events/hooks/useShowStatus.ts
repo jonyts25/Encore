@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { useSession } from '@/modules/identity';
 
-import { getUserShowStatus, setShowStatus } from '../api';
+import { getUserShowStatus, removeShowStatus, setShowStatus } from '../api';
 import type { ShowStatus } from '../types';
 
 export function useShowStatus(showId: string) {
@@ -55,6 +55,22 @@ export function useShowStatus(showId: string) {
     [session, showId]
   );
 
+  const removeStatus = useCallback(async () => {
+    if (!session?.access_token) return;
+
+    setIsMutating(true);
+    setError(null);
+    try {
+      await removeShowStatus(showId, session.access_token);
+      setStatus(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unknown error');
+      throw err;
+    } finally {
+      setIsMutating(false);
+    }
+  }, [session, showId]);
+
   return {
     status,
     isLoading,
@@ -62,6 +78,7 @@ export function useShowStatus(showId: string) {
     error,
     refetch,
     updateStatus,
+    removeStatus,
     requiresAuth: isGuest,
   };
 }

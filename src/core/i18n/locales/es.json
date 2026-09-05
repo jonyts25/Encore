@@ -75,6 +75,7 @@
     "yourStatus": "Tu estado",
     "currentStatus": "Estado actual: {{status}}",
     "statusRequiresAuth": "Inicia sesión para marcar si vas o te interesa.",
+    "removeFromMyShows": "Quitar de mis shows",
     "status": {
       "interesado": "Me interesa",
       "voy": "Voy",

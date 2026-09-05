@@ -14,7 +14,7 @@ type ShowStatusButtonsProps = {
 export function ShowStatusButtons({ showId }: ShowStatusButtonsProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { status, isLoading, isMutating, requiresAuth, updateStatus, error } =
+  const { status, isLoading, isMutating, requiresAuth, updateStatus, removeStatus, error } =
     useShowStatus(showId);
 
   const handlePress = (nextStatus: ShowStatus) => {
@@ -58,6 +58,23 @@ export function ShowStatusButtons({ showId }: ShowStatusButtonsProps) {
           onPress={() => handlePress('voy')}
         />
       </ThemedView>
+
+      {!requiresAuth && status ? (
+        <Button
+          disabled={isLoading || isMutating}
+          title={isLoading || isMutating ? t('common.loading') : t('events.removeFromMyShows')}
+          variant="secondary"
+          onPress={() => {
+            void (async () => {
+              try {
+                await removeStatus();
+              } catch {
+                // Error rendered below.
+              }
+            })();
+          }}
+        />
+      ) : null}
 
       {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
     </ThemedView>

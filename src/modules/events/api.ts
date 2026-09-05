@@ -183,6 +183,22 @@ export async function setShowStatus(
   return data.user_show;
 }
 
+export async function removeShowStatus(showId: string, accessToken: string): Promise<void> {
+  try {
+    await apiFetch<{ removed: boolean }>(`/api/shows/${showId}/status`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 405)) {
+      const { error: dbError } = await supabase.from('user_shows').delete().eq('show_id', showId);
+      if (dbError) throw dbError;
+      return;
+    }
+    throw error;
+  }
+}
+
 /** Reads current user status from Supabase (RLS). No backend GET exists yet. */
 export async function getUserShowStatus(showId: string): Promise<ShowStatus | null> {
   const { data, error } = await supabase

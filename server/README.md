@@ -34,6 +34,7 @@ npm start
 - `GET /api/shows/upcoming?followed=true` — upcoming shows for followed artists only (requires auth)
 - `GET /api/shows/[id]` — show detail (public)
 - `POST /api/shows/[id]/status` — set `interesado` \| `voy` \| `fui` for authenticated user
+- `DELETE /api/shows/[id]/status` — remove the user's row from `user_shows` for that show
 
 ### M4 — Setlist Intelligence
 

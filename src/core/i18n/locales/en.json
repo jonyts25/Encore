@@ -75,6 +75,7 @@
     "yourStatus": "Your status",
     "currentStatus": "Current status: {{status}}",
     "statusRequiresAuth": "Sign in to mark interested or going.",
+    "removeFromMyShows": "Remove from my shows",
     "status": {
       "interesado": "Interested",
       "voy": "Going",

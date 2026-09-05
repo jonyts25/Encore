@@ -14,7 +14,14 @@ export default function LiveScreen() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack.Screen options={{ title: t('live.screenTitle'), headerShown: false }} />
+      <Stack.Screen
+        options={{
+          title: t('live.screenTitle'),
+          headerShown: false,
+          gestureEnabled: false,
+          fullScreenGestureEnabled: false,
+        }}
+      />
       <LiveCameraContent artist={artist} showId={showId} title={title} />
     </>
   );

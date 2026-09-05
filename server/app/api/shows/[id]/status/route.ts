@@ -1,6 +1,6 @@
 import { jsonError, jsonOk } from '@/lib/http';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { getShowById, upsertUserShowStatus } from '@/lib/shows';
+import { getShowById, upsertUserShowStatus, deleteUserShowStatus } from '@/lib/shows';
 import { SHOW_STATUSES, type ShowStatus } from '@/lib/types';
 
 type RouteContext = {
@@ -65,6 +65,33 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonOk({ user_show: userShow });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update show status';
+    return jsonError(message, 500);
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const auth = await requireAuthenticatedUser(_request);
+  if (!auth) {
+    return jsonError('Unauthorized', 401);
+  }
+
+  const { id: showId } = await context.params;
+
+  try {
+    const show = await getShowById(showId);
+    if (!show) {
+      return jsonError('Show not found', 404);
+    }
+
+    await deleteUserShowStatus({
+      supabase: auth.supabase,
+      userId: auth.user.id,
+      showId,
+    });
+
+    return jsonOk({ removed: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Failed to remove show status';
     return jsonError(message, 500);
   }
 }
