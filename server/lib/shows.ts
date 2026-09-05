@@ -176,8 +176,12 @@ export async function getShowById(showId: string): Promise<ShowWithRelations | n
   const show = (data as unknown as ShowWithRelations | null) ?? null;
   if (!show) return null;
 
-  const { ensureVenuePhotoUrl } = await import('./venue-photos');
+  const [{ ensureVenuePhotoUrl }, { ensureArtistImageUrl }] = await Promise.all([
+    import('./venue-photos'),
+    import('./artist-photos'),
+  ]);
   show.venue = await ensureVenuePhotoUrl(show.venue);
+  show.artist = await ensureArtistImageUrl(show.artist);
   return show;
 }
 

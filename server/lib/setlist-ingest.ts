@@ -1,3 +1,4 @@
+import { ensureArtistImageUrl } from './artist-photos';
 import { createSupabaseAdminClient } from './supabase';
 import {
   flattenSetlistSongs,
@@ -12,6 +13,7 @@ type ArtistRow = {
   id: string;
   name: string;
   mbid: string | null;
+  image_url: string | null;
 };
 
 export type SetlistIngestOptions = {
@@ -44,7 +46,7 @@ export async function ingestArtistSetlists(
 
   const { data: artist, error: artistError } = await supabase
     .from('artists')
-    .select('id, name, mbid')
+    .select('id, name, mbid, image_url')
     .eq('id', artistId)
     .maybeSingle();
 
@@ -67,6 +69,12 @@ export async function ingestArtistSetlists(
     if (updateMbidError) throw updateMbidError;
     mbidUpdated = true;
   }
+
+  await ensureArtistImageUrl({
+    id: artistRow.id,
+    name: artistRow.name,
+    image_url: artistRow.image_url,
+  });
 
   const setlists: SetlistFmSetlist[] = [];
   let page = 1;

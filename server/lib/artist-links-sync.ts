@@ -1,3 +1,4 @@
+import { ensureArtistImageUrl } from './artist-photos';
 import type { ArtistLinkPlatform } from './artist-link-types';
 import {
   extractArtistLinksFromRelations,
@@ -9,6 +10,7 @@ type ArtistRow = {
   id: string;
   name: string;
   mbid: string | null;
+  image_url: string | null;
 };
 
 export type ArtistLinksSyncResult = {
@@ -24,7 +26,7 @@ export async function syncArtistLinksFromMusicBrainz(artistId: string): Promise<
 
   const { data: artist, error: artistError } = await supabase
     .from('artists')
-    .select('id, name, mbid')
+    .select('id, name, mbid, image_url')
     .eq('id', artistId)
     .maybeSingle();
 
@@ -38,6 +40,12 @@ export async function syncArtistLinksFromMusicBrainz(artistId: string): Promise<
 
   const relations = await fetchMusicBrainzArtistUrlRelations(artistRow.mbid);
   const links = extractArtistLinksFromRelations(relations);
+
+  await ensureArtistImageUrl({
+    id: artistRow.id,
+    name: artistRow.name,
+    image_url: artistRow.image_url,
+  });
 
   if (links.length === 0) {
     return {
