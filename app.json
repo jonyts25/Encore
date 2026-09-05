@@ -8,7 +8,12 @@
     "scheme": "encore",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jonathanrosique.encore",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Encore usa la cámara para el modo LIVE durante conciertos.",
+        "NSMicrophoneUsageDescription": "Encore usa el micrófono para grabar audio junto con el video en el modo LIVE."
+      }
     },
     "android": {
       "adaptiveIcon": {
