@@ -10,12 +10,13 @@ import { Button, ThemedText } from '@/core/ui/Themed';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 
-import type { LiveFloatingHeight, LiveLayoutMode, LiveZoomPreset } from '../types';
+import type { LiveFloatingHeight, LiveLayoutMode } from '../types';
 import { LiveFloatingLyrics } from './LiveFloatingLyrics';
 import { LiveLayoutMenu } from './LiveLayoutMenu';
 import { LiveLyricsOverlay } from './LiveLyricsOverlay';
 import { LiveSongPickerModal } from './LiveSongPickerModal';
-import { LiveZoomChips, zoomPresetToValue } from './LiveZoomChips';
+import { LiveZoomSlider } from './LiveZoomSlider';
+import { useLiveHardwareShutter } from '../hooks/useLiveHardwareShutter';
 
 type LiveCameraContentProps = {
   artist: string;
@@ -44,7 +45,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [flashTip, setFlashTip] = useState<string | null>(null);
   const flashTipShownRef = useRef(false);
 
-  const [zoomPreset, setZoomPreset] = useState<LiveZoomPreset>(1);
+  const [zoom, setZoom] = useState(0);
   const [layoutMode, setLayoutMode] = useState<LiveLayoutMode>('overlay');
   const [lyricsVisible, setLyricsVisible] = useState(true);
   const [floatingHeight, setFloatingHeight] = useState<LiveFloatingHeight>(200);
@@ -135,6 +136,12 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const permissionsGranted = Boolean(cameraPermission?.granted && micPermission?.granted);
   const lyricsUnavailable = Boolean(lyricsError || notFound || !lyrics);
   const headerOffset = insets.top + TOP_BAR_CONTENT_HEIGHT;
+
+  const handleToggleRecordingRef = useRef<() => Promise<void>>(async () => {});
+
+  useLiveHardwareShutter(() => {
+    void handleToggleRecordingRef.current();
+  }, permissionsGranted);
   const showLyricsPanel = lyricsVisible;
   const lyricsProps = {
     contentTopInset: headerOffset,
@@ -185,6 +192,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     }
   };
 
+  handleToggleRecordingRef.current = handleToggleRecording;
+
   if (!permissionsRequested) {
     return (
       <View style={styles.centered}>
@@ -220,7 +229,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       mode="video"
       facing={facing}
       enableTorch={facing === 'back' && torchOn}
-      zoom={zoomPresetToValue(zoomPreset)}
+      zoom={zoom}
     />
   );
 
@@ -248,12 +257,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           height={floatingHeight}
         />
       ) : null}
-
-      <LiveZoomChips
-        preset={zoomPreset}
-        topInset={headerOffset}
-        onChange={setZoomPreset}
-      />
 
       <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={styles.iconButton}>
@@ -297,6 +300,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
         {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
         {flashTip ? <Text style={styles.flashTip}>{flashTip}</Text> : null}
+
+        <LiveZoomSlider value={zoom} onChange={setZoom} />
 
         <View style={styles.bottomControlRow}>
           <Pressable

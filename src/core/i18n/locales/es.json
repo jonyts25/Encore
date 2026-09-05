@@ -170,7 +170,7 @@
     "flashOff": "Linterna apagada",
     "flipCamera": "Cambiar cámara",
     "flashTip": "Tip: el flash puede distraer a otros en el show 💡",
-    "zoomLevel": "Zoom {{level}}x",
+    "zoomSlider": "Zoom {{zoom}}",
     "openSongPicker": "Elegir canción del setlist",
     "songPickerTitle": "Canciones del setlist",
     "songPickerSubtitle": "Cambia la letra sin salir de LIVE.",

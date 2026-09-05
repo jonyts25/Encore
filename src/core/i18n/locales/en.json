@@ -170,7 +170,7 @@
     "flashOff": "Flash off",
     "flipCamera": "Flip camera",
     "flashTip": "Tip: the flash can distract others at the show 💡",
-    "zoomLevel": "Zoom {{level}}x",
+    "zoomSlider": "Zoom {{zoom}}",
     "openSongPicker": "Pick a setlist song",
     "songPickerTitle": "Setlist songs",
     "songPickerSubtitle": "Change lyrics without leaving LIVE.",
