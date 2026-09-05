@@ -15,6 +15,7 @@ export type ArtistEnrichResult = {
   image_updated: boolean;
   links_upserted: number;
   skipped_reason?: string;
+  error?: string;
 };
 
 export async function enrichArtist(artistId: string): Promise<ArtistEnrichResult> {
@@ -108,8 +109,22 @@ export async function enrichArtistsNeedingBackfill(options?: {
   for (const artistId of targets.slice(0, limit)) {
     try {
       results.push(await enrichArtist(artistId));
-    } catch {
+    } catch (error) {
       skipped += 1;
+      const message = error instanceof Error ? error.message : 'Artist enrich failed';
+      const { data: artist } = await createSupabaseAdminClient()
+        .from('artists')
+        .select('id, name')
+        .eq('id', artistId)
+        .maybeSingle();
+
+      results.push({
+        artist_id: artistId,
+        artist_name: artist?.name ?? artistId,
+        image_updated: false,
+        links_upserted: 0,
+        error: message,
+      });
     }
   }
 

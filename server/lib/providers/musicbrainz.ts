@@ -12,7 +12,11 @@ type MusicBrainzUrlRelation = {
 
 type MusicBrainzArtistResponse = {
   relations?: MusicBrainzUrlRelation[];
+  'relation-count'?: number;
 };
+
+const URL_RELATIONS_PAGE_SIZE = 100;
+const MUSICBRAINZ_MAX_RETRIES = 2;
 
 type MusicBrainzArtistTag = {
   name?: string;
@@ -66,20 +70,33 @@ const AUTO_RESOLVE_MIN_GAP = 12;
 const USER_AGENT = 'Encore/0.1 ( concert companion app )';
 
 async function musicBrainzRequest<T>(path: string): Promise<T> {
-  await acquireMusicBrainzRequestSlot();
+  let lastError: Error | null = null;
 
-  const response = await fetch(`https://musicbrainz.org/ws/2${path}`, {
-    headers: {
-      'User-Agent': USER_AGENT,
-      Accept: 'application/json',
-    },
-  });
+  for (let attempt = 0; attempt <= MUSICBRAINZ_MAX_RETRIES; attempt += 1) {
+    await acquireMusicBrainzRequestSlot();
 
-  if (!response.ok) {
-    throw new Error(`MusicBrainz request failed (${response.status})`);
+    const response = await fetch(`https://musicbrainz.org/ws/2${path}`, {
+      headers: {
+        'User-Agent': USER_AGENT,
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      return (await response.json()) as T;
+    }
+
+    if ((response.status === 429 || response.status === 503) && attempt < MUSICBRAINZ_MAX_RETRIES) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 1500 * (attempt + 1));
+      });
+      continue;
+    }
+
+    lastError = new Error(`MusicBrainz request failed (${response.status})`);
   }
 
-  return (await response.json()) as T;
+  throw lastError ?? new Error('MusicBrainz request failed');
 }
 
 function extractGenresFromTags(tags: MusicBrainzArtistTag[] | undefined): string[] | null {
@@ -215,10 +232,29 @@ export function mapMusicBrainzUrlToPlatform(url: string, relationType?: string):
 }
 
 export async function fetchMusicBrainzArtistUrlRelations(mbid: string): Promise<MusicBrainzUrlRelation[]> {
-  const payload = await musicBrainzRequest<MusicBrainzArtistResponse>(
-    `/artist/${encodeURIComponent(mbid)}?inc=url-rels&fmt=json`
-  );
-  return payload.relations ?? [];
+  const trimmedMbid = mbid.trim();
+  if (!trimmedMbid) return [];
+
+  const allRelations: MusicBrainzUrlRelation[] = [];
+  let offset = 0;
+
+  while (true) {
+    const payload = await musicBrainzRequest<MusicBrainzArtistResponse>(
+      `/artist/${encodeURIComponent(trimmedMbid)}?inc=url-rels&fmt=json&limit=${URL_RELATIONS_PAGE_SIZE}&offset=${offset}`
+    );
+
+    const batch = payload.relations ?? [];
+    allRelations.push(...batch);
+
+    const totalCount = payload['relation-count'] ?? batch.length;
+    offset += batch.length;
+
+    if (batch.length === 0 || offset >= totalCount || batch.length < URL_RELATIONS_PAGE_SIZE) {
+      break;
+    }
+  }
+
+  return allRelations;
 }
 
 export function extractArtistLinksFromRelations(

@@ -128,32 +128,50 @@ export async function getAppleMusicDeveloperToken(): Promise<string> {
   return token;
 }
 
+function buildAppleMusicFallbackTerms(fullName: string): string[] {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) return [];
+
+  const lastName = parts[parts.length - 1];
+  return lastName.toLowerCase() === fullName.trim().toLowerCase() ? [] : [lastName];
+}
+
 function pickBestArtistMatch(
   artists: AppleMusicArtistResource[],
-  searchName: string
+  searchName: string,
+  acceptNames: string[] = []
 ): AppleMusicArtistResource | null {
   if (artists.length === 0) return null;
 
-  const normalizedTarget = searchName.trim().toLowerCase();
-  return (
-    artists.find((artist) => artist.attributes?.name?.trim().toLowerCase() === normalizedTarget) ??
-    artists[0] ??
-    null
+  const accepted = new Set(
+    [searchName, ...acceptNames]
+      .map((name) => name.trim().toLowerCase())
+      .filter(Boolean)
   );
+
+  const exact = artists.find((artist) =>
+    accepted.has(artist.attributes?.name?.trim().toLowerCase() ?? '')
+  );
+  if (exact) return exact;
+
+  return artists[0] ?? null;
 }
 
-export async function searchArtist(name: string): Promise<AppleMusicArtistMatch | null> {
-  const trimmedName = name.trim();
-  if (!trimmedName) return null;
+async function searchArtistOnce(
+  term: string,
+  acceptNames: string[]
+): Promise<AppleMusicArtistMatch | null> {
+  const trimmedTerm = term.trim();
+  if (!trimmedTerm) return null;
 
   const credentials = getAppleMusicCredentials();
   if (!credentials) return null;
 
   const token = await getAppleMusicDeveloperToken();
   const url = new URL(`https://api.music.apple.com/v1/catalog/${CATALOG_STOREFRONT}/search`);
-  url.searchParams.set('term', trimmedName);
+  url.searchParams.set('term', trimmedTerm);
   url.searchParams.set('types', 'artists');
-  url.searchParams.set('limit', '5');
+  url.searchParams.set('limit', '10');
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -167,7 +185,7 @@ export async function searchArtist(name: string): Promise<AppleMusicArtistMatch 
   }
 
   const payload = (await response.json()) as AppleMusicSearchResponse;
-  const match = pickBestArtistMatch(payload.results?.artists?.data ?? [], trimmedName);
+  const match = pickBestArtistMatch(payload.results?.artists?.data ?? [], trimmedTerm, acceptNames);
   if (!match?.id) return null;
 
   const attributes = match.attributes;
@@ -176,8 +194,26 @@ export async function searchArtist(name: string): Promise<AppleMusicArtistMatch 
 
   return {
     id: match.id,
-    name: attributes?.name?.trim() ?? trimmedName,
+    name: attributes?.name?.trim() ?? trimmedTerm,
     imageUrl,
     genreNames: attributes?.genreNames ?? [],
   };
+}
+
+export async function searchArtist(name: string): Promise<AppleMusicArtistMatch | null> {
+  const trimmedName = name.trim();
+  if (!trimmedName) return null;
+
+  const fallbackTerms = buildAppleMusicFallbackTerms(trimmedName);
+  const acceptNames = [trimmedName, ...fallbackTerms];
+
+  const primary = await searchArtistOnce(trimmedName, acceptNames);
+  if (primary?.imageUrl) return primary;
+
+  for (const term of fallbackTerms) {
+    const fallback = await searchArtistOnce(term, acceptNames);
+    if (fallback?.imageUrl) return fallback;
+  }
+
+  return primary ?? null;
 }
