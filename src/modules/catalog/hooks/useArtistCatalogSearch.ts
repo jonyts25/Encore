@@ -2,22 +2,32 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslation } from '@/core/i18n';
 
-import { listPublicArtists, searchLocalArtists, searchArtistsWithResolution } from '../api';
-import type { Artist } from '../types';
+import {
+  confirmArtistResolution,
+  listPublicArtists,
+  searchArtistsWithResolution,
+  searchLocalArtists,
+} from '../api';
+import type { Artist, ArtistResolutionCandidate } from '../types';
 
 export function useArtistCatalogSearch() {
   const { t } = useTranslation();
   const [artists, setArtists] = useState<Artist[]>([]);
+  const [candidates, setCandidates] = useState<ArtistResolutionCandidate[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isResolving, setIsResolving] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(
     async (searchQuery: string) => {
       setIsLoading(true);
       setIsResolving(false);
+      setIsConfirming(false);
       setError(null);
+      setCandidates([]);
+
       try {
         const trimmedQuery = searchQuery.trim();
         if (trimmedQuery) {
@@ -29,8 +39,9 @@ export function useArtistCatalogSearch() {
 
           setIsLoading(false);
           setIsResolving(true);
-          const data = await searchArtistsWithResolution(trimmedQuery);
-          setArtists(data);
+          const result = await searchArtistsWithResolution(trimmedQuery);
+          setArtists(result.artists);
+          setCandidates(result.source === 'ambiguous' ? result.candidates : []);
           return;
         }
 
@@ -38,10 +49,29 @@ export function useArtistCatalogSearch() {
         setArtists(data);
       } catch (err) {
         setArtists([]);
+        setCandidates([]);
         setError(err instanceof Error ? err.message : t('catalog.loadError'));
       } finally {
         setIsLoading(false);
         setIsResolving(false);
+      }
+    },
+    [t]
+  );
+
+  const confirmCandidate = useCallback(
+    async (mbid: string) => {
+      setIsConfirming(true);
+      setError(null);
+
+      try {
+        const artist = await confirmArtistResolution(mbid);
+        setArtists([artist]);
+        setCandidates([]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t('catalog.loadError'));
+      } finally {
+        setIsConfirming(false);
       }
     },
     [t]
@@ -61,9 +91,12 @@ export function useArtistCatalogSearch() {
     query,
     setQuery,
     artists: results,
+    candidates,
     isLoading,
     isResolving,
+    isConfirming,
     error,
+    confirmCandidate,
     refetch: () => load(query),
   };
 }

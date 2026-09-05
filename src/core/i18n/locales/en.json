@@ -39,6 +39,8 @@
     "emptySubtitle": "When you insert test data in Supabase, it will show up here.",
     "noResults": "No results for your search",
     "resolvingArtist": "Looking up this artist…",
+    "disambiguationTitle": "Which one is it?",
+    "confirmingArtist": "Saving artist…",
     "loadError": "Could not load catalog",
     "artistDetail": "Artist",
     "artistNotFound": "Artist not found",

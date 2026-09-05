@@ -24,10 +24,22 @@ type MusicBrainzSearchArtist = {
   name?: string;
   score?: number;
   tags?: MusicBrainzArtistTag[];
+  disambiguation?: string;
+  country?: string;
+  type?: string;
 };
 
 type MusicBrainzSearchResponse = {
   artists?: MusicBrainzSearchArtist[];
+};
+
+type MusicBrainzArtistDetail = {
+  id?: string;
+  name?: string;
+  tags?: MusicBrainzArtistTag[];
+  disambiguation?: string;
+  country?: string;
+  type?: string;
 };
 
 export type MusicBrainzArtistMatch = {
@@ -35,6 +47,21 @@ export type MusicBrainzArtistMatch = {
   name: string;
   genres: string[] | null;
 };
+
+export type MusicBrainzArtistCandidate = {
+  mbid: string;
+  name: string;
+  score: number;
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  genres: string[] | null;
+};
+
+const SEARCH_CANDIDATE_LIMIT = 10;
+const MIN_CANDIDATE_SCORE = 50;
+const AUTO_RESOLVE_MIN_SCORE = 95;
+const AUTO_RESOLVE_MIN_GAP = 12;
 
 const USER_AGENT = 'Encore/0.1 ( concert companion app )';
 
@@ -68,40 +95,96 @@ function extractGenresFromTags(tags: MusicBrainzArtistTag[] | undefined): string
   return genres.length > 0 ? genres : null;
 }
 
-function pickBestArtistMatch(
-  artists: MusicBrainzSearchArtist[],
-  searchName: string
-): MusicBrainzSearchArtist | null {
-  if (artists.length === 0) return null;
+function mapSearchArtistToCandidate(artist: MusicBrainzSearchArtist): MusicBrainzArtistCandidate | null {
+  if (!artist.id?.trim() || !artist.name?.trim()) return null;
 
-  const normalizedTarget = searchName.trim().toLowerCase();
-  const exact = artists.find((artist) => artist.name?.trim().toLowerCase() === normalizedTarget);
-  if (exact) return exact;
-
-  return artists.reduce<MusicBrainzSearchArtist | null>((best, current) => {
-    if (!best) return current;
-    return (current.score ?? 0) > (best.score ?? 0) ? current : best;
-  }, null);
+  return {
+    mbid: artist.id.trim(),
+    name: artist.name.trim(),
+    score: artist.score ?? 0,
+    disambiguation: artist.disambiguation?.trim() || null,
+    country: artist.country?.trim() || null,
+    type: artist.type?.trim() || null,
+    genres: extractGenresFromTags(artist.tags),
+  };
 }
 
-export async function searchMusicBrainzArtists(name: string): Promise<MusicBrainzArtistMatch | null> {
+function namesMatch(searchName: string, artistName: string): boolean {
+  return searchName.trim().toLowerCase() === artistName.trim().toLowerCase();
+}
+
+export function pickAutoResolvableCandidate(
+  candidates: MusicBrainzArtistCandidate[],
+  searchName: string
+): MusicBrainzArtistCandidate | null {
+  if (candidates.length === 0) return null;
+
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+  const best = sorted[0];
+  const second = sorted[1];
+
+  if (!namesMatch(searchName, best.name)) return null;
+  if (best.score < AUTO_RESOLVE_MIN_SCORE) return null;
+  if (second && best.score - second.score < AUTO_RESOLVE_MIN_GAP) return null;
+
+  return best;
+}
+
+export function filterAmbiguousCandidates(
+  candidates: MusicBrainzArtistCandidate[]
+): MusicBrainzArtistCandidate[] {
+  return candidates
+    .filter((candidate) => candidate.score >= MIN_CANDIDATE_SCORE)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, SEARCH_CANDIDATE_LIMIT);
+}
+
+export async function searchMusicBrainzArtistCandidates(
+  name: string,
+  limit = SEARCH_CANDIDATE_LIMIT
+): Promise<MusicBrainzArtistCandidate[]> {
   const trimmedName = name.trim();
-  if (!trimmedName) return null;
+  if (!trimmedName) return [];
 
   const params = new URLSearchParams({
     query: `artist:"${trimmedName}"`,
     fmt: 'json',
-    limit: '5',
+    limit: String(limit),
   });
 
   const payload = await musicBrainzRequest<MusicBrainzSearchResponse>(`/artist/?${params.toString()}`);
-  const match = pickBestArtistMatch(payload.artists ?? [], trimmedName);
-  if (!match?.id?.trim() || !match.name?.trim()) return null;
+  return (payload.artists ?? [])
+    .map(mapSearchArtistToCandidate)
+    .filter((candidate): candidate is MusicBrainzArtistCandidate => candidate !== null);
+}
+
+export async function fetchMusicBrainzArtistByMbid(mbid: string): Promise<MusicBrainzArtistMatch | null> {
+  const trimmedMbid = mbid.trim();
+  if (!trimmedMbid) return null;
+
+  const payload = await musicBrainzRequest<MusicBrainzArtistDetail>(
+    `/artist/${encodeURIComponent(trimmedMbid)}?inc=tags&fmt=json`
+  );
+
+  if (!payload.id?.trim() || !payload.name?.trim()) return null;
 
   return {
-    mbid: match.id.trim(),
-    name: match.name.trim(),
-    genres: extractGenresFromTags(match.tags),
+    mbid: payload.id.trim(),
+    name: payload.name.trim(),
+    genres: extractGenresFromTags(payload.tags),
+  };
+}
+
+/** @deprecated Use searchMusicBrainzArtistCandidates + pickAutoResolvableCandidate */
+export async function searchMusicBrainzArtists(name: string): Promise<MusicBrainzArtistMatch | null> {
+  const candidates = await searchMusicBrainzArtistCandidates(name, 5);
+  const autoMatch = pickAutoResolvableCandidate(candidates, name);
+  if (!autoMatch) return null;
+
+  return {
+    mbid: autoMatch.mbid,
+    name: autoMatch.name,
+    genres: autoMatch.genres,
   };
 }
 

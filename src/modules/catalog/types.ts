@@ -7,6 +7,25 @@ export type Artist = {
   created_at: string;
 };
 
+export type ArtistResolutionCandidate = {
+  mbid: string;
+  name: string;
+  score: number;
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  genres: string[] | null;
+};
+
+export type ArtistSearchSource = 'local' | 'resolved' | 'ambiguous' | 'none';
+
+export type ArtistSearchResponse = {
+  artists: Artist[];
+  candidates: ArtistResolutionCandidate[];
+  source: ArtistSearchSource;
+  query: string;
+};
+
 export type UserArtist = {
   user_id: string;
   artist_id: string;

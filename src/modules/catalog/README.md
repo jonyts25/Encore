@@ -15,9 +15,11 @@ Artistas canónicos, búsqueda pública y seguimiento por usuario.
 Si la búsqueda local no encuentra resultados, el cliente llama a `GET /api/artists/search?q={name}`:
 
 1. Busca en `artists` (Supabase)
-2. Si no hay match, resuelve vía MusicBrainz (MBID + tags/géneros + url-rels → `artist_links`)
-3. Intenta foto con Apple Music (`ensureArtistImageUrl`) sin bloquear si falla
-4. Persiste el artista — la siguiente búsqueda es local/instantánea
+2. Si no hay match, consulta MusicBrainz con varios candidatos y `score`
+3. Auto-resuelve solo si hay un candidato con score alto y claramente por encima del siguiente
+4. Si hay ambigüedad, devuelve candidatos al cliente → `POST /api/artists/resolve-confirm` con el MBID elegido
+5. Intenta foto con Apple Music (`ensureArtistImageUrl`) sin bloquear si falla
+6. Persiste el artista — la siguiente búsqueda es local/instantánea
 
 ## Artist links (MusicBrainz)
 

@@ -30,7 +30,8 @@ npm start
 - `GET /api/health` → `{ "status": "ok" }`
 
 ### M2 — Catalog
-- `GET /api/artists/search?q={name}` — local artist search; if empty, resolves via MusicBrainz (mbid, links, optional Apple Music photo) and persists to Supabase
+- `GET /api/artists/search?q={name}` — local artist search; if empty, resolves via MusicBrainz when confidence is high, otherwise returns ambiguous candidates
+- `POST /api/artists/resolve-confirm` — body `{ "mbid": "..." }` persists the user-selected MusicBrainz artist (links + optional Apple Music photo)
 
 ### M3 — Events (shows)
 - `GET /api/shows/upcoming` — upcoming shows with artist + venue (public)

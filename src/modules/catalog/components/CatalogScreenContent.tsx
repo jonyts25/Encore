@@ -4,11 +4,22 @@ import { useTranslation } from '@/core/i18n';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useArtistCatalogSearch } from '../hooks/useArtistCatalogSearch';
+import { ArtistDisambiguationList } from './ArtistDisambiguationList';
 import { ArtistListItem } from './ArtistListItem';
 
 export function CatalogScreenContent() {
   const { t } = useTranslation();
-  const { query, setQuery, artists, isLoading, isResolving, error } = useArtistCatalogSearch();
+  const {
+    query,
+    setQuery,
+    artists,
+    candidates,
+    isLoading,
+    isResolving,
+    isConfirming,
+    error,
+    confirmCandidate,
+  } = useArtistCatalogSearch();
 
   return (
     <ThemedView style={styles.container}>
@@ -37,13 +48,21 @@ export function CatalogScreenContent() {
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && error ? (
+      {!isLoading && !isResolving && !isConfirming && error ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.error}>{error}</ThemedText>
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && !error && artists.length === 0 ? (
+      {!isLoading && !isResolving && !isConfirming && !error && candidates.length > 0 ? (
+        <ArtistDisambiguationList
+          candidates={candidates}
+          isConfirming={isConfirming}
+          onSelect={confirmCandidate}
+        />
+      ) : null}
+
+      {!isLoading && !isResolving && !isConfirming && !error && candidates.length === 0 && artists.length === 0 ? (
         <ThemedView style={styles.centered}>
           <ThemedText style={styles.emptyTitle}>
             {query.trim() ? t('catalog.noResults') : t('catalog.emptyTitle')}
@@ -54,7 +73,7 @@ export function CatalogScreenContent() {
         </ThemedView>
       ) : null}
 
-      {!isLoading && !isResolving && !error && artists.length > 0 ? (
+      {!isLoading && !isResolving && !isConfirming && !error && artists.length > 0 ? (
         <View style={styles.list}>
           {artists.map((artist) => (
             <ArtistListItem key={artist.id} artist={artist} />

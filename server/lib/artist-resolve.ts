@@ -1,8 +1,12 @@
 import { ensureArtistImageUrl } from './artist-photos';
 import {
   extractArtistLinksFromRelations,
+  fetchMusicBrainzArtistByMbid,
   fetchMusicBrainzArtistUrlRelations,
-  searchMusicBrainzArtists,
+  filterAmbiguousCandidates,
+  pickAutoResolvableCandidate,
+  searchMusicBrainzArtistCandidates,
+  type MusicBrainzArtistMatch,
 } from './providers/musicbrainz';
 import { createSupabaseAdminClient, createSupabaseClient } from './supabase';
 
@@ -15,12 +19,24 @@ export type CatalogArtist = {
   created_at: string;
 };
 
-const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
+export type ArtistResolutionCandidate = {
+  mbid: string;
+  name: string;
+  score: number;
+  disambiguation: string | null;
+  country: string | null;
+  type: string | null;
+  genres: string[] | null;
+};
 
 export type ArtistSearchResult = {
+  source: 'local' | 'resolved' | 'ambiguous' | 'none';
   artists: CatalogArtist[];
-  source: 'local' | 'resolved' | 'none';
+  candidates: ArtistResolutionCandidate[];
+  query: string;
 };
+
+const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
 
 function escapeIlikePattern(value: string): string {
   return value.replace(/[%_,]/g, (char) => `\\${char}`);
@@ -94,10 +110,7 @@ async function upsertArtistLinks(artistId: string, mbid: string): Promise<void> 
   if (error) throw error;
 }
 
-export async function resolveArtistFromMusicBrainz(name: string): Promise<CatalogArtist | null> {
-  const match = await searchMusicBrainzArtists(name);
-  if (!match) return null;
-
+async function persistResolvedArtist(match: MusicBrainzArtistMatch): Promise<CatalogArtist> {
   const existing = await findArtistByMbid(match.mbid);
   if (existing) {
     await upsertArtistLinks(existing.id, match.mbid).catch(() => undefined);
@@ -127,26 +140,56 @@ export async function resolveArtistFromMusicBrainz(name: string): Promise<Catalo
   }
 
   const artist = inserted as CatalogArtist;
-
   await upsertArtistLinks(artist.id, match.mbid).catch(() => undefined);
   return ensureArtistImageUrl(artist);
+}
+
+export async function confirmArtistResolution(mbid: string): Promise<CatalogArtist | null> {
+  const trimmedMbid = mbid.trim();
+  if (!trimmedMbid) return null;
+
+  const existing = await findArtistByMbid(trimmedMbid);
+  if (existing) {
+    await upsertArtistLinks(existing.id, trimmedMbid).catch(() => undefined);
+    return ensureArtistImageUrl(existing);
+  }
+
+  const details = await fetchMusicBrainzArtistByMbid(trimmedMbid);
+  if (!details) return null;
+
+  return persistResolvedArtist(details);
 }
 
 export async function searchArtistsWithResolution(query: string): Promise<ArtistSearchResult> {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
-    return { artists: [], source: 'none' };
+    return { artists: [], candidates: [], source: 'none', query: '' };
   }
 
   const localMatches = await searchLocalArtists(trimmedQuery);
   if (localMatches.length > 0) {
-    return { artists: localMatches, source: 'local' };
+    return { artists: localMatches, candidates: [], source: 'local', query: trimmedQuery };
   }
 
-  const resolved = await resolveArtistFromMusicBrainz(trimmedQuery);
-  if (!resolved) {
-    return { artists: [], source: 'none' };
+  const rawCandidates = await searchMusicBrainzArtistCandidates(trimmedQuery);
+  if (rawCandidates.length === 0) {
+    return { artists: [], candidates: [], source: 'none', query: trimmedQuery };
   }
 
-  return { artists: [resolved], source: 'resolved' };
+  const autoMatch = pickAutoResolvableCandidate(rawCandidates, trimmedQuery);
+  if (autoMatch) {
+    const resolved = await persistResolvedArtist({
+      mbid: autoMatch.mbid,
+      name: autoMatch.name,
+      genres: autoMatch.genres,
+    });
+    return { artists: [resolved], candidates: [], source: 'resolved', query: trimmedQuery };
+  }
+
+  const candidates = filterAmbiguousCandidates(rawCandidates);
+  if (candidates.length === 0) {
+    return { artists: [], candidates: [], source: 'none', query: trimmedQuery };
+  }
+
+  return { artists: [], candidates, source: 'ambiguous', query: trimmedQuery };
 }

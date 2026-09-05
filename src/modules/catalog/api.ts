@@ -1,7 +1,7 @@
 import { apiFetch } from '@/core/api/client';
 import { supabase } from '@/core/api/supabase';
 
-import type { Artist, ArtistLink, UserArtist } from './types';
+import type { Artist, ArtistLink, ArtistSearchResponse, UserArtist } from './types';
 
 const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
 
@@ -60,22 +60,42 @@ export async function searchPublicArtists(query: string, limit = 100): Promise<A
   return searchLocalArtists(query, limit);
 }
 
-type ArtistSearchResponse = {
-  artists: Artist[];
-  source: 'local' | 'resolved' | 'none';
+type ArtistConfirmResponse = {
+  artist: Artist;
+  source: 'resolved';
 };
 
-export async function searchArtistsWithResolution(query: string, limit = 100): Promise<Artist[]> {
+export async function fetchArtistSearch(query: string): Promise<ArtistSearchResponse> {
   const normalized = query.trim();
-  if (!normalized) return listPublicArtists(limit);
+  if (!normalized) {
+    return { artists: [], candidates: [], source: 'none', query: '' };
+  }
+
+  return apiFetch<ArtistSearchResponse>(`/api/artists/search?q=${encodeURIComponent(normalized)}`);
+}
+
+export async function confirmArtistResolution(mbid: string): Promise<Artist> {
+  const response = await apiFetch<ArtistConfirmResponse>('/api/artists/resolve-confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mbid }),
+  });
+
+  return response.artist;
+}
+
+export async function searchArtistsWithResolution(query: string, limit = 100): Promise<ArtistSearchResponse> {
+  const normalized = query.trim();
+  if (!normalized) {
+    return { artists: await listPublicArtists(limit), candidates: [], source: 'none', query: '' };
+  }
 
   const localMatches = await searchLocalArtists(normalized, limit);
-  if (localMatches.length > 0) return localMatches;
+  if (localMatches.length > 0) {
+    return { artists: localMatches, candidates: [], source: 'local', query: normalized };
+  }
 
-  const response = await apiFetch<ArtistSearchResponse>(
-    `/api/artists/search?q=${encodeURIComponent(normalized)}`
-  );
-  return response.artists ?? [];
+  return fetchArtistSearch(normalized);
 }
 
 export async function getArtistFollow(
