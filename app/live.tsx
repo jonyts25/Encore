@@ -1,10 +1,15 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
+import { useKeepAwake } from 'expo-keep-awake';
 import { StatusBar } from 'expo-status-bar';
 
 import { useTranslation } from '@/core/i18n';
 import { LiveCameraContent } from '@/modules/live';
 
+const LIVE_KEEP_AWAKE_TAG = 'encore-live';
+
 export default function LiveScreen() {
+  useKeepAwake(LIVE_KEEP_AWAKE_TAG);
+
   const { t } = useTranslation();
   const params = useLocalSearchParams<{ artist?: string; title?: string; showId?: string }>();
   const artist = typeof params.artist === 'string' ? params.artist : '';
