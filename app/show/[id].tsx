@@ -1,7 +1,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 
 import { useTranslation } from '@/core/i18n';
-import { ShowDetailContent } from '@/modules/events';
+import { ShowDetailWithPrep } from '@/modules/prep';
 
 export default function ShowDetailScreen() {
   const { t } = useTranslation();
@@ -14,7 +14,7 @@ export default function ShowDetailScreen() {
   return (
     <>
       <Stack.Screen options={{ title: t('events.showDetail') }} />
-      <ShowDetailContent showId={id} />
+      <ShowDetailWithPrep showId={id} />
     </>
   );
 }
