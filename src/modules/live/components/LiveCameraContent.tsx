@@ -1,4 +1,5 @@
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { Asset } from 'expo-media-library';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,6 +26,11 @@ import { LiveLyricsOverlay } from './LiveLyricsOverlay';
 import { LiveSongPickerModal } from './LiveSongPickerModal';
 import { LiveZoomSlider } from './LiveZoomSlider';
 import { useLiveHardwareShutter } from '../hooks/useLiveHardwareShutter';
+import {
+  activateRecordingKeepAwake,
+  deactivateRecordingKeepAwake,
+  isLiveDiagnosticsEnabled,
+} from '../recordingKeepAwake';
 
 type LiveCameraContentProps = {
   artist: string;
@@ -67,6 +73,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [keepAwakeDiagnostic, setKeepAwakeDiagnostic] = useState<string | null>(null);
+  const showKeepAwakeDiagnostic = isLiveDiagnosticsEnabled();
 
   const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
   const pickerSongs = useMemo(
@@ -128,18 +136,20 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           // Camera may already be torn down during navigation.
         }
       }
+      deactivateRecordingKeepAwake();
     };
   }, []);
 
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
-      if (nextState === 'active' || !isRecordingRef.current) return;
+      if (nextState !== 'background' || !isRecordingRef.current) return;
 
       try {
         cameraRef.current?.stopRecording();
       } catch {
         // Best-effort stop when the app backgrounds during recording.
       }
+      deactivateRecordingKeepAwake();
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
@@ -192,6 +202,23 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     syncedLines: lyrics?.syncedLines,
   };
 
+  const applyKeepAwakeDiagnostic = (result: { ok: true } | { ok: false; error: string }) => {
+    if (!showKeepAwakeDiagnostic || !isMountedRef.current) return;
+    setKeepAwakeDiagnostic(result.ok ? 'Pantalla activa ✓' : result.error);
+  };
+
+  const releaseRecordingKeepAwake = () => {
+    const result = deactivateRecordingKeepAwake();
+    if (!showKeepAwakeDiagnostic || !isMountedRef.current) return;
+    if (!result.ok) {
+      setKeepAwakeDiagnostic(result.error);
+      return;
+    }
+    if (!isRecordingRef.current) {
+      setKeepAwakeDiagnostic(null);
+    }
+  };
+
   const handleToggleRecording = async () => {
     if (isSaving) return;
 
@@ -210,6 +237,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         if (isMountedRef.current) {
           setIsRecording(false);
         }
+        releaseRecordingKeepAwake();
       }
       return;
     }
@@ -218,6 +246,9 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     setIsRecording(true);
     setStatusMessage(t('live.recording'));
 
+    const keepAwakeResult = await activateRecordingKeepAwake();
+    applyKeepAwakeDiagnostic(keepAwakeResult);
+
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: 900 });
       isRecordingRef.current = false;
@@ -225,6 +256,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       if (!isMountedRef.current) return;
 
       setIsRecording(false);
+      releaseRecordingKeepAwake();
 
       if (!video?.uri) {
         setErrorMessage(t('live.recordFailed'));
@@ -238,12 +270,13 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         return;
       }
 
-      await MediaLibrary.saveToLibraryAsync(video.uri);
+      await Asset.create(video.uri);
       if (isMountedRef.current) {
         setStatusMessage(t('live.savedToCameraRoll'));
       }
     } catch {
       isRecordingRef.current = false;
+      releaseRecordingKeepAwake();
       if (isMountedRef.current) {
         setIsRecording(false);
         setErrorMessage(t('live.recordFailed'));
@@ -358,6 +391,20 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       <Text style={[styles.songLabel, { top: insets.top + 8 }]} numberOfLines={1}>
         {activeTitle} · {artist}
       </Text>
+
+      {showKeepAwakeDiagnostic && keepAwakeDiagnostic ? (
+        <Text
+          style={[
+            styles.keepAwakeDiagnostic,
+            { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 },
+            keepAwakeDiagnostic === 'Pantalla activa ✓'
+              ? styles.keepAwakeDiagnosticOk
+              : styles.keepAwakeDiagnosticError,
+          ]}
+          numberOfLines={2}>
+          {keepAwakeDiagnostic}
+        </Text>
+      ) : null}
 
       <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
         {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
@@ -502,6 +549,21 @@ const styles = StyleSheet.create({
   },
   iconGlyphActive: {
     color: '#ffe566',
+  },
+  keepAwakeDiagnostic: {
+    fontSize: 11,
+    fontWeight: '600',
+    left: 16,
+    position: 'absolute',
+    right: 16,
+    textAlign: 'center',
+    zIndex: 27,
+  },
+  keepAwakeDiagnosticError: {
+    color: '#ffb4b4',
+  },
+  keepAwakeDiagnosticOk: {
+    color: '#b8ffb8',
   },
   permissionSubtitle: {
     opacity: 0.75,

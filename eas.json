@@ -9,14 +9,16 @@
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app",
+        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "environment": "production",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app"
+        "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app",
+        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true"
       }
     },
     "production": {

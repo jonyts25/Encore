@@ -70,8 +70,17 @@ type ShowRow = {
   show_date: string;
 };
 
+type VenueRelation = {
+  name: string | null;
+  city: string | null;
+};
+
 type PriorShowRow = ShowRow & {
-  venue: { name: string | null; city: string | null } | null;
+  venue: VenueRelation | null;
+};
+
+type RawPriorShowRow = ShowRow & {
+  venue: VenueRelation | VenueRelation[] | null;
 };
 
 type ShowSongRow = {
@@ -526,6 +535,24 @@ function detectStructure(
   return rotatingCandidates.length >= 3 ? 'rotating' : 'mostly_fixed';
 }
 
+function normalizeVenueRelation(
+  venue: VenueRelation | VenueRelation[] | null | undefined
+): VenueRelation | null {
+  if (!venue) return null;
+  if (Array.isArray(venue)) return venue[0] ?? null;
+  return venue;
+}
+
+function normalizePriorShowRows(rows: RawPriorShowRow[]): PriorShowRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    artist_id: row.artist_id,
+    tour_id: row.tour_id,
+    show_date: row.show_date,
+    venue: normalizeVenueRelation(row.venue),
+  }));
+}
+
 function getUtcCalendarDay(isoDate: string): string {
   const date = new Date(isoDate);
   const year = date.getUTCFullYear();
@@ -574,7 +601,7 @@ async function listPriorShowsWithVenues(
   const { data, error } = await query;
   if (error) throw error;
 
-  const candidates = ((data ?? []) as PriorShowRow[]).filter(
+  const candidates = normalizePriorShowRows((data ?? []) as RawPriorShowRow[]).filter(
     (show) => getUtcCalendarDay(show.show_date) !== targetDay
   );
   if (candidates.length === 0) return [];
