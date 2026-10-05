@@ -2,7 +2,15 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  AppState,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type AppStateStatus,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
@@ -35,6 +43,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
+  const isMountedRef = useRef(true);
+  const isRecordingRef = useRef(false);
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -107,6 +117,36 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   ]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      if (isRecordingRef.current) {
+        try {
+          cameraRef.current?.stopRecording();
+        } catch {
+          // Camera may already be torn down during navigation.
+        }
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active' || !isRecordingRef.current) return;
+
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        // Best-effort stop when the app backgrounds during recording.
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
     if (facing === 'front') {
       setTorchOn(false);
     }
@@ -153,21 +193,37 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   };
 
   const handleToggleRecording = async () => {
+    if (isSaving) return;
+
+    if (!isMountedRef.current) return;
+
     setErrorMessage(null);
     setStatusMessage(null);
 
     if (!cameraRef.current) return;
 
-    if (isRecording) {
-      cameraRef.current.stopRecording();
+    if (isRecording || isRecordingRef.current) {
+      try {
+        cameraRef.current.stopRecording();
+      } catch {
+        isRecordingRef.current = false;
+        if (isMountedRef.current) {
+          setIsRecording(false);
+        }
+      }
       return;
     }
 
+    isRecordingRef.current = true;
     setIsRecording(true);
     setStatusMessage(t('live.recording'));
 
     try {
       const video = await cameraRef.current.recordAsync({ maxDuration: 900 });
+      isRecordingRef.current = false;
+
+      if (!isMountedRef.current) return;
+
       setIsRecording(false);
 
       if (!video?.uri) {
@@ -183,12 +239,19 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       }
 
       await MediaLibrary.saveToLibraryAsync(video.uri);
-      setStatusMessage(t('live.savedToCameraRoll'));
+      if (isMountedRef.current) {
+        setStatusMessage(t('live.savedToCameraRoll'));
+      }
     } catch {
-      setIsRecording(false);
-      setErrorMessage(t('live.recordFailed'));
+      isRecordingRef.current = false;
+      if (isMountedRef.current) {
+        setIsRecording(false);
+        setErrorMessage(t('live.recordFailed'));
+      }
     } finally {
-      setIsSaving(false);
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
     }
   };
 

@@ -10,13 +10,14 @@ Modo concierto: cámara + overlay de letra con scroll automático.
 ## Flujo en la app
 
 1. Pantalla de letra, ficha del show (CTA «Hoy») o setlist → **Modo LIVE**
-2. Permisos de cámara/micrófono solo al entrar
-3. Preview fullscreen (`expo-camera`) con slider de zoom continuo (~1×–3×) sobre el botón de grabar
-4. Botones físicos iOS (`expo-hardware-buttons`): volumen + Camera Control → grabar/detener (dev build)
-5. Selector de canciones del setlist predicho (si hay `showId`) sin salir de LIVE
-6. Layouts: franja superior (default), split 50/50, overlay flotante arrastrable
-7. Toggle para ocultar letra (solo cámara)
-8. Grabación local al carrete — nunca se sube al servidor
+2. Pantalla siempre encendida mientras LIVE está activo (`expo-keep-awake` en `app/live.tsx`)
+3. Permisos de cámara/micrófono solo al entrar
+4. Preview fullscreen (`expo-camera`) con slider de zoom continuo (~1×–3×) sobre el botón de grabar
+5. Botones físicos iOS (`expo-hardware-buttons`): volumen + Camera Control → grabar/detener (dev build)
+6. Selector de canciones del setlist predicho (si hay `showId`) sin salir de LIVE
+7. Layouts: franja superior (default), split 50/50, overlay flotante arrastrable
+8. Toggle para ocultar letra (solo cámara)
+9. Grabación local al carrete — nunca se sube al servidor
 
 ## Auth deep link
 
