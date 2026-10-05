@@ -1,8 +1,8 @@
 import { createSupabaseAdminClient } from './supabase';
 
-const WILDCARD_MIN = 0.25;
-const WILDCARD_MAX = 0.85;
+const WILDCARD_FREQUENCY_PCT = 70;
 const FIXED_SONG_THRESHOLD = 0.9;
+const PRIOR_SHOW_CANDIDATE_POOL = 50;
 
 export type PredictedSong = {
   song_id: string;
@@ -328,7 +328,7 @@ function buildReconstructedSetlist(
       confidence,
       frequency_pct: frequencyPct,
       avg_position: Number(entry.avgPosition.toFixed(1)),
-      is_wildcard: confidence >= WILDCARD_MIN && confidence <= WILDCARD_MAX,
+      is_wildcard: frequencyPct < WILDCARD_FREQUENCY_PCT,
       appeared_in_shows: appearedInShows,
       total_shows: sampleSize,
       position: index + 1,
@@ -519,12 +519,31 @@ function detectStructure(
   );
   if (coreSongs.length >= 5) return 'mostly_fixed';
 
-  const rotatingCandidates = songs.filter((song) => {
-    const ratio = song.confidence ?? 0;
-    return ratio >= WILDCARD_MIN && ratio <= WILDCARD_MAX;
-  });
+  const rotatingCandidates = songs.filter(
+    (song) => (song.frequency_pct ?? 0) < WILDCARD_FREQUENCY_PCT
+  );
 
   return rotatingCandidates.length >= 3 ? 'rotating' : 'mostly_fixed';
+}
+
+function getUtcCalendarDay(isoDate: string): string {
+  const date = new Date(isoDate);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+async function listShowIdsWithSongs(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  showIds: string[]
+): Promise<Set<string>> {
+  if (showIds.length === 0) return new Set();
+
+  const { data, error } = await supabase.from('show_songs').select('show_id').in('show_id', showIds);
+  if (error) throw error;
+
+  return new Set((data ?? []).map((row) => row.show_id as string));
 }
 
 async function listPriorShowsWithVenues(
@@ -532,17 +551,21 @@ async function listPriorShowsWithVenues(
   artistId: string,
   tourId: string | null,
   excludeShowId: string,
-  beforeDate: string,
+  targetShowDate: string,
   sampleSize: number
 ): Promise<PriorShowRow[]> {
+  const now = new Date().toISOString();
+  const targetDay = getUtcCalendarDay(targetShowDate);
+  const limit = Math.min(sampleSize, 10);
+
   let query = supabase
     .from('shows')
     .select('id, artist_id, tour_id, show_date, venue:venues ( name, city )')
     .eq('artist_id', artistId)
     .neq('id', excludeShowId)
-    .lt('show_date', beforeDate)
+    .lt('show_date', now)
     .order('show_date', { ascending: false })
-    .limit(Math.min(sampleSize, 10));
+    .limit(PRIOR_SHOW_CANDIDATE_POOL);
 
   if (tourId) {
     query = query.eq('tour_id', tourId);
@@ -550,7 +573,18 @@ async function listPriorShowsWithVenues(
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as unknown as PriorShowRow[];
+
+  const candidates = ((data ?? []) as PriorShowRow[]).filter(
+    (show) => getUtcCalendarDay(show.show_date) !== targetDay
+  );
+  if (candidates.length === 0) return [];
+
+  const showIdsWithSongs = await listShowIdsWithSongs(
+    supabase,
+    candidates.map((show) => show.id)
+  );
+
+  return candidates.filter((show) => showIdsWithSongs.has(show.id)).slice(0, limit);
 }
 
 async function listShowSongs(showIds: string[]): Promise<ShowSongRow[]> {

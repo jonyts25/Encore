@@ -123,6 +123,34 @@ export async function ingestArtistSetlists(
 
 type SupabaseAdmin = ReturnType<typeof createSupabaseAdminClient>;
 
+type ExistingShowRow = {
+  id: string;
+  tour_id: string | null;
+  venue_id: string;
+  show_date: string;
+  setlistfm_id: string | null;
+};
+
+const CITY_ALIASES: Record<string, string> = {
+  'mexico city': 'ciudad de mexico',
+  'ciudad de mexico': 'ciudad de mexico',
+  'ciudad de méxico': 'ciudad de mexico',
+};
+
+function normalizeCityName(city: string): string {
+  const normalized = city
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .trim();
+  return CITY_ALIASES[normalized] ?? normalized;
+}
+
+function hasCustomShowTime(isoDate: string): boolean {
+  const date = new Date(isoDate);
+  return !(date.getUTCHours() === 12 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0);
+}
+
 async function persistSetlist(
   supabase: SupabaseAdmin,
   artistId: string,
@@ -191,16 +219,19 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
   const venue = setlist.venue;
   const city = venue.city.name;
   const country = venue.city.country.name;
+  const normalizedCity = normalizeCityName(city);
 
-  const { data: existing, error: findError } = await supabase
+  const { data: candidates, error: findError } = await supabase
     .from('venues')
-    .select('id')
+    .select('id, city')
     .eq('name', venue.name)
-    .eq('city', city)
-    .eq('country', country)
-    .maybeSingle();
+    .eq('country', country);
 
   if (findError) throw findError;
+
+  const existing = (candidates ?? []).find(
+    (row) => normalizeCityName((row.city as string | null) ?? '') === normalizedCity
+  );
   if (existing?.id) return existing.id as string;
 
   const lat = venue.city.coords?.lat ?? null;
@@ -262,6 +293,30 @@ async function upsertTour(
   return data.id as string;
 }
 
+async function findAdoptableShow(
+  supabase: SupabaseAdmin,
+  artistId: string,
+  showDate: string
+): Promise<ExistingShowRow | null> {
+  const center = new Date(showDate).getTime();
+  const windowStart = new Date(center - 24 * 60 * 60 * 1000).toISOString();
+  const windowEnd = new Date(center + 24 * 60 * 60 * 1000).toISOString();
+
+  const { data, error } = await supabase
+    .from('shows')
+    .select('id, tour_id, venue_id, show_date, setlistfm_id')
+    .eq('artist_id', artistId)
+    .gte('show_date', windowStart)
+    .lte('show_date', windowEnd)
+    .is('setlistfm_id', null)
+    .order('show_date', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as ExistingShowRow | null) ?? null;
+}
+
 async function upsertShow(
   supabase: SupabaseAdmin,
   params: {
@@ -272,25 +327,45 @@ async function upsertShow(
     setlistfmId: string;
   }
 ): Promise<string> {
-  const { data: existing, error: findError } = await supabase
+  const { data: existingBySetlistFm, error: findError } = await supabase
     .from('shows')
-    .select('id')
+    .select('id, show_date')
     .eq('setlistfm_id', params.setlistfmId)
     .maybeSingle();
 
   if (findError) throw findError;
-  if (existing?.id) {
+  if (existingBySetlistFm?.id) {
+    const updatePayload: {
+      artist_id: string;
+      tour_id: string | null;
+      venue_id: string;
+      show_date?: string;
+    } = {
+      artist_id: params.artistId,
+      tour_id: params.tourId,
+      venue_id: params.venueId,
+    };
+
+    if (!hasCustomShowTime(existingBySetlistFm.show_date as string)) {
+      updatePayload.show_date = params.showDate;
+    }
+
     const { error: updateError } = await supabase
       .from('shows')
-      .update({
-        artist_id: params.artistId,
-        tour_id: params.tourId,
-        venue_id: params.venueId,
-        show_date: params.showDate,
-      })
-      .eq('id', existing.id);
+      .update(updatePayload)
+      .eq('id', existingBySetlistFm.id);
     if (updateError) throw updateError;
-    return existing.id as string;
+    return existingBySetlistFm.id as string;
+  }
+
+  const adoptable = await findAdoptableShow(supabase, params.artistId, params.showDate);
+  if (adoptable) {
+    const { error: adoptError } = await supabase
+      .from('shows')
+      .update({ setlistfm_id: params.setlistfmId })
+      .eq('id', adoptable.id);
+    if (adoptError) throw adoptError;
+    return adoptable.id;
   }
 
   const { data, error } = await supabase
