@@ -25,6 +25,6 @@ export async function GET(request: Request) {
     return jsonOk({ shows });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load upcoming shows';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

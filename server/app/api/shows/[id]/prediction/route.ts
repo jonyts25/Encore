@@ -20,6 +20,6 @@ export async function GET(request: Request, context: RouteContext) {
     return jsonOk({ prediction });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to generate prediction';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

@@ -16,6 +16,6 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonOk({ result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to sync artist links';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

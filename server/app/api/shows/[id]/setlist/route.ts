@@ -23,6 +23,6 @@ export async function GET(_request: Request, context: RouteContext) {
     return jsonOk({ show_id: id, songs });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load setlist';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

@@ -22,6 +22,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load home show sections';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

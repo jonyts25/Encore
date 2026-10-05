@@ -65,7 +65,7 @@ export async function POST(request: Request, context: RouteContext) {
     return jsonOk({ user_show: userShow });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update show status';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }
 
@@ -92,6 +92,6 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return jsonOk({ removed: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to remove show status';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

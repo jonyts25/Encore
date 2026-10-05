@@ -32,6 +32,6 @@ export async function POST(request: Request) {
     return jsonOk({ result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Artist enrich backfill failed';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

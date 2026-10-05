@@ -24,6 +24,6 @@ export async function GET(request: Request, context: RouteContext) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load artist shows';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

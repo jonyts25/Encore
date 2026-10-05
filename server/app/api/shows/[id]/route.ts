@@ -22,6 +22,6 @@ export async function GET(_request: Request, context: RouteContext) {
     return jsonOk({ show });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to load show';
-    return jsonError(message, 500);
+    return jsonError(message, 500, error);
   }
 }

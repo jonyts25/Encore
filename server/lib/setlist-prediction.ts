@@ -104,14 +104,10 @@ type SongAggregate = {
 
 const NON_SONG_MARKERS = new Set(['intro', 'outro']);
 
-let predictionCacheInvalidated = false;
-
 export async function generateShowPrediction(
   showId: string,
   sampleSize = 10
 ): Promise<SetlistPrediction | null> {
-  await invalidatePredictionCacheOnce();
-
   const supabase = createSupabaseAdminClient();
   const { data: show, error: showError } = await supabase
     .from('shows')
@@ -183,15 +179,6 @@ export async function getShowSetlist(showId: string): Promise<ActualSetlistSong[
       };
     })
     .filter((row): row is ActualSetlistSong => row !== null);
-}
-
-async function invalidatePredictionCacheOnce(): Promise<void> {
-  if (predictionCacheInvalidated) return;
-  predictionCacheInvalidated = true;
-
-  const supabase = createSupabaseAdminClient();
-  const { error } = await supabase.from('setlist_predictions').delete().neq('show_id', '');
-  if (error) throw error;
 }
 
 async function buildStatisticalPrediction(

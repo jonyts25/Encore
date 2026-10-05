@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     return jsonOk(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Artist search failed';
-    return jsonError(message, 502);
+    return jsonError(message, 502, error);
   }
 }

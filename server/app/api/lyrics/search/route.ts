@@ -46,6 +46,6 @@ export async function GET(request: Request) {
     if (message.includes('not found')) {
       return jsonError('Lyrics not found', 404);
     }
-    return jsonError(message, 502);
+    return jsonError(message, 502, error);
   }
 }

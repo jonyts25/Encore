@@ -27,6 +27,6 @@ export async function POST(request: Request) {
     return jsonOk({ artist, source: 'resolved' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Artist confirmation failed';
-    return jsonError(message, 502);
+    return jsonError(message, 502, error);
   }
 }
