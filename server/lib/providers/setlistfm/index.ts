@@ -2,6 +2,7 @@ export {
   SetlistFmProvider,
   flattenSetlistSongs,
   getSetlistFmProvider,
+  normalizeSetlistSongTitle,
   parseSetlistFmEventDate,
   resolveArtistMbid,
 } from './adapter';
