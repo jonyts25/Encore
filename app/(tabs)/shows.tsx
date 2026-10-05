@@ -1,5 +1,10 @@
 import { UpcomingShowsContent } from '@/modules/events';
+import { ThemedView } from '@/core/ui/Themed';
 
 export default function ShowsScreen() {
-  return <UpcomingShowsContent />;
+  return (
+    <ThemedView style={{ flex: 1 }}>
+      <UpcomingShowsContent />
+    </ThemedView>
+  );
 }

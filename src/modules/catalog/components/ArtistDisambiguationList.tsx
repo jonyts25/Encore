@@ -89,7 +89,6 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
   container: {
-    flex: 1,
     marginTop: 8,
   },
   option: {

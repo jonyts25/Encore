@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
@@ -11,9 +12,12 @@ import { ShowListItem } from './ShowListItem';
 
 type ShowsViewMode = 'followed' | 'all';
 
+const TAB_BAR_CLEARANCE = 56;
+
 export function UpcomingShowsContent() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isGuest, session, isLoading: sessionLoading } = useSession();
   const [viewMode, setViewMode] = useState<ShowsViewMode>('followed');
 
@@ -28,7 +32,13 @@ export function UpcomingShowsContent() {
   const showGlobalEmpty = !followedOnly && !isLoading && !error && shows.length === 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[
+        styles.scrollContent,
+        { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
+      ]}
+      keyboardShouldPersistTaps="handled">
       <ThemedView style={styles.container}>
         <ThemedText style={styles.title}>{t('events.upcomingTitle')}</ThemedText>
         <ThemedText style={styles.subtitle}>
@@ -100,7 +110,6 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
   },
   container: {
-    flexGrow: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -124,8 +133,11 @@ const styles = StyleSheet.create({
   list: {
     marginTop: 12,
   },
-  scroll: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   subtitle: {
     marginTop: 4,

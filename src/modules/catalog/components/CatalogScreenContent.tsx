@@ -1,16 +1,21 @@
-import { useEffect, useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, StyleSheet, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 import { useSession } from '@/modules/identity';
 
 import { useArtistCatalogSearch, type CatalogViewMode } from '../hooks/useArtistCatalogSearch';
+import type { Artist } from '../types';
 import { ArtistDisambiguationList } from './ArtistDisambiguationList';
 import { ArtistListItem } from './ArtistListItem';
 
+const TAB_BAR_CLEARANCE = 56;
+
 export function CatalogScreenContent() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { isGuest, user, isLoading: sessionLoading } = useSession();
   const [viewMode, setViewMode] = useState<CatalogViewMode>('all');
 
@@ -41,8 +46,13 @@ export function CatalogScreenContent() {
   const showFollowedEmpty =
     followedOnly && !showBusy && !isResolving && !isConfirming && !error && artists.length === 0;
 
-  return (
-    <ThemedView style={styles.container}>
+  const renderItem = useCallback(
+    ({ item }: { item: Artist }) => <ArtistListItem artist={item} />,
+    []
+  );
+
+  const listHeader = (
+    <View style={styles.header}>
       <ThemedText style={styles.title}>{t('catalog.title')}</ThemedText>
       <ThemedText style={styles.subtitle}>{t('catalog.subtitle')}</ThemedText>
 
@@ -125,14 +135,23 @@ export function CatalogScreenContent() {
           ) : null}
         </ThemedView>
       ) : null}
+    </View>
+  );
 
-      {!showBusy && !isResolving && !isConfirming && !error && artists.length > 0 ? (
-        <View style={styles.list}>
-          {artists.map((artist) => (
-            <ArtistListItem key={artist.id} artist={artist} />
-          ))}
-        </View>
-      ) : null}
+  return (
+    <ThemedView style={styles.container}>
+      <FlatList
+        data={artists}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ListHeaderComponent={listHeader}
+        keyboardShouldPersistTaps="handled"
+        style={styles.list}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingBottom: insets.bottom + TAB_BAR_CLEARANCE,
+        }}
+      />
     </ThemedView>
   );
 }
@@ -140,14 +159,11 @@ export function CatalogScreenContent() {
 const styles = StyleSheet.create({
   centered: {
     alignItems: 'center',
-    flex: 1,
     justifyContent: 'center',
-    padding: 24,
+    paddingVertical: 32,
   },
   container: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingTop: 16,
   },
   emptySubtitle: {
     marginTop: 8,
@@ -176,9 +192,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
     opacity: 0.75,
   },
+  header: {
+    paddingTop: 16,
+  },
   list: {
     flex: 1,
-    marginTop: 8,
   },
   searchInput: {
     backgroundColor: '#F4F4F4',

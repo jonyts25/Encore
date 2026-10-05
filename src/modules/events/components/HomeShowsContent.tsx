@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
@@ -9,9 +10,12 @@ import { useHomeShowSections } from '../hooks/useHomeShowSections';
 import { ShowSection } from './ShowSection';
 import { getTodayGoingShow, TodayShowCta } from './TodayShowCta';
 
+const TAB_BAR_CLEARANCE = 56;
+
 export function HomeShowsContent() {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { isGuest, session, isLoading: sessionLoading } = useSession();
 
   const { sections, isLoading, error } = useHomeShowSections({
@@ -21,7 +25,7 @@ export function HomeShowsContent() {
 
   if (sessionLoading) {
     return (
-      <ThemedView style={styles.centered}>
+      <ThemedView style={styles.centeredFull}>
         <ThemedText>{t('common.loading')}</ThemedText>
       </ThemedView>
     );
@@ -29,7 +33,12 @@ export function HomeShowsContent() {
 
   if (isGuest) {
     return (
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
+        ]}>
         <ThemedView style={styles.container}>
           <ThemedText style={styles.title}>{t('home.title')}</ThemedText>
           <ThemedText style={styles.subtitle}>{t('home.subtitle')}</ThemedText>
@@ -46,7 +55,12 @@ export function HomeShowsContent() {
   const todayShow = getTodayGoingShow(sections.going);
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={[
+        styles.scrollContent,
+        { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
+      ]}>
       <ThemedView style={styles.container}>
         <ThemedText style={styles.title}>{t('home.title')}</ThemedText>
         <ThemedText style={styles.subtitle}>{t('home.subtitle')}</ThemedText>
@@ -99,9 +113,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 32,
   },
+  centeredFull: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
   container: {
-    flexGrow: 1,
-    paddingBottom: 24,
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -121,8 +138,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  scroll: {
+  scrollContent: {
     flexGrow: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   subtitle: {
     marginTop: 4,
