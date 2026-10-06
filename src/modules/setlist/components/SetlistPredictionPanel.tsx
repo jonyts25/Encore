@@ -74,14 +74,14 @@ export function SetlistPredictionPanel({ showId, artistName }: SetlistPrediction
   const openLyrics = (title: string) => {
     router.push({
       pathname: '/lyrics',
-      params: { artist: artistName, title },
+      params: { artist: artistName, title, showId },
     });
   };
 
   const openLive = (title: string) => {
     router.push({
       pathname: '/live',
-      params: { artist: artistName, title },
+      params: { artist: artistName, title, showId },
     });
   };
 

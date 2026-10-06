@@ -84,9 +84,8 @@ export function LyricsScrollPanel({
     activeLineIndex,
     isPlaying,
     modeLabelKey,
-    start,
     reset,
-    toggle,
+    playPause,
   } = useLyricsAutoScroll({
     plainLyrics: safePlainLyrics,
     syncedLines: safeSyncedLines,
@@ -189,13 +188,7 @@ export function LyricsScrollPanel({
           <>
             <Pressable
               accessibilityRole="button"
-              onPress={() => {
-                if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0) {
-                  start();
-                } else {
-                  toggle();
-                }
-              }}
+              onPress={playPause}
               style={({ pressed }) => [
                 styles.compactControl,
                 styles.compactControlPrimary,
@@ -218,13 +211,7 @@ export function LyricsScrollPanel({
           <>
             <Button
               title={primaryActionLabel}
-              onPress={() => {
-                if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0) {
-                  start();
-                } else {
-                  toggle();
-                }
-              }}
+              onPress={playPause}
             />
             <Button title={t('lyrics.restart')} variant="secondary" onPress={reset} />
           </>

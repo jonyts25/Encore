@@ -3,14 +3,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { LyricsScrollMode, SyncedLine } from '../types';
 import {
   buildDisplayLines,
+  DEFAULT_MANUAL_LINE_INTERVAL_SECONDS,
   detectScrollMode,
+  elapsedSecondsForLineIndex,
   normalizeDurationSeconds,
   normalizePlainLyrics,
   normalizeSyncedLines,
   resolveActiveLineIndex,
 } from '../scrollLogic';
-
-const MANUAL_LINE_INTERVAL_SECONDS = 4;
 const TICK_MS = 100;
 
 type UseLyricsAutoScrollOptions = {
@@ -72,6 +72,70 @@ export function useLyricsAutoScroll({
     }
   }, [isPlaying, pause, start]);
 
+  const playPause = useCallback(() => {
+    if (scrollMode === 'manual' && !isPlaying && activeLineIndex === 0 && pausedElapsedRef.current === 0) {
+      start();
+      return;
+    }
+    toggle();
+  }, [activeLineIndex, isPlaying, scrollMode, start, toggle]);
+
+  const getElapsedSeconds = useCallback(() => {
+    if (startedAtRef.current === null) {
+      return pausedElapsedRef.current;
+    }
+    return (Date.now() - startedAtRef.current) / 1000;
+  }, []);
+
+  const setElapsedSeconds = useCallback(
+    (seconds: number) => {
+      const clampedSeconds = Math.max(0, seconds);
+      pausedElapsedRef.current = clampedSeconds;
+      if (isPlaying) {
+        startedAtRef.current = Date.now() - clampedSeconds * 1000;
+      } else {
+        startedAtRef.current = null;
+      }
+
+      const nextIndex = resolveActiveLineIndex(
+        scrollMode,
+        clampedSeconds,
+        displayLines,
+        safeSyncedLines,
+        safeDurationSeconds,
+        DEFAULT_MANUAL_LINE_INTERVAL_SECONDS
+      );
+      setActiveLineIndex(nextIndex);
+    },
+    [displayLines, isPlaying, safeDurationSeconds, safeSyncedLines, scrollMode]
+  );
+
+  const seekToLine = useCallback(
+    (lineIndex: number) => {
+      if (displayLines.length === 0) return;
+      const elapsed = elapsedSecondsForLineIndex(
+        scrollMode,
+        lineIndex,
+        displayLines,
+        safeSyncedLines,
+        safeDurationSeconds,
+        DEFAULT_MANUAL_LINE_INTERVAL_SECONDS
+      );
+      setElapsedSeconds(elapsed);
+    },
+    [displayLines, safeDurationSeconds, safeSyncedLines, scrollMode, setElapsedSeconds]
+  );
+
+  const stepLine = useCallback(
+    (delta: -1 | 1) => {
+      if (displayLines.length === 0) return;
+      const nextIndex = Math.min(Math.max(activeLineIndex + delta, 0), displayLines.length - 1);
+      if (nextIndex === activeLineIndex) return;
+      seekToLine(nextIndex);
+    },
+    [activeLineIndex, displayLines.length, seekToLine]
+  );
+
   useEffect(() => {
     reset();
   }, [safePlainLyrics, safeSyncedLines, safeDurationSeconds, reset]);
@@ -96,7 +160,7 @@ export function useLyricsAutoScroll({
         displayLines,
         safeSyncedLines,
         safeDurationSeconds,
-        MANUAL_LINE_INTERVAL_SECONDS
+        DEFAULT_MANUAL_LINE_INTERVAL_SECONDS
       );
       setActiveLineIndex(nextIndex);
 
@@ -135,5 +199,9 @@ export function useLyricsAutoScroll({
     pause,
     reset,
     toggle,
+    playPause,
+    stepLine,
+    seekToLine,
+    getElapsedSeconds,
   };
 }

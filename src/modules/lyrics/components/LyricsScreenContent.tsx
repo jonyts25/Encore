@@ -12,13 +12,14 @@ import { useLyrics } from '../hooks/useLyrics';
 type LyricsScreenContentProps = {
   artist: string;
   title: string;
+  showId?: string;
 };
 
 async function openExternalUrl(url: string) {
   await WebBrowser.openBrowserAsync(url);
 }
 
-export function LyricsScreenContent({ artist, title }: LyricsScreenContentProps) {
+export function LyricsScreenContent({ artist, title, showId }: LyricsScreenContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { lyrics, isLoading, error, notFound } = useLyrics(artist, title);
@@ -79,7 +80,7 @@ export function LyricsScreenContent({ artist, title }: LyricsScreenContentProps)
               onPress={() => {
                 router.push({
                   pathname: '/live',
-                  params: { artist, title },
+                  params: showId ? { artist, title, showId } : { artist, title },
                 });
               }}
             />

@@ -41,7 +41,37 @@ export function buildDisplayLines(
   if (lines.length > 0) {
     return lines.map((entry) => entry.line);
   }
-  return splitPlainLyricsLines(plainLyrics);
+  return splitPlainLyricsLines(normalizePlainLyrics(plainLyrics));
+}
+
+export const DEFAULT_MANUAL_LINE_INTERVAL_SECONDS = 4;
+
+export function elapsedSecondsForLineIndex(
+  mode: LyricsScrollMode,
+  lineIndex: number,
+  displayLines: string[],
+  syncedLines?: SyncedLine[] | null,
+  durationSeconds?: number | null,
+  manualLineIntervalSeconds = DEFAULT_MANUAL_LINE_INTERVAL_SECONDS
+): number {
+  const safeDisplayLines = Array.isArray(displayLines) ? displayLines : [];
+  const safeSyncedLines = normalizeSyncedLines(syncedLines);
+  const safeDuration = normalizeDurationSeconds(durationSeconds);
+
+  if (safeDisplayLines.length === 0) return 0;
+
+  const clampedIndex = Math.min(Math.max(lineIndex, 0), safeDisplayLines.length - 1);
+
+  if (mode === 'synced') {
+    return safeSyncedLines[clampedIndex]?.timestamp_seconds ?? 0;
+  }
+
+  if (mode === 'estimated' && safeDuration !== null) {
+    const lineDuration = safeDuration / safeDisplayLines.length;
+    return clampedIndex * lineDuration;
+  }
+
+  return clampedIndex * manualLineIntervalSeconds;
 }
 
 export function resolveActiveLineIndex(
@@ -50,7 +80,7 @@ export function resolveActiveLineIndex(
   displayLines: string[],
   syncedLines?: SyncedLine[] | null,
   durationSeconds?: number | null,
-  manualLineIntervalSeconds: number
+  manualLineIntervalSeconds = DEFAULT_MANUAL_LINE_INTERVAL_SECONDS
 ): number {
   const safeDisplayLines = Array.isArray(displayLines) ? displayLines : [];
   const safeSyncedLines = normalizeSyncedLines(syncedLines);

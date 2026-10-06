@@ -1,4 +1,17 @@
-import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import {
+  EncoreMultiCamBackPreview,
+  EncoreMultiCamFrontPreview,
+  saveToPhotos,
+  setCameraMode,
+  shouldUseEncoreNativeCamera,
+  startMultiCamPreview,
+  startMultiCamRecording,
+  stopMultiCamPreview,
+  stopMultiCamRecording,
+  type EncoreCameraState,
+  type EncoreCameraZoomState,
+} from 'encore-camera';
 import { Asset } from 'expo-media-library';
 import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
@@ -18,13 +31,12 @@ import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText } from '@/core/ui/Themed';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
+import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
 
-import type { LiveFloatingHeight, LiveLayoutMode } from '../types';
-import { LiveFloatingLyrics } from './LiveFloatingLyrics';
-import { LiveLayoutMenu } from './LiveLayoutMenu';
-import { LiveLyricsOverlay } from './LiveLyricsOverlay';
+import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
+import { LiveConcertBottomBar } from './LiveConcertBottomBar';
+import { LiveConcertLyricsStrip } from './LiveConcertLyricsStrip';
 import { LiveSongPickerModal } from './LiveSongPickerModal';
-import { LiveZoomSlider } from './LiveZoomSlider';
 import { useLiveHardwareShutter } from '../hooks/useLiveHardwareShutter';
 import {
   activateRecordingKeepAwake,
@@ -40,17 +52,71 @@ type LiveCameraContentProps = {
 
 const TOP_BAR_CONTENT_HEIGHT = 44;
 
-function sortSongsForPicker<T extends { title: string; confidence: number | null }>(songs: T[]) {
+const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
+  'mostly_fixed',
+  'rotating',
+  'no_tour_data_fallback',
+];
+
+const FIXED_LENS_CHIPS = [
+  { id: 'ultra', label: '.5×' },
+  { id: 'wide', label: '1×' },
+  { id: 'tele2', label: '2×' },
+  { id: 'tele5', label: '5×' },
+];
+
+function sortSongsForPicker(songs: PredictedSong[]) {
   return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+}
+
+function sortSongsBySetlistOrder(songs: PredictedSong[]) {
+  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
+}
+
+function buildNativeZoomFactors(state: EncoreCameraState): number[] {
+  const factors = [...(state.lensZoomFactors ?? [1])];
+  if (state.maxZoom >= 2 && !factors.some((factor) => Math.abs(factor - 2) < 0.05)) {
+    factors.push(2);
+  }
+  return [...new Set(factors)].sort((a, b) => a - b);
+}
+
+function formatNativeZoomChip(factor: number): string {
+  if (factor < 1) {
+    return `${factor.toFixed(1).replace(/^0\./, '.')}×`;
+  }
+  if (Math.abs(factor - Math.round(factor)) < 0.001) {
+    return `${Math.round(factor)}×`;
+  }
+  return `${factor.toFixed(1)}×`;
+}
+
+function selectedNativeZoomFactor(factors: number[], currentZoom: number): number {
+  const eligible = factors.filter((factor) => factor <= currentZoom + 0.01);
+  return eligible.length > 0 ? eligible[eligible.length - 1] : (factors[0] ?? 1);
+}
+
+function zoomChipId(factor: number) {
+  return `zoom-${factor}`;
+}
+
+function parseZoomChipId(id: string): number | null {
+  if (!id.startsWith('zoom-')) return null;
+  const value = Number.parseFloat(id.slice(5));
+  return Number.isFinite(value) ? value : null;
 }
 
 export function LiveCameraContent({ artist, title, showId }: LiveCameraContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const cameraRef = useRef<CameraView>(null);
+  const previewRef = useRef<LiveCameraPreviewRef>(null);
   const isMountedRef = useRef(true);
   const isRecordingRef = useRef(false);
+  const wantsNativePreview = shouldUseEncoreNativeCamera();
+  const [nativeCameraFailed, setNativeCameraFailed] = useState(false);
+  const useNativePreview = wantsNativePreview && !nativeCameraFailed;
+  const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
@@ -62,11 +128,13 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const flashTipShownRef = useRef(false);
 
   const [zoom, setZoom] = useState(0);
-  const [layoutMode, setLayoutMode] = useState<LiveLayoutMode>('overlay');
   const [lyricsVisible, setLyricsVisible] = useState(true);
-  const [floatingHeight, setFloatingHeight] = useState<LiveFloatingHeight>(200);
-  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const [songPickerOpen, setSongPickerOpen] = useState(false);
+  const [multiCamActive, setMultiCamActive] = useState(false);
+  const [nativeCameraState, setNativeCameraState] = useState<EncoreCameraState | null>(null);
+  const [nativeZoom, setNativeZoom] = useState(1);
+  const lastRoundedNativeZoomRef = useRef<number | null>(null);
+  const [selectedLensId, setSelectedLensId] = useState<string>('wide');
 
   const [activeTitle, setActiveTitle] = useState(title);
   const [isRecording, setIsRecording] = useState(false);
@@ -77,10 +145,47 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const showKeepAwakeDiagnostic = isLiveDiagnosticsEnabled();
 
   const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
-  const pickerSongs = useMemo(
-    () => sortSongsForPicker(prediction?.songs ?? []),
-    [prediction?.songs]
-  );
+  const pickerSongs = useMemo(() => {
+    if (!prediction?.songs) return [];
+    const showConfidence = CONFIDENCE_STRUCTURES.includes(prediction.structure);
+    return showConfidence
+      ? sortSongsForPicker(prediction.songs)
+      : sortSongsBySetlistOrder(prediction.songs);
+  }, [prediction]);
+
+  const updateNativeZoom = (zoom: number) => {
+    const rounded = Math.round(zoom * 10) / 10;
+    if (lastRoundedNativeZoomRef.current === rounded) return;
+    lastRoundedNativeZoomRef.current = rounded;
+    setNativeZoom(rounded);
+  };
+
+  const lensChips = useMemo(() => {
+    if (useNativePreview && nativeCameraState) {
+      const factors = buildNativeZoomFactors(nativeCameraState);
+      const selectedFactor = selectedNativeZoomFactor(factors, nativeZoom);
+      return factors.map((factor) => ({
+        id: zoomChipId(factor),
+        label:
+          factor === selectedFactor
+            ? formatNativeZoomChip(nativeZoom)
+            : formatNativeZoomChip(factor),
+      }));
+    }
+    return FIXED_LENS_CHIPS;
+  }, [nativeCameraState, nativeZoom, useNativePreview]);
+
+  const nativeSelectedLensId = useMemo(() => {
+    if (!useNativePreview || !nativeCameraState) return null;
+    const factors = buildNativeZoomFactors(nativeCameraState);
+    return zoomChipId(selectedNativeZoomFactor(factors, nativeZoom));
+  }, [nativeCameraState, nativeZoom, useNativePreview]);
+
+  useEffect(() => {
+    if (permissionsRequested && !micPermission?.granted) {
+      void requestMicPermission();
+    }
+  }, [permissionsRequested, micPermission?.granted, requestMicPermission]);
 
   useEffect(() => {
     if (title.trim()) {
@@ -122,6 +227,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     micPermission?.granted,
     requestCameraPermission,
     requestMicPermission,
+    useNativePreview,
   ]);
 
   useEffect(() => {
@@ -131,21 +237,26 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       isMountedRef.current = false;
       if (isRecordingRef.current) {
         try {
-          cameraRef.current?.stopRecording();
+          previewRef.current?.stopRecording();
         } catch {
           // Camera may already be torn down during navigation.
         }
       }
       deactivateRecordingKeepAwake();
+      if (multiCamActive) {
+        void stopMultiCamPreview().catch(() => undefined);
+      }
     };
-  }, []);
+  }, [multiCamActive]);
 
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
+      setAppIsActive(nextState === 'active');
+
       if (nextState !== 'background' || !isRecordingRef.current) return;
 
       try {
-        cameraRef.current?.stopRecording();
+        previewRef.current?.stopRecording();
       } catch {
         // Best-effort stop when the app backgrounds during recording.
       }
@@ -154,7 +265,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, []);
+  }, [useNativePreview]);
 
   useEffect(() => {
     if (facing === 'front') {
@@ -170,8 +281,35 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     return () => clearTimeout(timeoutId);
   }, [flashTip]);
 
-  const handleToggleTorch = () => {
+  const handleNativeCameraState = (state: EncoreCameraState) => {
+    setNativeCameraState(state);
+    setFacing(state.activeCameraPosition === 'front' ? 'front' : 'back');
+    setTorchOn(state.torchEnabled);
+    updateNativeZoom(state.currentZoom);
+  };
+
+  const handleNativeZoomChanged = (zoomState: EncoreCameraZoomState) => {
+    updateNativeZoom(zoomState.currentZoom);
+  };
+
+  const handleToggleTorch = async () => {
     if (facing === 'front') return;
+
+    if (useNativePreview) {
+      try {
+        const next = await previewRef.current?.setNativeTorch(!torchOn);
+        if (typeof next === 'boolean') {
+          setTorchOn(next);
+          if (next && !flashTipShownRef.current) {
+            flashTipShownRef.current = true;
+            setFlashTip(t('live.flashTip'));
+          }
+        }
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+      }
+      return;
+    }
 
     setTorchOn((current) => {
       const next = !current;
@@ -184,22 +322,52 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   };
 
   const permissionsGranted = Boolean(cameraPermission?.granted && micPermission?.granted);
+  const previewActive = permissionsGranted && appIsActive && !multiCamActive;
+  const multiCamPreviewActive = permissionsGranted && appIsActive && multiCamActive;
   const lyricsUnavailable = Boolean(lyricsError || notFound || !lyrics);
-  const headerOffset = insets.top + TOP_BAR_CONTENT_HEIGHT;
+  const singleCameraActive = previewActive && !multiCamActive;
 
   const handleToggleRecordingRef = useRef<() => Promise<void>>(async () => {});
 
   useLiveHardwareShutter(() => {
     void handleToggleRecordingRef.current();
-  }, permissionsGranted);
+  }, permissionsGranted && !useNativePreview);
   const showLyricsPanel = lyricsVisible;
-  const lyricsProps = {
-    contentTopInset: headerOffset,
-    durationSeconds: lyrics?.durationSeconds,
-    isLoading: lyricsLoading,
-    isUnavailable: lyricsUnavailable,
-    plainLyrics: lyrics?.plainLyrics,
-    syncedLines: lyrics?.syncedLines,
+
+  const handleToggleMultiCam = async () => {
+    if (!useNativePreview) {
+      setErrorMessage(t('live.multiCamUnavailable'));
+      return;
+    }
+
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    if (multiCamActive) {
+      try {
+        await stopMultiCamPreview();
+        await setCameraMode('single');
+        setMultiCamActive(false);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : t('live.multiCamFailed'));
+      }
+      return;
+    }
+
+    try {
+      await setCameraMode('multiCamPreview');
+      setMultiCamActive(true);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resolve());
+        });
+      });
+      await startMultiCamPreview();
+    } catch (error) {
+      await setCameraMode('single').catch(() => undefined);
+      setMultiCamActive(false);
+      setErrorMessage(error instanceof Error ? error.message : t('live.multiCamFailed'));
+    }
   };
 
   const applyKeepAwakeDiagnostic = (result: { ok: true } | { ok: false; error: string }) => {
@@ -227,11 +395,58 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     setErrorMessage(null);
     setStatusMessage(null);
 
-    if (!cameraRef.current) return;
+    if (multiCamActive) {
+      if (isRecording || isRecordingRef.current) {
+        try {
+          const result = await stopMultiCamRecording();
+          isRecordingRef.current = false;
+          setIsRecording(false);
+          releaseRecordingKeepAwake();
+          setIsSaving(true);
+          await saveToPhotos(result.backVideoURL);
+          await saveToPhotos(result.frontVideoURL);
+          if (isMountedRef.current) {
+            setStatusMessage(t('live.savedMultiCamToCameraRoll'));
+          }
+        } catch (error) {
+          isRecordingRef.current = false;
+          releaseRecordingKeepAwake();
+          if (isMountedRef.current) {
+            setIsRecording(false);
+            setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsSaving(false);
+          }
+        }
+        return;
+      }
+
+      isRecordingRef.current = true;
+      setIsRecording(true);
+      setStatusMessage(t('live.recording'));
+      const keepAwakeResult = await activateRecordingKeepAwake();
+      applyKeepAwakeDiagnostic(keepAwakeResult);
+      try {
+        await startMultiCamRecording();
+      } catch (error) {
+        isRecordingRef.current = false;
+        releaseRecordingKeepAwake();
+        if (isMountedRef.current) {
+          setIsRecording(false);
+          setStatusMessage(null);
+          setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+        }
+      }
+      return;
+    }
+
+    if (!previewRef.current) return;
 
     if (isRecording || isRecordingRef.current) {
       try {
-        cameraRef.current.stopRecording();
+        previewRef.current.stopRecording();
       } catch {
         isRecordingRef.current = false;
         if (isMountedRef.current) {
@@ -250,7 +465,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     applyKeepAwakeDiagnostic(keepAwakeResult);
 
     try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: 900 });
+      const video = await previewRef.current.recordAsync({ maxDuration: 900 });
       isRecordingRef.current = false;
 
       if (!isMountedRef.current) return;
@@ -264,22 +479,33 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       }
 
       setIsSaving(true);
-      const mediaPermission = await MediaLibrary.requestPermissionsAsync();
-      if (!mediaPermission.granted) {
-        setErrorMessage(t('live.mediaPermissionDenied'));
-        return;
+
+      if (useNativePreview) {
+        await saveToPhotos(video.uri);
+      } else {
+        const mediaPermission = await MediaLibrary.requestPermissionsAsync();
+        if (!mediaPermission.granted) {
+          setErrorMessage(t('live.mediaPermissionDenied'));
+          return;
+        }
+
+        await Asset.create(video.uri);
       }
 
-      await Asset.create(video.uri);
       if (isMountedRef.current) {
         setStatusMessage(t('live.savedToCameraRoll'));
       }
-    } catch {
+    } catch (error) {
       isRecordingRef.current = false;
       releaseRecordingKeepAwake();
       if (isMountedRef.current) {
         setIsRecording(false);
-        setErrorMessage(t('live.recordFailed'));
+        const message = error instanceof Error ? error.message : '';
+        setErrorMessage(
+          message.includes('Photo') || message.includes('PHOTOS')
+            ? t('live.mediaPermissionDenied')
+            : t('live.recordFailed')
+        );
       }
     } finally {
       if (isMountedRef.current) {
@@ -289,6 +515,90 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   };
 
   handleToggleRecordingRef.current = handleToggleRecording;
+
+  const handleNativeRecordingStarted = async () => {
+    isRecordingRef.current = true;
+    setIsRecording(true);
+    setStatusMessage(t('live.recording'));
+    const keepAwakeResult = await activateRecordingKeepAwake();
+    applyKeepAwakeDiagnostic(keepAwakeResult);
+  };
+
+  const handleNativeRecordingFinished = async (uri: string) => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    releaseRecordingKeepAwake();
+
+    if (!isMountedRef.current) return;
+
+    setErrorMessage(null);
+    setStatusMessage(null);
+    setIsSaving(true);
+
+    try {
+      await saveToPhotos(uri);
+      if (isMountedRef.current) {
+        setStatusMessage(t('live.savedToCameraRoll'));
+      }
+    } catch (error) {
+      if (isMountedRef.current) {
+        const message = error instanceof Error ? error.message : '';
+        setErrorMessage(
+          message.includes('Photo') || message.includes('PHOTOS')
+            ? t('live.mediaPermissionDenied')
+            : t('live.recordFailed')
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleNativeRecordingError = (message: string) => {
+    isRecordingRef.current = false;
+    releaseRecordingKeepAwake();
+    if (isMountedRef.current) {
+      setIsRecording(false);
+      setErrorMessage(message || t('live.recordFailed'));
+    }
+  };
+
+  const handleFlipCamera = async () => {
+    if (useNativePreview) {
+      try {
+        await previewRef.current?.switchNativeCamera();
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+      }
+      return;
+    }
+
+    setFacing((current) => (current === 'back' ? 'front' : 'back'));
+  };
+
+  const handleSelectLens = async (id: string) => {
+    if (useNativePreview) {
+      const factor = parseZoomChipId(id);
+      if (factor === null) return;
+
+      try {
+        await previewRef.current?.setNativeZoom(factor);
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+      }
+      return;
+    }
+
+    setSelectedLensId(id);
+
+    setFacing('back');
+    if (id === 'ultra') setZoom(0);
+    else if (id === 'wide') setZoom(0);
+    else if (id === 'tele2') setZoom(0.35);
+    else if (id === 'tele5') setZoom(0.65);
+  };
 
   if (!permissionsRequested) {
     return (
@@ -302,7 +612,9 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   if (!permissionsGranted) {
     return (
       <View style={styles.centered}>
-        <ThemedText style={styles.permissionTitle}>{t('live.permissionsRequired')}</ThemedText>
+        <ThemedText style={styles.permissionTitle}>
+          {t('live.permissionsRequired')}
+        </ThemedText>
         <ThemedText style={styles.permissionSubtitle}>{t('live.permissionsHint')}</ThemedText>
         <Button
           title={t('live.retryPermissions')}
@@ -319,175 +631,130 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   }
 
   const cameraNode = (
-    <CameraView
-      ref={cameraRef}
-      style={layoutMode === 'split' ? StyleSheet.absoluteFill : StyleSheet.absoluteFill}
-      mode="video"
-      facing={facing}
-      enableTorch={facing === 'back' && torchOn}
-      zoom={zoom}
-    />
+    <>
+      <LiveCameraPreview
+        ref={previewRef}
+        useNativePreview={useNativePreview}
+        active={singleCameraActive}
+        facing={facing}
+        torchOn={torchOn}
+        zoom={zoom}
+        style={StyleSheet.absoluteFill}
+        onNativeCameraError={() => {
+          setNativeCameraFailed(true);
+        }}
+        onNativeCameraState={useNativePreview ? handleNativeCameraState : undefined}
+        onNativeZoomChanged={useNativePreview ? handleNativeZoomChanged : undefined}
+        onNativeRecordingStarted={useNativePreview ? handleNativeRecordingStarted : undefined}
+        onNativeRecordingFinished={useNativePreview ? handleNativeRecordingFinished : undefined}
+        onNativeRecordingError={useNativePreview ? handleNativeRecordingError : undefined}
+      />
+      {useNativePreview && multiCamActive ? (
+        <>
+          <EncoreMultiCamBackPreview active={multiCamPreviewActive} style={StyleSheet.absoluteFill} />
+          <EncoreMultiCamFrontPreview active={multiCamPreviewActive} style={styles.multiCamPip} />
+        </>
+      ) : null}
+    </>
   );
 
   return (
     <View style={styles.root}>
-      {layoutMode === 'split' ? (
-        <View style={styles.splitCameraPane}>{cameraNode}</View>
-      ) : (
-        cameraNode
-      )}
-
-      {showLyricsPanel && layoutMode === 'overlay' ? (
-        <LiveLyricsOverlay {...lyricsProps} layout="overlay" />
-      ) : null}
-
-      {showLyricsPanel && layoutMode === 'split' ? (
-        <View style={styles.splitLyricsPane}>
-          <LiveLyricsOverlay {...lyricsProps} contentTopInset={12} layout="split" />
-        </View>
-      ) : null}
-
-      {showLyricsPanel && layoutMode === 'floating' ? (
-        <LiveFloatingLyrics
-          {...lyricsProps}
-          height={floatingHeight}
-        />
-      ) : null}
-
-      <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => router.back()} style={styles.iconButton}>
-          <Text style={styles.iconButtonText}>{t('live.back')}</Text>
-        </Pressable>
-
-        <View style={styles.topBarActions}>
-          {showId ? (
-            <Pressable
-              accessibilityLabel={t('live.openSongPicker')}
-              accessibilityRole="button"
-              onPress={() => setSongPickerOpen(true)}
-              style={styles.iconButtonRound}>
-              <Text style={styles.iconGlyph}>☰</Text>
-            </Pressable>
-          ) : null}
-
-          <Pressable
-            accessibilityLabel={lyricsVisible ? t('live.hideLyrics') : t('live.showLyrics')}
-            accessibilityRole="button"
-            onPress={() => setLyricsVisible((current) => !current)}
-            style={styles.iconButtonRound}>
-            <Text style={styles.iconGlyph}>{lyricsVisible ? '👁' : '🚫'}</Text>
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel={t('live.openLayoutMenu')}
-            accessibilityRole="button"
-            onPress={() => setLayoutMenuOpen(true)}
-            style={styles.iconButtonRound}>
-            <Text style={styles.iconGlyph}>⚙</Text>
-          </Pressable>
-        </View>
+      <View pointerEvents={useNativePreview ? 'auto' : 'none'} style={styles.cameraLayer}>
+        {cameraNode}
       </View>
 
-      <Text style={[styles.songLabel, { top: insets.top + 8 }]} numberOfLines={1}>
-        {activeTitle} · {artist}
-      </Text>
-
-      {showKeepAwakeDiagnostic && keepAwakeDiagnostic ? (
-        <Text
-          style={[
-            styles.keepAwakeDiagnostic,
-            { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 },
-            keepAwakeDiagnostic === 'Pantalla activa ✓'
-              ? styles.keepAwakeDiagnosticOk
-              : styles.keepAwakeDiagnosticError,
-          ]}
-          numberOfLines={2}>
-          {keepAwakeDiagnostic}
-        </Text>
-      ) : null}
-
-      <View style={[styles.bottomControls, { paddingBottom: insets.bottom + 16 }]}>
-        {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
-        {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-        {flashTip ? <Text style={styles.flashTip}>{flashTip}</Text> : null}
-
-        <LiveZoomSlider value={zoom} onChange={setZoom} />
-
-        <View style={styles.bottomControlRow}>
-          <Pressable
-            accessibilityLabel={t('live.flipCamera')}
-            accessibilityRole="button"
-            disabled={isRecording}
-            onPress={() => {
-              setFacing((current) => (current === 'back' ? 'front' : 'back'));
-            }}
-            style={[styles.iconButton, styles.iconButtonRound, isRecording && styles.iconButtonDisabled]}>
-            <Text style={styles.iconGlyph}>⟲</Text>
+      <View pointerEvents="box-none" style={styles.uiOverlay}>
+        <View pointerEvents="box-none" style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.headerSideButton}>
+            <Text style={styles.headerSideText}>{t('live.back')}</Text>
           </Pressable>
 
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {activeTitle} · {artist}
+          </Text>
+
           <Pressable
+            accessibilityLabel={t('live.more')}
             accessibilityRole="button"
-            disabled={isSaving}
-            onPress={() => {
+            onPress={() => setSongPickerOpen(true)}
+            style={styles.headerSideButton}>
+            <Text style={styles.headerSideText}>{t('live.more')}</Text>
+          </Pressable>
+        </View>
+
+        {showKeepAwakeDiagnostic && keepAwakeDiagnostic ? (
+          <Text
+            style={[
+              styles.keepAwakeDiagnostic,
+              { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 },
+              keepAwakeDiagnostic === 'Pantalla activa ✓'
+                ? styles.keepAwakeDiagnosticOk
+                : styles.keepAwakeDiagnosticError,
+            ]}
+            numberOfLines={2}>
+            {keepAwakeDiagnostic}
+          </Text>
+        ) : null}
+
+        {showLyricsPanel ? (
+          <View pointerEvents="box-none" style={styles.lyricsRegion}>
+            <LiveConcertLyricsStrip
+              durationSeconds={lyrics?.durationSeconds}
+              isLoading={lyricsLoading}
+              isUnavailable={lyricsUnavailable}
+              plainLyrics={lyrics?.plainLyrics}
+              syncedLines={lyrics?.syncedLines}
+            />
+          </View>
+        ) : null}
+
+        <View
+          pointerEvents="box-none"
+          style={[styles.bottomControls, { paddingBottom: insets.bottom + 12 }]}>
+          {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+          {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
+          {flashTip ? <Text style={styles.flashTip}>{flashTip}</Text> : null}
+
+          <LiveConcertBottomBar
+            flipDisabled={isRecording || multiCamActive}
+            isRecording={isRecording}
+            isSaving={isSaving}
+            lensChips={multiCamActive ? [] : lensChips}
+            multiCamActive={multiCamActive}
+            multiCamDisabled={!useNativePreview || isRecording}
+            selectedLensId={useNativePreview ? (nativeSelectedLensId ?? 'zoom-1') : selectedLensId}
+            torchDisabled={facing === 'front' || multiCamActive}
+            torchOn={torchOn}
+            onFlip={() => {
+              void handleFlipCamera();
+            }}
+            onSelectLens={(id) => {
+              void handleSelectLens(id);
+            }}
+            onToggleMultiCam={() => {
+              void handleToggleMultiCam();
+            }}
+            onToggleRecording={() => {
               void handleToggleRecording();
             }}
-            style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
-            <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
-          </Pressable>
-
-          <Pressable
-            accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
-            accessibilityRole="button"
-            disabled={facing === 'front'}
-            onPress={handleToggleTorch}
-            style={[
-              styles.iconButton,
-              styles.iconButtonRound,
-              torchOn && styles.iconButtonActive,
-              facing === 'front' && styles.iconButtonDisabled,
-            ]}>
-            <Text style={[styles.iconGlyph, torchOn && styles.iconGlyphActive]}>⚡</Text>
-          </Pressable>
+            onToggleTorch={handleToggleTorch}
+          />
         </View>
 
-        <Text style={styles.recordLabel}>
-          {isSaving
-            ? t('live.saving')
-            : isRecording
-              ? t('live.stopRecording')
-              : t('live.startRecording')}
-        </Text>
+        <LiveSongPickerModal
+          activeTitle={activeTitle}
+          songs={pickerSongs}
+          visible={songPickerOpen}
+          onClose={() => setSongPickerOpen(false)}
+          onSelect={setActiveTitle}
+        />
       </View>
-
-      <LiveSongPickerModal
-        activeTitle={activeTitle}
-        songs={pickerSongs}
-        visible={songPickerOpen}
-        onClose={() => setSongPickerOpen(false)}
-        onSelect={setActiveTitle}
-      />
-
-      <LiveLayoutMenu
-        floatingHeight={floatingHeight}
-        layoutMode={layoutMode}
-        lyricsVisible={lyricsVisible}
-        visible={layoutMenuOpen}
-        onClose={() => setLayoutMenuOpen(false)}
-        onFloatingHeightChange={setFloatingHeight}
-        onLayoutChange={setLayoutMode}
-        onLyricsVisibleChange={setLyricsVisible}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bottomControlRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    gap: 36,
-    justifyContent: 'center',
-  },
   bottomControls: {
     alignItems: 'center',
     bottom: 0,
@@ -574,81 +841,70 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  recordButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderColor: '#fff',
-    borderRadius: 32,
-    borderWidth: 3,
-    height: 64,
-    justifyContent: 'center',
-    width: 64,
-  },
-  recordButtonActive: {
-    borderColor: '#ff4d4f',
-  },
-  recordInner: {
-    backgroundColor: '#ff4d4f',
-    borderRadius: 999,
-    height: 44,
-    width: 44,
-  },
-  recordInnerActive: {
-    borderRadius: 6,
-    height: 22,
-    width: 22,
-  },
-  recordLabel: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  root: {
-    backgroundColor: '#000',
-    flex: 1,
-  },
-  songLabel: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    left: 96,
-    opacity: 0.85,
-    position: 'absolute',
-    right: 72,
-    textAlign: 'center',
-    zIndex: 28,
-  },
-  splitCameraPane: {
-    height: '50%',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  splitLyricsPane: {
-    bottom: 0,
-    height: '50%',
-    left: 0,
-    position: 'absolute',
-    right: 0,
-    zIndex: 12,
-  },
-  statusMessage: {
-    color: '#b8ffb8',
-    textAlign: 'center',
-  },
-  topBar: {
+  header: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 12,
     justifyContent: 'space-between',
     left: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     position: 'absolute',
     right: 0,
     top: 0,
     zIndex: 30,
   },
-  topBarActions: {
-    flexDirection: 'row',
-    gap: 8,
+  headerSideButton: {
+    minWidth: 56,
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  headerSideText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  headerTitle: {
+    color: '#fff',
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    opacity: 0.92,
+    textAlign: 'center',
+  },
+  lyricsRegion: {
+    justifyContent: 'center',
+    left: 0,
+    paddingHorizontal: 8,
+    position: 'absolute',
+    right: 0,
+    top: '22%',
+    zIndex: 12,
+  },
+  multiCamPip: {
+    borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 16,
+    borderWidth: 1,
+    bottom: 330,
+    height: 168,
+    overflow: 'hidden',
+    position: 'absolute',
+    right: 16,
+    width: 112,
+    zIndex: 2,
+  },
+  cameraLayer: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 0,
+  },
+  root: {
+    backgroundColor: '#000',
+    flex: 1,
+  },
+  uiOverlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 1,
+  },
+  statusMessage: {
+    color: '#b8ffb8',
+    textAlign: 'center',
   },
 });

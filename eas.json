@@ -10,7 +10,8 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app",
-        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true"
+        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true",
+        "EXPO_PUBLIC_USE_NATIVE_CAMERA": "true"
       }
     },
     "preview": {
@@ -18,7 +19,8 @@
       "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://encore-api-production-5b9a.up.railway.app",
-        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true"
+        "EXPO_PUBLIC_LIVE_DIAGNOSTICS": "true",
+        "EXPO_PUBLIC_USE_NATIVE_CAMERA": "true"
       }
     },
     "production": {

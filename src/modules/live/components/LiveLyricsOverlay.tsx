@@ -38,7 +38,9 @@ export function LiveLyricsOverlay({
 
   return (
     <View pointerEvents="box-none" style={[containerStyle, style]}>
-      <View style={[styles.content, layout === 'overlay' && { paddingTop: contentTopInset }]}>
+      <View
+        pointerEvents="auto"
+        style={[styles.content, layout === 'overlay' && { paddingTop: contentTopInset }]}>
         {isLoading ? (
           <Text style={styles.message}>{t('common.loading')}</Text>
         ) : null}
