@@ -19,6 +19,7 @@ import { useIsOffline } from '@/core/network/useIsOffline';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { GlassIconButton, PillButton } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
+import { typography } from '@/core/ui/theme/typography';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 import {
   getSetlistPredictionMetaLine,
@@ -39,11 +40,12 @@ const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
   'no_tour_data_fallback',
 ];
 
+const HERO_PLACEHOLDER = '#1B1024';
+
 type ShowDetailContentProps = {
   showId: string;
 };
 
-// Hermes (iOS) does not implement Intl.RelativeTimeFormat, so build the text ourselves.
 function formatRelativeUpdated(
   timestamp: number,
   t: (key: string, options?: Record<string, unknown>) => string
@@ -136,24 +138,30 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     });
   };
 
+  const openLive = () => {
+    if (!show) return;
+    router.push({
+      pathname: '/live',
+      params: {
+        artist: show.artist.name,
+        title: primarySongTitle ?? '',
+        showId: show.id,
+      },
+    });
+  };
+
+  const openPracticeLyrics = () => {
+    if (!show || !primarySongTitle) return;
+    router.push({
+      pathname: '/lyrics',
+      params: { artist: show.artist.name, title: primarySongTitle, showId: show.id },
+    });
+  };
+
   const handleFab = () => {
     if (!show) return;
-    if (phase === 'today') {
-      router.push({
-        pathname: '/live',
-        params: {
-          artist: show.artist.name,
-          title: primarySongTitle ?? '',
-          showId: show.id,
-        },
-      });
-      return;
-    }
     if (primarySongTitle) {
-      router.push({
-        pathname: '/lyrics',
-        params: { artist: show.artist.name, title: primarySongTitle, showId: show.id },
-      });
+      openPracticeLyrics();
       return;
     }
     router.push(`/show/${show.id}`);
@@ -170,23 +178,12 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   if (error || !show) {
     return (
       <ThemedView style={styles.centered}>
-        <ThemedText style={styles.error}>{error ?? t('events.showNotFound')}</ThemedText>
+        <ThemedText style={{ color: tokens.recording, textAlign: 'center' }}>
+          {error ?? t('events.showNotFound')}
+        </ThemedText>
       </ThemedView>
     );
   }
-
-  const fabTitle = phase === 'today' ? t('events.openLiveCompact') : t('events.practiceLyrics');
-
-  const openLive = () => {
-    router.push({
-      pathname: '/live',
-      params: {
-        artist: show.artist.name,
-        title: primarySongTitle ?? '',
-        showId: show.id,
-      },
-    });
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: tokens.background }]}>
@@ -199,7 +196,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           <Image
             contentFit="cover"
             source={show.artist.image_url ? { uri: show.artist.image_url } : undefined}
-            style={styles.heroImage}
+            style={[styles.heroImage, { backgroundColor: HERO_PLACEHOLDER }]}
           />
           <LinearGradient
             colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.82)']}
@@ -219,7 +216,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             />
           </View>
           <View style={styles.heroText}>
-            <Text style={styles.heroArtist}>{show.artist.name}</Text>
+            <Text style={[styles.heroArtist, { color: tokens.onAccent }]}>{show.artist.name}</Text>
             <Text style={styles.heroTour}>{heroSubtitle}</Text>
           </View>
         </View>
@@ -230,13 +227,13 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           <View style={[styles.infoCard, { backgroundColor: tokens.surface }]}>
             <View style={[styles.infoRow, { borderBottomColor: tokens.separator }]}>
               <Ionicons color={tokens.accent} name="calendar-outline" size={20} />
-              <Text style={[styles.infoText, { color: tokens.text }]}>
+              <Text style={[typography.body, { color: tokens.text, flex: 1 }]}>
                 {formatShowDate(show.show_date, i18n.language)}
               </Text>
             </View>
             <View style={[styles.infoRow, styles.infoRowLast]}>
               <Ionicons color={tokens.accent} name="location-outline" size={20} />
-              <Text numberOfLines={2} style={[styles.infoText, styles.infoVenue, { color: tokens.text }]}>
+              <Text numberOfLines={2} style={[typography.body, { color: tokens.text, flex: 1 }]}>
                 {show.venue.name}
               </Text>
               <Ionicons color={tokens.tabIconDefault} name="chevron-forward" size={16} />
@@ -244,22 +241,6 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           </View>
 
           <ShowStatusButtons appearance="showDetail" showDate={show.show_date} showId={show.id} />
-
-          {phase === 'today' ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={openLive}
-              style={({ pressed }) => [
-                styles.liveInlineButton,
-                { backgroundColor: tokens.recording },
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons color={tokens.surface} name="videocam" size={20} />
-              <Text style={[styles.liveInlineLabel, { color: tokens.surface }]}>
-                {t('events.openLiveCompact')}
-              </Text>
-            </Pressable>
-          ) : null}
 
           {packRecord && packRecord.status !== 'idle' ? (
             <Pressable
@@ -271,22 +252,22 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
                 { backgroundColor: tokens.surface },
                 pressed && isPartial && styles.pressed,
               ]}>
-              <View style={[styles.packIcon, { backgroundColor: tokens.fillMuted }]}>
+              <View style={[styles.packIcon, { backgroundColor: tokens.successMuted }]}>
                 <Ionicons color={tokens.success} name="checkmark" size={18} />
               </View>
               <View style={styles.packText}>
-                <Text style={[styles.packTitle, { color: tokens.text }]}>{packCardTitle}</Text>
+                <Text style={[typography.bodySemibold, { color: tokens.text }]}>{packCardTitle}</Text>
                 {packSubtitle ? (
-                  <Text style={[styles.packSubtitle, { color: tokens.textSecondary }]}>{packSubtitle}</Text>
+                  <Text style={[typography.footnote, { color: tokens.textSecondary }]}>{packSubtitle}</Text>
                 ) : null}
               </View>
             </Pressable>
           ) : null}
 
           <View style={styles.setlistHeader}>
-            <Text style={[styles.setlistTitle, { color: tokens.text }]}>{t('setlist.probableTitle')}</Text>
+            <Text style={[typography.title, { color: tokens.text }]}>{t('setlist.probableTitle')}</Text>
             {predictionMeta ? (
-              <Text style={[styles.setlistMeta, { color: tokens.textSecondary }]}>{predictionMeta}</Text>
+              <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{predictionMeta}</Text>
             ) : null}
           </View>
 
@@ -294,15 +275,33 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
         </View>
       </ScrollView>
 
-      {phase !== 'today' ? (
-        <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
-          <LinearGradient
-            colors={[`${tokens.background}00`, `${tokens.background}E6`]}
-            style={styles.fabGradient}
-          />
-          <PillButton style={styles.fabButton} title={fabTitle} onPress={handleFab} />
-        </View>
-      ) : null}
+      <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
+        <LinearGradient
+          colors={[`${tokens.background}00`, `${tokens.background}E6`]}
+          style={styles.fabGradient}
+        />
+        {phase === 'today' ? (
+          <View style={styles.fabRow}>
+            <PillButton
+              icon="videocam"
+              style={styles.fabHalf}
+              title={t('events.openLiveFab')}
+              variant="recording"
+              onPress={openLive}
+            />
+            {primarySongTitle ? (
+              <PillButton
+                style={styles.fabHalf}
+                title={t('events.practiceLyrics')}
+                variant="glass"
+                onPress={openPracticeLyrics}
+              />
+            ) : null}
+          </View>
+        ) : (
+          <PillButton style={styles.fabButton} title={t('events.practiceLyrics')} onPress={handleFab} />
+        )}
+      </View>
     </View>
   );
 }
@@ -319,15 +318,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  error: {
-    color: '#D64545',
-    textAlign: 'center',
-  },
   fabButton: {
     marginHorizontal: 20,
   },
   fabGradient: {
     ...StyleSheet.absoluteFill,
+  },
+  fabHalf: {
+    flex: 1,
+    minHeight: 54,
+  },
+  fabRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginHorizontal: 20,
   },
   fabWrap: {
     bottom: 0,
@@ -357,7 +361,6 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#1B1024',
   },
   heroText: {
     bottom: 18,
@@ -370,28 +373,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     marginTop: 4,
   },
-  liveInlineButton: {
-    alignItems: 'center',
-    borderRadius: 20,
-    flexDirection: 'row',
-    gap: 8,
-    height: 40,
-    justifyContent: 'center',
-  },
-  liveInlineLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
   infoCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     overflow: 'hidden',
     paddingHorizontal: 16,
   },
   infoRow: {
     alignItems: 'center',
-    borderBottomColor: '#E5E5EA',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     gap: 12,
@@ -401,17 +389,8 @@ const styles = StyleSheet.create({
   infoRowLast: {
     borderBottomWidth: 0,
   },
-  infoText: {
-    color: '#111114',
-    flex: 1,
-    fontSize: 16,
-  },
-  infoVenue: {
-    flex: 1,
-  },
   packCard: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     flexDirection: 'row',
     gap: 12,
@@ -420,24 +399,14 @@ const styles = StyleSheet.create({
   },
   packIcon: {
     alignItems: 'center',
-    backgroundColor: '#E3F4E6',
     borderRadius: 18,
     height: 36,
     justifyContent: 'center',
     width: 36,
   },
-  packSubtitle: {
-    color: '#5E5E63',
-    fontSize: 13,
-  },
   packText: {
     flex: 1,
     gap: 2,
-  },
-  packTitle: {
-    color: '#111114',
-    fontSize: 16,
-    fontWeight: '600',
   },
   pressed: {
     opacity: 0.85,
@@ -451,15 +420,5 @@ const styles = StyleSheet.create({
   setlistHeader: {
     gap: 2,
     marginTop: 4,
-  },
-  setlistMeta: {
-    color: '#5E5E63',
-    fontSize: 14,
-  },
-  setlistTitle: {
-    color: '#111114',
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
   },
 });

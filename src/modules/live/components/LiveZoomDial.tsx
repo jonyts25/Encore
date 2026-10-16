@@ -167,20 +167,22 @@ export function LiveZoomDial({
       const clamped = clampZoom(next, minZoom, cappedMax);
       pendingZoomRef.current = clamped;
       const position = zoomToPosition(clamped, minZoom, cappedMax);
-      wheelRotation.value = withTiming(-position * arcSpan, { duration: 16 });
+      wheelRotation.value = withTiming(-(arcStart + position * arcSpan), { duration: 16 });
       if (rafRef.current !== null) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         flushZoom();
       });
     },
-    [arcSpan, cappedMax, flushZoom, minZoom, wheelRotation]
+    [arcStart, arcSpan, cappedMax, flushZoom, minZoom, wheelRotation]
   );
 
   useEffect(() => {
     const position = zoomToPosition(currentZoom, minZoom, cappedMax);
-    wheelRotation.value = withTiming(-position * arcSpan, { duration: mode === 'chips' ? 250 : 16 });
-  }, [arcSpan, cappedMax, currentZoom, minZoom, mode, wheelRotation]);
+    wheelRotation.value = withTiming(-(arcStart + position * arcSpan), {
+      duration: mode === 'chips' ? 250 : 16,
+    });
+  }, [arcStart, arcSpan, cappedMax, currentZoom, minZoom, mode, wheelRotation]);
 
   useEffect(() => {
     return () => {

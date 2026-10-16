@@ -40,13 +40,7 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
 
   const phase = showDate ? getShowPhase(showDate) : 'upcoming';
 
-  const handlePress = (nextStatus: ShowStatus) => {
-    if (requiresAuth) {
-      router.push('/(tabs)/profile');
-      return;
-    }
-
-    hapticSelection();
+  const commitStatus = (nextStatus: ShowStatus) => {
     void (async () => {
       try {
         await updateStatus(nextStatus);
@@ -57,6 +51,29 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
         // Error rendered below.
       }
     })();
+  };
+
+  const handlePress = (nextStatus: ShowStatus) => {
+    if (requiresAuth) {
+      router.push('/(tabs)/profile');
+      return;
+    }
+
+    hapticSelection();
+    commitStatus(nextStatus);
+  };
+
+  const handleSegmentChange = (nextStatus: ShowStatus) => {
+    if (requiresAuth) {
+      router.push('/(tabs)/profile');
+      return;
+    }
+    hapticSelection();
+    if (status === nextStatus) {
+      void removeStatus();
+      return;
+    }
+    commitStatus(nextStatus);
   };
 
   const todaySubtitle = useMemo(() => {
@@ -104,8 +121,8 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
     );
   }
 
-  const segmentedValue: ShowStatus =
-    status === 'voy' || status === 'fui' || status === 'interesado' ? status : 'interesado';
+  const segmentedValue: ShowStatus | null =
+    status === 'voy' || status === 'fui' || status === 'interesado' ? status : null;
 
   const options =
     phase === 'upcoming' || phase === 'today'
@@ -119,12 +136,15 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
           { value: 'fui' as const, label: t('events.status.fui'), icon: 'sparkles-outline' as const },
         ];
 
+  const controlValue =
+    segmentedValue === 'fui' && phase !== 'past' ? null : segmentedValue;
+
   const control = (
     <GlassSegmentedControl
       disabled={isLoading || isMutating}
       options={options}
-      value={segmentedValue === 'fui' && phase !== 'past' ? 'voy' : segmentedValue}
-      onChange={(value) => handlePress(value)}
+      value={controlValue}
+      onChange={(value) => handleSegmentChange(value)}
     />
   );
 

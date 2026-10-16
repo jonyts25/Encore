@@ -960,7 +960,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
                 useNativePreview && nativeCameraState ? (
                   <LiveZoomDial
                     currentZoom={nativeZoom}
-                    disabled={isRecording}
                     lensFactors={nativeZoomFactors}
                     maxZoom={Math.min(nativeCameraState.maxZoom ?? 10, 10)}
                     minZoom={nativeCameraState.minZoom ?? 1}
@@ -969,7 +968,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
                 ) : (
                   <LiveZoomDial
                     currentZoom={expoZoomFactor}
-                    disabled={isRecording}
                     lensFactors={EXPO_ZOOM_FACTORS}
                     maxZoom={EXPO_MAX_ZOOM_FACTOR}
                     minZoom={EXPO_MIN_ZOOM_FACTOR}

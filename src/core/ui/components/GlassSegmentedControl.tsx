@@ -19,7 +19,7 @@ export type GlassSegmentOption<T extends string> = {
 
 type GlassSegmentedControlProps<T extends string> = {
   options: GlassSegmentOption<T>[];
-  value: T;
+  value: T | null;
   onChange: (value: T) => void;
   disabled?: boolean;
 };
@@ -36,16 +36,18 @@ export function GlassSegmentedControl<T extends string>({
   const { tokens, resolvedScheme } = useEncoreTheme();
   const [trackWidth, setTrackWidth] = useState(0);
   const segmentWidth = trackWidth > 0 ? (trackWidth - 6) / options.length : 0;
-  const selectedIndex = Math.max(0, options.findIndex((option) => option.value === value));
+  const selectedIndex =
+    value === null ? -1 : options.findIndex((option) => option.value === value);
 
   const thumbX = useSharedValue(0);
 
   useEffect(() => {
-    if (segmentWidth <= 0) return;
+    if (segmentWidth <= 0 || selectedIndex < 0) return;
     thumbX.value = withSpring(3 + selectedIndex * segmentWidth, THUMB_SPRING);
   }, [segmentWidth, selectedIndex, thumbX]);
 
   const thumbStyle = useAnimatedStyle(() => ({
+    opacity: selectedIndex < 0 ? 0 : 1,
     transform: [{ translateX: thumbX.value }],
     width: Math.max(segmentWidth, 0),
   }));
@@ -69,7 +71,7 @@ export function GlassSegmentedControl<T extends string>({
       />
       <View style={styles.segmentsRow}>
         {options.map((option) => {
-          const selected = option.value === value;
+          const selected = value !== null && option.value === value;
           return (
             <Pressable
               key={option.value}
@@ -77,7 +79,6 @@ export function GlassSegmentedControl<T extends string>({
               accessibilityState={{ selected, disabled }}
               disabled={disabled}
               onPress={() => {
-                if (option.value === value) return;
                 hapticSelection();
                 onChange(option.value);
               }}
