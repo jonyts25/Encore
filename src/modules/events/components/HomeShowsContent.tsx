@@ -94,6 +94,12 @@ export function HomeShowsContent() {
     enabled: !sessionLoading && !isGuest,
   });
 
+  // Hooks must run before any early return (React rules of hooks).
+  const todayShow = getTodayGoingShow(sections.going);
+  const { prediction: todayPrediction } = useShowPrediction(todayShow?.id ?? '', {
+    enabled: Boolean(todayShow?.id),
+  });
+
   if (sessionLoading) {
     return (
       <ThemedView style={styles.centeredFull}>
@@ -123,10 +129,6 @@ export function HomeShowsContent() {
     );
   }
 
-  const todayShow = getTodayGoingShow(sections.going);
-  const { prediction: todayPrediction } = useShowPrediction(todayShow?.id ?? '', {
-    enabled: Boolean(todayShow?.id),
-  });
   const heroShow = pickHeroShow(sections.going);
   const hasData = hasAnyShows(sections);
   const carouselShows = sections.going.filter((show) => show.id !== heroShow?.id).slice(0, 8);
