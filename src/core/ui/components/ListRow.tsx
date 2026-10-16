@@ -7,6 +7,7 @@ import { typography } from '../theme/typography';
 type ListRowProps = {
   title: string;
   subtitle?: string;
+  subtitleColor?: string;
   leading?: React.ReactNode;
   trailing?: React.ReactNode;
   onPress?: () => void;
@@ -22,6 +23,7 @@ export function ListRow({
   onPress,
   selected,
   style,
+  subtitleColor,
 }: ListRowProps) {
   const { tokens } = useEncoreTheme();
 
@@ -33,7 +35,9 @@ export function ListRow({
           {title}
         </Text>
         {subtitle ? (
-          <Text style={[typography.footnote, { color: tokens.textSecondary }]} numberOfLines={2}>
+          <Text
+            style={[typography.footnote, { color: subtitleColor ?? tokens.textSecondary }]}
+            numberOfLines={2}>
             {subtitle}
           </Text>
         ) : null}

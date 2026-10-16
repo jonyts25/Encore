@@ -1,4 +1,13 @@
-import { Pressable, StyleSheet, Text, type PressableProps, type StyleProp, type ViewStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type PressableProps,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 
 import { useEncoreTheme } from '../theme';
 import { minTouchTarget, radii, spacing } from '../theme/spacing';
@@ -6,13 +15,14 @@ import { typography } from '../theme/typography';
 
 import { Glass } from './Glass';
 
-type PillButtonVariant = 'primary' | 'secondary' | 'glass';
+type PillButtonVariant = 'primary' | 'secondary' | 'glass' | 'recording';
 
 type PillButtonProps = Omit<PressableProps, 'style'> & {
   title: string;
   variant?: PillButtonVariant;
   style?: StyleProp<ViewStyle>;
   textColor?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
 };
 
 export function PillButton({
@@ -21,23 +31,32 @@ export function PillButton({
   disabled,
   style,
   textColor,
+  icon,
   ...props
 }: PillButtonProps) {
   const { tokens } = useEncoreTheme();
 
+  const labelColor =
+    textColor ??
+    (variant === 'secondary'
+      ? tokens.text
+      : variant === 'glass'
+        ? tokens.onAccent
+        : tokens.onAccent);
+
   const content = (
-    <Text
-      style={[
-        typography.secondarySemibold,
-        styles.label,
-        variant === 'primary' && { color: '#FFFFFF' },
-        variant === 'secondary' && { color: tokens.text },
-        variant === 'glass' && { color: '#FFFFFF' },
-        textColor ? { color: textColor } : null,
-        disabled && styles.disabledText,
-      ]}>
-      {title}
-    </Text>
+    <View style={styles.contentRow}>
+      {icon ? <Ionicons color={labelColor} name={icon} size={20} /> : null}
+      <Text
+        style={[
+          typography.secondarySemibold,
+          styles.label,
+          { color: labelColor },
+          disabled && styles.disabledText,
+        ]}>
+        {title}
+      </Text>
+    </View>
   );
 
   if (variant === 'glass') {
@@ -65,7 +84,11 @@ export function PillButton({
         styles.base,
         {
           backgroundColor:
-            variant === 'primary' ? tokens.accent : tokens.fillMuted,
+            variant === 'recording'
+              ? tokens.recording
+              : variant === 'primary'
+                ? tokens.accent
+                : tokens.fillMuted,
           borderRadius: radii.pillLarge,
         },
         pressed && !disabled && styles.pressed,
@@ -84,6 +107,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: minTouchTarget,
     paddingHorizontal: spacing.xl,
+  },
+  contentRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    justifyContent: 'center',
   },
   disabled: {
     opacity: 0.45,

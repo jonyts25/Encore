@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +17,9 @@ import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { queryKeys } from '@/core/query';
 import { ListRow, PillButton, SegmentedControl } from '@/core/ui';
+import { darkTokens } from '@/core/ui/theme/tokens';
+import { spacing } from '@/core/ui/theme/spacing';
+import { typography } from '@/core/ui/theme/typography';
 import { fetchArtistSongs } from '@/modules/catalog/api';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
@@ -25,6 +28,17 @@ import type { PredictedSong } from '@/modules/setlist/types';
 import { useLiveSession } from '../context/LiveSessionContext';
 
 type SongSegment = 'predicted' | 'others' | 'all';
+
+type SongRow = {
+  key: string;
+  title: string;
+  index: number;
+  detail: string;
+  active: boolean;
+};
+
+const SHEET_BACKGROUND = 'rgba(28,28,30,0.92)';
+const tokens = darkTokens;
 
 function normalizeSearch(value: string): string {
   return value.trim().toLowerCase();
@@ -83,7 +97,7 @@ export function LiveSongsSheetContent() {
 
   const query = normalizeSearch(search);
 
-  const rows = useMemo(() => {
+  const rows = useMemo((): SongRow[] => {
     if (segment === 'predicted') {
       return predictedSongs
         .filter((song) => matchesSearch(song.title, query))
@@ -155,16 +169,25 @@ export function LiveSongsSheetContent() {
     router.back();
   };
 
+  const listFooter =
+    rows.length === 0 && query ? (
+      <Pressable onPress={() => selectTitle(search.trim())} style={styles.customRow}>
+        <Text style={[typography.bodySemibold, { color: tokens.accentText }]}>
+          {t('live.songPickerUseCustom', { title: search.trim() })}
+        </Text>
+      </Pressable>
+    ) : null;
+
   return (
-    <View style={[styles.root, { paddingBottom: insets.bottom + 12 }]}>
+    <View style={[styles.root, { backgroundColor: SHEET_BACKGROUND, paddingBottom: insets.bottom + 12 }]}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{t('live.songsSheetTitle')}</Text>
+        <Text style={[typography.title, { color: tokens.text }]}>{t('live.songsSheetTitle')}</Text>
         <PillButton title={t('live.songsSheetDone')} variant="glass" onPress={() => router.back()} />
       </View>
 
       <TextInput
         placeholder={t('live.songPickerSearch')}
-        placeholderTextColor="#A1A1A6"
+        placeholderTextColor={tokens.textSecondary}
         style={styles.search}
         value={search}
         onChangeText={setSearch}
@@ -180,71 +203,63 @@ export function LiveSongsSheetContent() {
         onChange={setSegment}
       />
 
-      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-        {rows.map((row) => (
+      <FlatList
+        data={rows}
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(item) => item.key}
+        ListFooterComponent={listFooter}
+        renderItem={({ item }) => (
           <ListRow
-            key={row.key}
-            leading={<Text style={styles.rowIndex}>{row.index}</Text>}
-            selected={row.active}
-            subtitle={row.detail}
-            title={row.title}
+            leading={<Text style={styles.rowIndex}>{item.index}</Text>}
+            selected={false}
+            style={item.active ? styles.rowActive : undefined}
+            subtitle={item.detail}
+            subtitleColor={item.active ? tokens.accentText : undefined}
+            title={item.title}
             trailing={
-              cachedTitles.has(row.title) ? (
+              cachedTitles.has(item.title) ? (
                 <Ionicons
                   accessibilityLabel={t('live.songHasCachedLyrics')}
-                  color={row.active ? '#FFFFFF' : '#A1A1A6'}
+                  color={item.active ? tokens.text : tokens.textSecondary}
                   name="document-text-outline"
                   size={18}
                 />
               ) : null
             }
-            onPress={() => selectTitle(row.title)}
+            onPress={() => selectTitle(item.title)}
           />
-        ))}
-
-        {rows.length === 0 && query ? (
-          <Pressable onPress={() => selectTitle(search.trim())} style={styles.customRow}>
-            <Text style={styles.customText}>
-              {t('live.songPickerUseCustom', { title: search.trim() })}
-            </Text>
-          </Pressable>
-        ) : null}
-      </ScrollView>
+        )}
+        style={styles.list}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   customRow: {
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-  },
-  customText: {
-    color: '#FF7A5E',
-    fontSize: 17,
-    fontWeight: '600',
-    textAlign: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.lg,
   },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
-    paddingHorizontal: 8,
+    marginBottom: spacing.md,
   },
   list: {
-    gap: 4,
-    paddingBottom: 16,
-    paddingHorizontal: 8,
-    paddingTop: 8,
+    flex: 1,
+    marginTop: spacing.md,
   },
   root: {
-    backgroundColor: 'transparent',
     flex: 1,
-    paddingTop: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  rowActive: {
+    backgroundColor: `${tokens.accent}47`,
   },
   rowIndex: {
-    color: '#A1A1A6',
+    color: tokens.textSecondary,
     fontSize: 15,
     fontVariant: ['tabular-nums'],
     width: 22,
@@ -252,16 +267,10 @@ const styles = StyleSheet.create({
   search: {
     backgroundColor: 'rgba(118,118,128,0.28)',
     borderRadius: 12,
-    color: '#FFFFFF',
+    color: tokens.text,
     fontSize: 16,
-    marginBottom: 12,
-    marginHorizontal: 8,
-    paddingHorizontal: 12,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
     paddingVertical: 10,
-  },
-  title: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
   },
 });

@@ -9,6 +9,8 @@ export type ThemeTokens = {
   accent: string;
   accentText: string;
   success: string;
+  successMuted: string;
+  onAccent: string;
   recording: string;
   zoomSelected: string;
   tint: string;
@@ -27,6 +29,8 @@ export const lightTokens: ThemeTokens = {
   accent: '#C8361F',
   accentText: '#C8361F',
   success: '#1E7A34',
+  successMuted: '#E3F4E6',
+  onAccent: '#FFFFFF',
   recording: '#FF3B30',
   zoomSelected: '#FFD60A',
   tint: '#C8361F',
@@ -45,6 +49,8 @@ export const darkTokens: ThemeTokens = {
   accent: '#C8361F',
   accentText: '#FF7A5E',
   success: '#30D158',
+  successMuted: '#1B3D28',
+  onAccent: '#FFFFFF',
   recording: '#FF3B30',
   zoomSelected: '#FFD60A',
   tint: '#FF7A5E',

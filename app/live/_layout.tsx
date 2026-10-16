@@ -33,7 +33,7 @@ export default function LiveStackLayout() {
             presentation: 'formSheet',
             sheetAllowedDetents: [0.6, 1],
             sheetGrabberVisible: true,
-            contentStyle: { backgroundColor: 'transparent' },
+            contentStyle: { backgroundColor: 'rgba(28,28,30,0.92)' },
           }}
         />
         </Stack>
