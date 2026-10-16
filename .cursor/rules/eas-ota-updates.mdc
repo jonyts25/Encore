@@ -1,0 +1,38 @@
+---
+description: Gate EAS OTA updates with fingerprint compare vs latest iOS preview build
+alwaysApply: true
+---
+
+# EAS OTA updates (Encore)
+
+Before **any** `eas update`, compare the local project fingerprint to the **latest finished iOS build** on profile **preview**. Use the same environment as updates: **production**.
+
+```bash
+# Latest iOS preview build id
+npx eas-cli@latest build:list --platform ios --profile preview --limit 1 --json --non-interactive
+
+# Compare local tree vs that build (must match to ship OTA)
+npx eas-cli@latest fingerprint:compare --build-id <BUILD_ID> --environment production --json --non-interactive
+```
+
+- If **hashes differ** (`fingerprint1.hash` ≠ `fingerprint2.hash`): **do not run `eas update`**. Tell the user a **new native build** is required (iOS preview at minimum).
+- If hashes **match**: publish with:
+
+```bash
+npx eas-cli@latest update --channel preview --environment production --message "..." --platform ios
+# Android separately if needed; compare against latest android preview build when shipping Android OTA.
+```
+
+## Changes that require a new build (not OTA-safe)
+
+Prefer fixes under `src/`, `app/` (JS/TS routes only), assets, and i18n when possible.
+
+**Fingerprint / runtime changes** — avoid unless a build is planned:
+
+- Anything under `modules/` (local native modules, e.g. `encore-camera`)
+- `app.json` (permissions, plugins, identifiers, native config)
+- `eas.json`
+- `package.json` **dependencies** or **scripts**
+- Expo config **plugins** and their native effects
+
+When asked for a fix that could go OTA, implement it without touching the paths above.
