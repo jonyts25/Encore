@@ -13,8 +13,8 @@ import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { QueryProvider } from '@/core/query';
 import { SessionProvider } from '@/modules/identity';
 import { EncoreThemeProvider, useEncoreTheme } from '@/core/ui/theme';
+import { AppErrorBoundary } from '@/core/ui/AppErrorBoundary';
 
-export { ErrorBoundary } from 'expo-router';
 
 export const unstable_settings = {
   initialRouteName: '(tabs)',
@@ -64,7 +64,9 @@ export default function RootLayout() {
         <SessionProvider>
           <QueryProvider>
             <EncoreThemeProvider>
-              <RootLayoutNav />
+              <AppErrorBoundary>
+                <RootLayoutNav />
+              </AppErrorBoundary>
             </EncoreThemeProvider>
           </QueryProvider>
         </SessionProvider>
