@@ -73,6 +73,12 @@
     "experiments": {
       "typedRoutes": true
     },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ddc37054-a55c-40a6-9dd8-0a3257703795"
+    },
     "extra": {
       "router": {},
       "eas": {

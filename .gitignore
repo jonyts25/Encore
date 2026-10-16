@@ -44,3 +44,6 @@ server/next-env.d.ts
 # generated native folders
 /ios
 /android
+
+# Supabase CLI
+supabase/.temp/

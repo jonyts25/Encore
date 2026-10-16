@@ -1,7 +1,15 @@
 import { apiFetch, ApiError } from '@/core/api/client';
 import { supabase } from '@/core/api/supabase';
 
-import type { ArtistShowSections, HomeShowSections, Show, ShowStatus, UserShow } from './types';
+import type {
+  ArtistShowSections,
+  ArtistSummary,
+  HomeShowSections,
+  Show,
+  ShowStatus,
+  UserShow,
+  VenueSummary,
+} from './types';
 
 type UpcomingShowsResponse = {
   shows: Show[];
@@ -45,6 +53,20 @@ const SHOW_SELECT = `
   )
 `;
 
+type ShowRowFromSupabase = Omit<Show, 'artist' | 'venue'> & {
+  artist: ArtistSummary | ArtistSummary[] | null;
+  venue: VenueSummary | VenueSummary[] | null;
+};
+
+function normalizeShowRow(row: ShowRowFromSupabase): Show {
+  const artist = Array.isArray(row.artist) ? row.artist[0] : row.artist;
+  const venue = Array.isArray(row.venue) ? row.venue[0] : row.venue;
+  if (!artist || !venue) {
+    throw new Error(`Show ${row.id} is missing artist or venue relation`);
+  }
+  return { ...row, artist, venue };
+}
+
 async function listShowsByIdsFromSupabase(
   showIds: string[],
   options?: { upcomingOnly?: boolean }
@@ -63,7 +85,7 @@ async function listShowsByIdsFromSupabase(
   const { data, error } = await query;
 
   if (error) throw error;
-  return (data ?? []) as Show[];
+  return (data ?? []).map((row) => normalizeShowRow(row as ShowRowFromSupabase));
 }
 
 async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise<Show[]> {
@@ -76,7 +98,7 @@ async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise
     .order('show_date', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as Show[];
+  return (data ?? []).map((row) => normalizeShowRow(row as ShowRowFromSupabase));
 }
 
 export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): Promise<Show[]> {
