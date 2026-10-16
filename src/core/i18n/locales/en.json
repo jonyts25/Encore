@@ -28,7 +28,10 @@
     "appearance": "Appearance",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
-    "appearanceDark": "Dark"
+    "appearanceDark": "Dark",
+    "language": "Language",
+    "spanish": "Español",
+    "english": "English"
   },
   "home": {
     "tab": "Home",
@@ -140,6 +143,12 @@
       "interesado": "Interested",
       "voy": "Going",
       "fui": "Went"
+    },
+    "relative": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}} h ago",
+      "daysAgo": "{{count}} d ago"
     }
   },
   "identity": {
@@ -166,11 +175,6 @@
     "authError": "Authentication failed",
     "authCallbackLoading": "Confirming your account…",
     "authCallbackFailed": "Could not complete confirmation. Try signing in manually."
-  },
-  "settings": {
-    "language": "Language",
-    "spanish": "Español",
-    "english": "English"
   },
   "setlist": {
     "probableTitle": "Likely setlist",

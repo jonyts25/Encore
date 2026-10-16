@@ -43,18 +43,17 @@ type ShowDetailContentProps = {
   showId: string;
 };
 
-function formatRelativeUpdated(timestamp: number, locale: string): string {
-  const tag = locale.startsWith('en') ? 'en-US' : 'es-MX';
-  const diffMs = Date.now() - timestamp;
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) {
-    return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(0, 'minute');
-  }
-  if (minutes < 60) {
-    return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(-minutes, 'minute');
-  }
+// Hermes (iOS) does not implement Intl.RelativeTimeFormat, so build the text ourselves.
+function formatRelativeUpdated(
+  timestamp: number,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const minutes = Math.round((Date.now() - timestamp) / 60_000);
+  if (minutes < 1) return t('events.relative.justNow');
+  if (minutes < 60) return t('events.relative.minutesAgo', { count: minutes });
   const hours = Math.round(minutes / 60);
-  return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(-hours, 'hour');
+  if (hours < 24) return t('events.relative.hoursAgo', { count: hours });
+  return t('events.relative.daysAgo', { count: Math.round(hours / 24) });
 }
 
 function sortSongsForPractice(
@@ -105,7 +104,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     const updated =
       packRecord.statusUpdatedAt > 0
         ? t('events.packUpdated', {
-            relative: formatRelativeUpdated(packRecord.statusUpdatedAt, i18n.language),
+            relative: formatRelativeUpdated(packRecord.statusUpdatedAt, t),
           })
         : null;
     if (packRecord.status === 'ready' && packRecord.lyricsTotal > 0) {

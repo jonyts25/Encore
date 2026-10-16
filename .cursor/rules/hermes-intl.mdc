@@ -1,0 +1,20 @@
+---
+description: Hermes Intl APIs — avoid unsupported formatters in app code
+alwaysApply: true
+---
+
+# Hermes and Intl (Encore)
+
+React Native on iOS uses **Hermes**, which does **not** implement these Intl constructors:
+
+- `Intl.RelativeTimeFormat`
+- `Intl.ListFormat`
+- `Intl.PluralRules`
+- `Intl.Segmenter`
+
+Do **not** use them in `src/` or `app/`. Prefer:
+
+- **i18n keys** with `t(...)` and explicit copy (e.g. `events.relative.minutesAgo`)
+- **`Intl.DateTimeFormat` / `Intl.NumberFormat`** only when already verified for the target; when in doubt, use i18n
+
+If relative time is needed, compute deltas in plain JS and map to translation keys (see `ShowDetailContent` / `events.relative.*`).
