@@ -1,6 +1,7 @@
 import { saveToPhotos } from 'encore-camera';
 import { Asset } from 'expo-media-library';
 import * as MediaLibrary from 'expo-media-library';
+import { Platform } from 'react-native';
 
 export type SaveRecordingTarget = 'native' | 'expo';
 
@@ -13,6 +14,9 @@ export async function saveRecordingToCameraRoll(
   }
 
   if (target === 'native') {
+    if (Platform.OS !== 'ios') {
+      throw new Error('Native photo library save is only available on iOS');
+    }
     await saveToPhotos(uri);
     return;
   }
@@ -26,6 +30,9 @@ export async function saveRecordingToCameraRoll(
 }
 
 export async function saveMultiCamRecordings(backUri: string, frontUri: string): Promise<void> {
+  if (Platform.OS !== 'ios') {
+    throw new Error('MultiCam save is only available on iOS');
+  }
   await saveRecordingToCameraRoll(backUri, 'native');
   await saveRecordingToCameraRoll(frontUri, 'native');
 }

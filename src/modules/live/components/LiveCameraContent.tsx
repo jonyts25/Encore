@@ -19,6 +19,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -287,7 +288,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         }
       }
       deactivateRecordingKeepAwake();
-      if (multiCamActive) {
+      if (Platform.OS === 'ios' && multiCamActive) {
         void stopMultiCamPreview().catch(() => undefined);
       }
     };
@@ -375,11 +376,11 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   useLiveHardwareShutter(() => {
     void handleToggleRecordingRef.current();
-  }, permissionsGranted && !useNativePreview);
+  }, Platform.OS === 'ios' && permissionsGranted);
   const showLyricsPanel = lyricsVisible;
 
   const handleToggleMultiCam = async () => {
-    if (!useNativePreview) {
+    if (Platform.OS !== 'ios' || !useNativePreview) {
       setErrorMessage(t('live.multiCamUnavailable'));
       return;
     }
@@ -527,7 +528,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     setErrorMessage(null);
     setStatusMessage(null);
 
-    if (multiCamActive) {
+    if (Platform.OS === 'ios' && multiCamActive) {
       if (isRecording || isRecordingRef.current) {
         try {
           const result = await stopMultiCamRecording();
@@ -681,7 +682,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const stopRecordingAndWaitForSave = useCallback(async () => {
     const saveWait = waitForRecordingSave();
 
-    if (multiCamActive && isRecordingRef.current) {
+    if (Platform.OS === 'ios' && multiCamActive && isRecordingRef.current) {
       try {
         const result = await stopMultiCamRecording();
         isRecordingRef.current = false;
@@ -820,6 +821,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         onNativeRecordingStarted={useNativePreview ? handleNativeRecordingStarted : undefined}
         onNativeRecordingFinished={useNativePreview ? handleNativeRecordingFinished : undefined}
         onNativeRecordingError={useNativePreview ? handleNativeRecordingError : undefined}
+        onExpoZoomChange={useNativePreview ? undefined : setZoom}
       />
       {useNativePreview && multiCamActive ? (
         <>
@@ -832,7 +834,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   return (
     <View style={styles.root}>
-      <View pointerEvents={useNativePreview ? 'auto' : 'none'} style={styles.cameraLayer}>
+      <View pointerEvents="auto" style={styles.cameraLayer}>
         {cameraNode}
       </View>
 

@@ -7,6 +7,12 @@ import {
 } from 'encore-camera';
 import { forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  PinchGestureHandler,
+  State,
+  type PinchGestureHandlerGestureEvent,
+  type PinchGestureHandlerStateChangeEvent,
+} from 'react-native-gesture-handler';
 
 export type LiveCameraPreviewRef = {
   stopRecording: () => void;
@@ -31,6 +37,7 @@ type LiveCameraPreviewProps = {
   onNativeRecordingStarted?: () => void;
   onNativeRecordingFinished?: (uri: string) => void;
   onNativeRecordingError?: (message: string) => void;
+  onExpoZoomChange?: (zoom: number) => void;
 };
 
 type PendingRecording = {
@@ -54,6 +61,7 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       onNativeRecordingStarted,
       onNativeRecordingFinished,
       onNativeRecordingError,
+      onExpoZoomChange,
     },
     ref
   ) {
@@ -65,12 +73,17 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     const onNativeRecordingStartedRef = useRef(onNativeRecordingStarted);
     const onNativeRecordingFinishedRef = useRef(onNativeRecordingFinished);
     const onNativeRecordingErrorRef = useRef(onNativeRecordingError);
+    const onExpoZoomChangeRef = useRef(onExpoZoomChange);
+    const expoZoomRef = useRef(zoom);
+    const pinchStartZoomRef = useRef(zoom);
 
     onNativeCameraStateRef.current = onNativeCameraState;
     onNativeZoomChangedRef.current = onNativeZoomChanged;
     onNativeRecordingStartedRef.current = onNativeRecordingStarted;
     onNativeRecordingFinishedRef.current = onNativeRecordingFinished;
     onNativeRecordingErrorRef.current = onNativeRecordingError;
+    onExpoZoomChangeRef.current = onExpoZoomChange;
+    expoZoomRef.current = zoom;
 
     const notifyNativeCameraState = (state: EncoreCameraState) => {
       onNativeCameraStateRef.current?.(state);
@@ -185,15 +198,32 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       );
     }
 
+    const handlePinchGesture = (event: PinchGestureHandlerGestureEvent) => {
+      const delta = (event.nativeEvent.scale - 1) * 0.35;
+      const next = Math.min(1, Math.max(0, pinchStartZoomRef.current + delta));
+      onExpoZoomChangeRef.current?.(next);
+    };
+
+    const handlePinchStateChange = (event: PinchGestureHandlerStateChangeEvent) => {
+      if (event.nativeEvent.state === State.BEGAN) {
+        pinchStartZoomRef.current = expoZoomRef.current;
+      }
+      if (event.nativeEvent.oldState === State.ACTIVE) {
+        pinchStartZoomRef.current = expoZoomRef.current;
+      }
+    };
+
     return (
-      <CameraView
-        ref={expoCameraRef}
-        style={style ?? StyleSheet.absoluteFill}
-        mode="video"
-        facing={facing}
-        enableTorch={facing === 'back' && torchOn}
-        zoom={zoom}
-      />
+      <PinchGestureHandler onGestureEvent={handlePinchGesture} onHandlerStateChange={handlePinchStateChange}>
+        <CameraView
+          ref={expoCameraRef}
+          style={style ?? StyleSheet.absoluteFill}
+          mode="video"
+          facing={facing}
+          enableTorch={facing === 'back' && torchOn}
+          zoom={zoom}
+        />
+      </PinchGestureHandler>
     );
   }
 );

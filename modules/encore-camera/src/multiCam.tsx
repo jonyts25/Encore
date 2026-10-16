@@ -1,6 +1,6 @@
 import { requireNativeModule, requireNativeViewManager } from 'expo-modules-core';
 import * as React from 'react';
-import { Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, View, type StyleProp, type ViewStyle } from 'react-native';
 
 export type EncoreCameraMode = 'single' | 'multiCamPreview' | 'multiCamRecord';
 
@@ -51,29 +51,16 @@ type EncoreCameraNativeModule = {
   stopMultiCamRecording: () => Promise<EncoreMultiCamRecordingResult>;
 };
 
-const NativeModule = requireNativeModule<EncoreCameraNativeModule>('EncoreCamera');
-
 type NativeMultiCamPreviewProps = {
   active?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
-const NativeMultiCamBackPreview = requireNativeViewManager<NativeMultiCamPreviewProps>(
-  'EncoreCamera',
-  'EncoreMultiCamBackPreviewView'
-);
-const NativeMultiCamFrontPreview = requireNativeViewManager<NativeMultiCamPreviewProps>(
-  'EncoreCamera',
-  'EncoreMultiCamFrontPreviewView'
-);
+type NativeMultiCamPreviewComponent = React.ComponentType<NativeMultiCamPreviewProps>;
 
-export function EncoreMultiCamBackPreview(props: NativeMultiCamPreviewProps) {
-  return <NativeMultiCamBackPreview {...props} />;
-}
-
-export function EncoreMultiCamFrontPreview(props: NativeMultiCamPreviewProps) {
-  return <NativeMultiCamFrontPreview {...props} />;
-}
+let nativeModule: EncoreCameraNativeModule | null = null;
+let nativeMultiCamBackPreview: NativeMultiCamPreviewComponent | null = null;
+let nativeMultiCamFrontPreview: NativeMultiCamPreviewComponent | null = null;
 
 function ensureIOS() {
   if (Platform.OS !== 'ios') {
@@ -81,37 +68,72 @@ function ensureIOS() {
   }
 }
 
-export async function getCameraMode(): Promise<EncoreCameraMode> {
+function getNativeModule(): EncoreCameraNativeModule {
   ensureIOS();
-  return NativeModule.getCameraMode();
+  if (!nativeModule) {
+    nativeModule = requireNativeModule<EncoreCameraNativeModule>('EncoreCamera');
+  }
+  return nativeModule;
+}
+
+function getNativeMultiCamBackPreview(): NativeMultiCamPreviewComponent | null {
+  if (Platform.OS !== 'ios') return null;
+  if (!nativeMultiCamBackPreview) {
+    nativeMultiCamBackPreview = requireNativeViewManager<NativeMultiCamPreviewProps>(
+      'EncoreCamera',
+      'EncoreMultiCamBackPreviewView'
+    );
+  }
+  return nativeMultiCamBackPreview;
+}
+
+function getNativeMultiCamFrontPreview(): NativeMultiCamPreviewComponent | null {
+  if (Platform.OS !== 'ios') return null;
+  if (!nativeMultiCamFrontPreview) {
+    nativeMultiCamFrontPreview = requireNativeViewManager<NativeMultiCamPreviewProps>(
+      'EncoreCamera',
+      'EncoreMultiCamFrontPreviewView'
+    );
+  }
+  return nativeMultiCamFrontPreview;
+}
+
+export function EncoreMultiCamBackPreview(props: NativeMultiCamPreviewProps) {
+  const NativeView = getNativeMultiCamBackPreview();
+  if (!NativeView) return <View style={props.style} />;
+  return <NativeView {...props} />;
+}
+
+export function EncoreMultiCamFrontPreview(props: NativeMultiCamPreviewProps) {
+  const NativeView = getNativeMultiCamFrontPreview();
+  if (!NativeView) return <View style={props.style} />;
+  return <NativeView {...props} />;
+}
+
+export async function getCameraMode(): Promise<EncoreCameraMode> {
+  return getNativeModule().getCameraMode();
 }
 
 export async function setCameraMode(mode: EncoreCameraMode) {
-  ensureIOS();
-  return NativeModule.setCameraMode(mode);
+  return getNativeModule().setCameraMode(mode);
 }
 
 export async function getMultiCamSupport(): Promise<EncoreMultiCamSupport> {
-  ensureIOS();
-  return NativeModule.getMultiCamSupport();
+  return getNativeModule().getMultiCamSupport();
 }
 
 export async function startMultiCamPreview(): Promise<EncoreMultiCamPreviewResult> {
-  ensureIOS();
-  return NativeModule.startMultiCamPreview();
+  return getNativeModule().startMultiCamPreview();
 }
 
 export async function stopMultiCamPreview(): Promise<void> {
-  ensureIOS();
-  return NativeModule.stopMultiCamPreview();
+  return getNativeModule().stopMultiCamPreview();
 }
 
 export async function startMultiCamRecording() {
-  ensureIOS();
-  return NativeModule.startMultiCamRecording();
+  return getNativeModule().startMultiCamRecording();
 }
 
 export async function stopMultiCamRecording(): Promise<EncoreMultiCamRecordingResult> {
-  ensureIOS();
-  return NativeModule.stopMultiCamRecording();
+  return getNativeModule().stopMultiCamRecording();
 }

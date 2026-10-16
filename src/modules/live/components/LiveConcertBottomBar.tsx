@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Glass, GlassIconButton } from '@/core/ui';
@@ -90,7 +90,9 @@ export function LiveConcertBottomBar({
           accessibilityLabel={t('live.flipCamera')}
           disabled={flipDisabled}
           icon="camera-reverse"
-          onLongPress={multiCamDisabled ? undefined : onToggleMultiCam}
+          onLongPress={
+            Platform.OS === 'ios' && !multiCamDisabled ? onToggleMultiCam : undefined
+          }
           onPress={onFlip}
         />
       </View>
