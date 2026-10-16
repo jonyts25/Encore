@@ -1,5 +1,6 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   LongPressGestureHandler,
   PanGestureHandler,
@@ -17,9 +18,13 @@ import { hapticSelection } from '@/core/haptics';
 import { Glass } from '@/core/ui';
 import { darkTokens } from '@/core/ui/theme/tokens';
 
-const DIAL_HOLD_MS = 1500;
-const LONG_PRESS_MS = 250;
-const MARK_COUNT = 48;
+const DIAL_HOLD_MS = 1200;
+const LONG_PRESS_MS = 200;
+const ARC_HEIGHT = 90;
+const CAPSULE_HEIGHT = 40;
+const CHIP_SIZE = 32;
+const CHIP_SIZE_ACTIVE = 38;
+const LABEL_MARKS = [0.5, 1, 2, 4, 10];
 
 type LiveZoomDialProps = {
   lensFactors: number[];
@@ -51,10 +56,20 @@ function positionToZoom(position: number, min: number, max: number): number {
   return Math.exp(logMin + t * (logMax - logMin));
 }
 
-function formatZoomLabel(factor: number): string {
+function formatZoomReadout(factor: number): string {
   if (factor < 1) return `${factor.toFixed(1).replace(/^0\./, '.')}×`;
   if (Math.abs(factor - Math.round(factor)) < 0.05) return `${Math.round(factor)}×`;
   return `${factor.toFixed(1)}×`;
+}
+
+function formatChipLabel(factor: number, active: boolean, liveZoom: number): string {
+  if (active && Math.abs(factor - liveZoom) > 0.05) {
+    return formatZoomReadout(liveZoom);
+  }
+  if (active) return formatZoomReadout(factor);
+  if (factor < 1) return factor.toFixed(1).replace(/^0\./, '.');
+  if (Math.abs(factor - Math.round(factor)) < 0.05) return `${Math.round(factor)}`;
+  return `${factor.toFixed(1)}`;
 }
 
 function nearestLensFactor(factors: number[], zoom: number): number {
@@ -80,13 +95,18 @@ export function LiveZoomDial({
   onSetZoom,
 }: LiveZoomDialProps) {
   const cappedMax = Math.min(maxZoom, 10);
+  const screenWidth = Dimensions.get('window').width;
+  const arcRadius = screenWidth * 0.95;
+  const arcSpan = Math.PI * 0.82;
+  const arcStart = -arcSpan / 2;
+
   const [mode, setMode] = useState<'chips' | 'dial'>('chips');
-  const [trackWidth, setTrackWidth] = useState(0);
   const dialTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rafRef = useRef<number | null>(null);
   const pendingZoomRef = useRef<number | null>(null);
   const lastHapticLensRef = useRef<number | null>(null);
   const panStartZoomRef = useRef(currentZoom);
+  const wheelRotation = useSharedValue(0);
   const dialOpacity = useSharedValue(0);
   const chipsOpacity = useSharedValue(1);
 
@@ -99,6 +119,18 @@ export function LiveZoomDial({
     () => nearestLensFactor(sortedFactors, currentZoom),
     [currentZoom, sortedFactors]
   );
+
+  const markFactors = useMemo(() => {
+    const marks = new Set<number>(sortedFactors);
+    for (const label of LABEL_MARKS) {
+      if (label >= minZoom - 0.01 && label <= cappedMax + 0.01) marks.add(label);
+    }
+    for (let step = 0; step <= 100; step += 1) {
+      const factor = Math.round((minZoom + (step / 100) * (cappedMax - minZoom)) * 10) / 10;
+      marks.add(factor);
+    }
+    return [...marks].sort((a, b) => a - b);
+  }, [cappedMax, minZoom, sortedFactors]);
 
   const scheduleDialCollapse = useCallback(() => {
     if (dialTimeoutRef.current) clearTimeout(dialTimeoutRef.current);
@@ -132,15 +164,23 @@ export function LiveZoomDial({
 
   const queueZoom = useCallback(
     (next: number) => {
-      pendingZoomRef.current = clampZoom(next, minZoom, cappedMax);
+      const clamped = clampZoom(next, minZoom, cappedMax);
+      pendingZoomRef.current = clamped;
+      const position = zoomToPosition(clamped, minZoom, cappedMax);
+      wheelRotation.value = withTiming(-position * arcSpan, { duration: 16 });
       if (rafRef.current !== null) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         flushZoom();
       });
     },
-    [cappedMax, flushZoom, minZoom]
+    [arcSpan, cappedMax, flushZoom, minZoom, wheelRotation]
   );
+
+  useEffect(() => {
+    const position = zoomToPosition(currentZoom, minZoom, cappedMax);
+    wheelRotation.value = withTiming(-position * arcSpan, { duration: mode === 'chips' ? 250 : 16 });
+  }, [arcSpan, cappedMax, currentZoom, minZoom, mode, wheelRotation]);
 
   useEffect(() => {
     return () => {
@@ -149,16 +189,11 @@ export function LiveZoomDial({
     };
   }, []);
 
-  const onTrackLayout = (event: LayoutChangeEvent) => {
-    setTrackWidth(event.nativeEvent.layout.width);
-  };
-
   const onPanGesture = (event: PanGestureHandlerGestureEvent) => {
-    if (mode !== 'dial' || trackWidth <= 0) return;
-    const delta = event.nativeEvent.translationX / trackWidth;
+    if (mode !== 'dial') return;
+    const delta = -event.nativeEvent.translationX / (screenWidth * 0.55);
     const startPos = zoomToPosition(panStartZoomRef.current, minZoom, cappedMax);
-    const next = positionToZoom(startPos + delta, minZoom, cappedMax);
-    queueZoom(next);
+    queueZoom(positionToZoom(startPos + delta, minZoom, cappedMax));
     scheduleDialCollapse();
   };
 
@@ -166,7 +201,7 @@ export function LiveZoomDial({
     if (event.nativeEvent.state === State.BEGAN) {
       panStartZoomRef.current = currentZoom;
     }
-    if (event.nativeEvent.oldState === State.ACTIVE) {
+    if (event.nativeEvent.oldState === State.ACTIVE && mode === 'dial') {
       scheduleDialCollapse();
     }
   };
@@ -179,14 +214,40 @@ export function LiveZoomDial({
     opacity: chipsOpacity.value,
   }));
 
-  const dialPosition = zoomToPosition(currentZoom, minZoom, cappedMax);
+  const wheelStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${wheelRotation.value}rad` }],
+  }));
+
+  const renderArcMarks = () =>
+    markFactors.map((factor) => {
+      const position = zoomToPosition(factor, minZoom, cappedMax);
+      const angle = arcStart + position * arcSpan;
+      const x = arcRadius + arcRadius * Math.sin(angle);
+      const y = arcRadius - arcRadius * Math.cos(angle);
+      const isLens = sortedFactors.some((value) => Math.abs(value - factor) < 0.05);
+      const isInteger = Math.abs(factor - Math.round(factor)) < 0.05;
+      const showLabel = isLens || LABEL_MARKS.includes(factor) || isInteger;
+      return (
+        <View
+          key={`mark-${factor}`}
+          style={[
+            styles.markWrap,
+            {
+              left: x,
+              top: y,
+              transform: [{ rotate: `${angle}rad` }],
+            },
+          ]}>
+          <View style={[styles.markLine, isLens || isInteger ? styles.markLineMajor : styles.markLineMinor]} />
+          {showLabel ? (
+            <Text style={styles.markLabel}>{formatChipLabel(factor, false, factor)}</Text>
+          ) : null}
+        </View>
+      );
+    });
 
   return (
     <View style={styles.wrap}>
-      {mode === 'dial' ? (
-        <Text style={styles.readout}>{formatZoomLabel(currentZoom)}</Text>
-      ) : null}
-
       <LongPressGestureHandler
         enabled={!disabled}
         minDurationMs={LONG_PRESS_MS}
@@ -206,37 +267,23 @@ export function LiveZoomDial({
           }}>
           <View style={styles.hitArea}>
             <Animated.View pointerEvents={mode === 'dial' ? 'auto' : 'none'} style={[styles.dialLayer, dialStyle]}>
-              <Glass style={styles.dialGlass}>
-                <View style={styles.dialTrack} onLayout={onTrackLayout}>
-                  {Array.from({ length: MARK_COUNT }).map((_, index) => {
-                    const pos = index / (MARK_COUNT - 1);
-                    const isMajor = sortedFactors.some(
-                      (factor) => Math.abs(zoomToPosition(factor, minZoom, cappedMax) - pos) < 0.02
-                    );
-                    return (
-                      <View
-                        key={index}
-                        style={[
-                          styles.tick,
-                          { left: `${pos * 100}%` },
-                          isMajor ? styles.tickMajor : styles.tickMinor,
-                        ]}
-                      />
-                    );
-                  })}
-                  <View style={[styles.thumb, { left: `${dialPosition * 100}%` }]} />
-                  {sortedFactors.map((factor) => (
-                    <Text
-                      key={factor}
-                      style={[
-                        styles.lensLabel,
-                        { left: `${zoomToPosition(factor, minZoom, cappedMax) * 100}%` },
-                      ]}>
-                      {formatZoomLabel(factor)}
-                    </Text>
-                  ))}
-                </View>
-              </Glass>
+              <Text style={styles.readout}>{formatZoomReadout(currentZoom)}</Text>
+              <View style={styles.arcClip}>
+                <LinearGradient
+                  colors={['rgba(20,20,22,0.92)', 'rgba(20,20,22,0.55)', 'rgba(20,20,22,0)']}
+                  locations={[0, 0.55, 1]}
+                  style={styles.arcFade}
+                />
+                <Animated.View
+                  style={[
+                    styles.wheel,
+                    { width: arcRadius * 2, height: arcRadius * 2, borderRadius: arcRadius },
+                    wheelStyle,
+                  ]}>
+                  <Glass style={styles.wheelGlass}>{renderArcMarks()}</Glass>
+                </Animated.View>
+                <View style={styles.needle} />
+              </View>
             </Animated.View>
 
             <Animated.View pointerEvents={mode === 'chips' ? 'auto' : 'none'} style={[styles.chipsLayer, chipsStyle]}>
@@ -244,18 +291,21 @@ export function LiveZoomDial({
                 <View style={styles.chipsRow}>
                   {sortedFactors.map((factor) => {
                     const selected = Math.abs(factor - activeChipFactor) < 0.05;
-                    const label =
-                      selected && Math.abs(factor - currentZoom) > 0.05
-                        ? formatZoomLabel(currentZoom)
-                        : formatZoomLabel(factor);
                     return (
                       <Pressable
                         key={factor}
                         accessibilityRole="button"
                         disabled={disabled}
-                        onPress={() => onSetZoom(factor)}
-                        style={[styles.chip, selected && styles.chipSelected]}>
-                        <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+                        onPress={() => {
+                          hapticSelection();
+                          onSetZoom(factor);
+                        }}
+                        style={styles.chipPressable}>
+                        <Animated.View style={[styles.chip, selected ? styles.chipActive : styles.chipIdle]}>
+                          <Text style={[styles.chipText, selected && styles.chipTextActive]}>
+                            {formatChipLabel(factor, selected, currentZoom)}
+                          </Text>
+                        </Animated.View>
                       </Pressable>
                     );
                   })}
@@ -272,28 +322,51 @@ export function LiveZoomDial({
 const tokens = darkTokens;
 
 const styles = StyleSheet.create({
-  chip: {
-    borderRadius: 19,
-    height: 38,
-    justifyContent: 'center',
-    minWidth: 38,
-    paddingHorizontal: 8,
+  arcClip: {
+    height: ARC_HEIGHT,
+    overflow: 'hidden',
+    width: '100%',
   },
-  chipSelected: {
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  arcFade: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 2,
+  },
+  chip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipActive: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: CHIP_SIZE_ACTIVE / 2,
+    height: CHIP_SIZE_ACTIVE,
+    minWidth: CHIP_SIZE_ACTIVE,
+    paddingHorizontal: 6,
+  },
+  chipIdle: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: CHIP_SIZE / 2,
+    height: CHIP_SIZE,
+    minWidth: CHIP_SIZE,
+    paddingHorizontal: 4,
+  },
+  chipPressable: {
+    borderRadius: 999,
   },
   chipText: {
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 13,
+    color: 'rgba(255,255,255,0.92)',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
     fontWeight: '600',
     textAlign: 'center',
   },
-  chipTextSelected: {
+  chipTextActive: {
     color: tokens.zoomSelected,
+    fontWeight: '700',
   },
   chipsGlass: {
-    borderRadius: 22,
-    paddingHorizontal: 6,
+    borderRadius: CAPSULE_HEIGHT / 2,
+    minHeight: CAPSULE_HEIGHT,
+    paddingHorizontal: 4,
     paddingVertical: 4,
   },
   chipsLayer: {
@@ -305,61 +378,70 @@ const styles = StyleSheet.create({
     gap: 4,
     justifyContent: 'center',
   },
-  dialGlass: {
-    borderRadius: 22,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
   dialLayer: {
     ...StyleSheet.absoluteFill,
-    justifyContent: 'center',
-  },
-  dialTrack: {
-    height: 36,
-    justifyContent: 'center',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: 2,
   },
   hitArea: {
-    minHeight: 46,
+    minHeight: ARC_HEIGHT + 24,
     width: '100%',
   },
-  lensLabel: {
-    bottom: -2,
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 10,
+  markLabel: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  markLine: {
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 999,
+    width: 1,
+  },
+  markLineMajor: {
+    height: 14,
+  },
+  markLineMinor: {
+    height: 7,
+    opacity: 0.55,
+  },
+  markWrap: {
+    alignItems: 'center',
     position: 'absolute',
-    transform: [{ translateX: -12 }],
+  },
+  needle: {
+    alignSelf: 'center',
+    backgroundColor: tokens.zoomSelected,
+    borderRadius: 2,
+    bottom: 4,
+    height: 18,
+    position: 'absolute',
+    width: 3,
+    zIndex: 4,
   },
   readout: {
     color: tokens.zoomSelected,
     fontSize: 15,
+    fontVariant: ['tabular-nums'],
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
     textAlign: 'center',
+    zIndex: 5,
   },
-  thumb: {
-    backgroundColor: tokens.zoomSelected,
-    borderRadius: 6,
-    height: 12,
-    marginTop: -6,
+  wheel: {
+    alignSelf: 'center',
+    bottom: -(Dimensions.get('window').width * 0.95 - ARC_HEIGHT + 8),
     position: 'absolute',
-    transform: [{ translateX: -6 }],
-    width: 12,
   },
-  tick: {
-    backgroundColor: 'rgba(255,255,255,0.6)',
-    bottom: 14,
-    position: 'absolute',
-    width: 1,
-  },
-  tickMajor: {
-    height: 16,
-  },
-  tickMinor: {
-    height: 8,
-    opacity: 0.6,
+  wheelGlass: {
+    ...StyleSheet.absoluteFill,
+    opacity: 0.92,
   },
   wrap: {
     alignItems: 'center',
+    marginBottom: 16,
     width: '100%',
   },
 });

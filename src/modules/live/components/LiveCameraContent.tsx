@@ -27,6 +27,8 @@ import {
   View,
   type AppStateStatus,
 } from 'react-native';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { finishRecordingSession, startRecordingSession } from '@/core/db/recordingsDb';
@@ -73,12 +75,27 @@ const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
   'no_tour_data_fallback',
 ];
 
-const FIXED_LENS_CHIPS = [
-  { id: 'ultra', label: '.5×' },
-  { id: 'wide', label: '1×' },
-  { id: 'tele2', label: '2×' },
-  { id: 'tele5', label: '5×' },
-];
+const EXPO_ZOOM_FACTORS = [0.5, 1, 2, 4];
+const EXPO_MIN_ZOOM_FACTOR = 1;
+const EXPO_MAX_ZOOM_FACTOR = 5;
+
+function expoFactorToNormalized(factor: number): number {
+  const safeMin = EXPO_MIN_ZOOM_FACTOR;
+  const safeMax = EXPO_MAX_ZOOM_FACTOR;
+  const logMin = Math.log(safeMin);
+  const logMax = Math.log(safeMax);
+  const clamped = Math.min(safeMax, Math.max(safeMin, factor));
+  return (Math.log(clamped) - logMin) / (logMax - logMin);
+}
+
+function expoNormalizedToFactor(normalized: number): number {
+  const safeMin = EXPO_MIN_ZOOM_FACTOR;
+  const safeMax = EXPO_MAX_ZOOM_FACTOR;
+  const logMin = Math.log(safeMin);
+  const logMax = Math.log(safeMax);
+  const t = Math.min(1, Math.max(0, normalized));
+  return Math.exp(logMin + t * (logMax - logMin));
+}
 
 function sortSongsForPicker(songs: PredictedSong[]) {
   return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
@@ -94,31 +111,6 @@ function buildNativeZoomFactors(state: EncoreCameraState): number[] {
     factors.push(2);
   }
   return [...new Set(factors)].sort((a, b) => a - b);
-}
-
-function formatNativeZoomChip(factor: number): string {
-  if (factor < 1) {
-    return `${factor.toFixed(1).replace(/^0\./, '.')}×`;
-  }
-  if (Math.abs(factor - Math.round(factor)) < 0.001) {
-    return `${Math.round(factor)}×`;
-  }
-  return `${factor.toFixed(1)}×`;
-}
-
-function selectedNativeZoomFactor(factors: number[], currentZoom: number): number {
-  const eligible = factors.filter((factor) => factor <= currentZoom + 0.01);
-  return eligible.length > 0 ? eligible[eligible.length - 1] : (factors[0] ?? 1);
-}
-
-function zoomChipId(factor: number) {
-  return `zoom-${factor}`;
-}
-
-function parseZoomChipId(id: string): number | null {
-  if (!id.startsWith('zoom-')) return null;
-  const value = Number.parseFloat(id.slice(5));
-  return Number.isFinite(value) ? value : null;
 }
 
 function formatRecordingClock(totalSeconds: number): string {
@@ -159,7 +151,11 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [nativeCameraState, setNativeCameraState] = useState<EncoreCameraState | null>(null);
   const [nativeZoom, setNativeZoom] = useState(1);
   const lastRoundedNativeZoomRef = useRef<number | null>(null);
-  const [selectedLensId, setSelectedLensId] = useState<string>('wide');
+  const previewOpacity = useSharedValue(1);
+  const [pipCorner, setPipCorner] = useState<'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight'>(
+    'topRight'
+  );
+  const [pipExpanded, setPipExpanded] = useState(false);
 
   const { activeTitle, setActiveTitle } = useLiveSession();
   const [isRecording, setIsRecording] = useState(false);
@@ -186,26 +182,12 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     setNativeZoom(rounded);
   };
 
-  const lensChips = useMemo(() => {
-    if (useNativePreview && nativeCameraState) {
-      const factors = buildNativeZoomFactors(nativeCameraState);
-      const selectedFactor = selectedNativeZoomFactor(factors, nativeZoom);
-      return factors.map((factor) => ({
-        id: zoomChipId(factor),
-        label:
-          factor === selectedFactor
-            ? formatNativeZoomChip(nativeZoom)
-            : formatNativeZoomChip(factor),
-      }));
-    }
-    return FIXED_LENS_CHIPS;
-  }, [nativeCameraState, nativeZoom, useNativePreview]);
+  const nativeZoomFactors = useMemo(() => {
+    if (!useNativePreview || !nativeCameraState) return EXPO_ZOOM_FACTORS;
+    return buildNativeZoomFactors(nativeCameraState);
+  }, [nativeCameraState, useNativePreview]);
 
-  const nativeSelectedLensId = useMemo(() => {
-    if (!useNativePreview || !nativeCameraState) return null;
-    const factors = buildNativeZoomFactors(nativeCameraState);
-    return zoomChipId(selectedNativeZoomFactor(factors, nativeZoom));
-  }, [nativeCameraState, nativeZoom, useNativePreview]);
+  const expoZoomFactor = useMemo(() => expoNormalizedToFactor(zoom), [zoom]);
 
   useEffect(() => {
     if (permissionsRequested && !micPermission?.granted) {
@@ -397,6 +379,11 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     }
 
     if (enabled === multiCamActive) return;
+
+    previewOpacity.value = withTiming(0.35, { duration: 120 });
+    setTimeout(() => {
+      previewOpacity.value = withTiming(1, { duration: 220 });
+    }, 140);
 
     setErrorMessage(null);
     setStatusMessage(null);
@@ -757,27 +744,30 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     });
   };
 
-  const handleSelectLens = async (id: string) => {
-    if (useNativePreview) {
-      const factor = parseZoomChipId(id);
-      if (factor === null) return;
-
-      try {
-        await previewRef.current?.setNativeZoom(factor);
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
-      }
-      return;
-    }
-
-    setSelectedLensId(id);
-
+  const handleExpoZoomDial = useCallback((factor: number) => {
     setFacing('back');
-    if (id === 'ultra') setZoom(0);
-    else if (id === 'wide') setZoom(0);
-    else if (id === 'tele2') setZoom(0.35);
-    else if (id === 'tele5') setZoom(0.65);
-  };
+    setZoom(expoFactorToNormalized(factor));
+  }, []);
+
+  const previewFadeStyle = useAnimatedStyle(() => ({
+    opacity: previewOpacity.value,
+  }));
+
+  const pipStyle = useMemo(() => {
+    const width = pipExpanded ? 168 : 112;
+    const height = pipExpanded ? 224 : 168;
+    const base = { width, height, borderRadius: 16 };
+    switch (pipCorner) {
+      case 'topLeft':
+        return { ...base, top: insets.top + 72, left: 16 };
+      case 'bottomLeft':
+        return { ...base, bottom: 330, left: 16 };
+      case 'bottomRight':
+        return { ...base, bottom: 330, right: 16 };
+      default:
+        return { ...base, top: insets.top + 72, right: 16 };
+    }
+  }, [insets.top, pipCorner, pipExpanded]);
 
   if (!permissionsRequested) {
     return (
@@ -839,7 +829,23 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       {useNativePreview && multiCamActive ? (
         <>
           <EncoreMultiCamBackPreview active={multiCamPreviewActive} style={StyleSheet.absoluteFill} />
-          <EncoreMultiCamFrontPreview active={multiCamPreviewActive} style={styles.multiCamPip} />
+          <PanGestureHandler
+            onHandlerStateChange={(event) => {
+              if (event.nativeEvent.oldState !== State.ACTIVE) return;
+              const dx = event.nativeEvent.translationX;
+              const dy = event.nativeEvent.translationY;
+              if (Math.abs(dx) < 24 && Math.abs(dy) < 24) return;
+              if (dx > 30 && dy < -20) setPipCorner('topRight');
+              else if (dx < -30 && dy < -20) setPipCorner('topLeft');
+              else if (dx > 30) setPipCorner('bottomRight');
+              else setPipCorner('bottomLeft');
+            }}>
+            <Pressable
+              onPress={() => setPipExpanded((current) => !current)}
+              style={[styles.multiCamPip, pipStyle]}>
+              <EncoreMultiCamFrontPreview active={multiCamPreviewActive} style={StyleSheet.absoluteFill} />
+            </Pressable>
+          </PanGestureHandler>
         </>
       ) : null}
     </>
@@ -847,9 +853,19 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   return (
     <View style={styles.root}>
-      <View pointerEvents="auto" style={styles.cameraLayer}>
-        {cameraNode}
-      </View>
+      <PanGestureHandler
+        activeOffsetX={[-24, 24]}
+        enabled={dualVideoAvailable && !isRecording}
+        onHandlerStateChange={(event) => {
+          if (event.nativeEvent.oldState !== State.ACTIVE) return;
+          const dx = event.nativeEvent.translationX;
+          if (dx > 48 && !multiCamActive) void handleSelectDualVideo(true);
+          else if (dx < -48 && multiCamActive) void handleSelectDualVideo(false);
+        }}>
+        <Animated.View pointerEvents="auto" style={[styles.cameraLayer, previewFadeStyle]}>
+          {cameraNode}
+        </Animated.View>
+      </PanGestureHandler>
 
       <View pointerEvents="box-none" style={styles.uiOverlay}>
         <View pointerEvents="box-none" style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -937,30 +953,36 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
             flipDisabled={isRecording || multiCamActive}
             isRecording={isRecording}
             isSaving={isSaving}
-            lensChips={!useNativePreview && !multiCamActive ? lensChips : []}
-            selectedLensId={useNativePreview ? (nativeSelectedLensId ?? 'zoom-1') : selectedLensId}
             torchDisabled={facing === 'front' || multiCamActive}
             torchOn={torchOn}
             zoomControl={
-              useNativePreview && !multiCamActive && nativeCameraState ? (
-                <LiveZoomDial
-                  currentZoom={nativeZoom}
-                  disabled={isRecording}
-                  lensFactors={buildNativeZoomFactors(nativeCameraState)}
-                  maxZoom={Math.min(nativeCameraState.maxZoom ?? 10, 10)}
-                  minZoom={nativeCameraState.minZoom ?? 1}
-                  onSetZoom={handleNativeZoomDial}
-                />
-              ) : undefined
+              !multiCamActive ? (
+                useNativePreview && nativeCameraState ? (
+                  <LiveZoomDial
+                    currentZoom={nativeZoom}
+                    disabled={isRecording}
+                    lensFactors={nativeZoomFactors}
+                    maxZoom={Math.min(nativeCameraState.maxZoom ?? 10, 10)}
+                    minZoom={nativeCameraState.minZoom ?? 1}
+                    onSetZoom={handleNativeZoomDial}
+                  />
+                ) : (
+                  <LiveZoomDial
+                    currentZoom={expoZoomFactor}
+                    disabled={isRecording}
+                    lensFactors={EXPO_ZOOM_FACTORS}
+                    maxZoom={EXPO_MAX_ZOOM_FACTOR}
+                    minZoom={EXPO_MIN_ZOOM_FACTOR}
+                    onSetZoom={handleExpoZoomDial}
+                  />
+                )
+              ) : null
             }
             onFlip={() => {
               void handleFlipCamera();
             }}
             onSelectDualVideo={(enabled) => {
               void handleSelectDualVideo(enabled);
-            }}
-            onSelectLens={(id) => {
-              void handleSelectLens(id);
             }}
             onToggleRecording={() => {
               void handleToggleRecording();
@@ -1114,14 +1136,9 @@ const styles = StyleSheet.create({
   },
   multiCamPip: {
     borderColor: 'rgba(255,255,255,0.35)',
-    borderRadius: 16,
     borderWidth: 1,
-    bottom: 330,
-    height: 168,
     overflow: 'hidden',
     position: 'absolute',
-    right: 16,
-    width: 112,
     zIndex: 2,
   },
   cameraLayer: {

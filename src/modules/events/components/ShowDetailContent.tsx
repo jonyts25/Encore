@@ -175,7 +175,18 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     );
   }
 
-  const fabTitle = phase === 'today' ? t('events.openLiveFab') : t('events.practiceLyrics');
+  const fabTitle = phase === 'today' ? t('events.openLiveCompact') : t('events.practiceLyrics');
+
+  const openLive = () => {
+    router.push({
+      pathname: '/live',
+      params: {
+        artist: show.artist.name,
+        title: primarySongTitle ?? '',
+        showId: show.id,
+      },
+    });
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: tokens.background }]}>
@@ -234,6 +245,22 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
           <ShowStatusButtons appearance="showDetail" showDate={show.show_date} showId={show.id} />
 
+          {phase === 'today' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={openLive}
+              style={({ pressed }) => [
+                styles.liveInlineButton,
+                { backgroundColor: tokens.recording },
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons color={tokens.surface} name="videocam" size={20} />
+              <Text style={[styles.liveInlineLabel, { color: tokens.surface }]}>
+                {t('events.openLiveCompact')}
+              </Text>
+            </Pressable>
+          ) : null}
+
           {packRecord && packRecord.status !== 'idle' ? (
             <Pressable
               accessibilityRole="button"
@@ -267,13 +294,15 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
         </View>
       </ScrollView>
 
-      <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
-        <LinearGradient
-          colors={[`${tokens.background}00`, `${tokens.background}E6`]}
-          style={styles.fabGradient}
-        />
-        <PillButton style={styles.fabButton} title={fabTitle} onPress={handleFab} />
-      </View>
+      {phase !== 'today' ? (
+        <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
+          <LinearGradient
+            colors={[`${tokens.background}00`, `${tokens.background}E6`]}
+            style={styles.fabGradient}
+          />
+          <PillButton style={styles.fabButton} title={fabTitle} onPress={handleFab} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -340,6 +369,19 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.88)',
     fontSize: 15,
     marginTop: 4,
+  },
+  liveInlineButton: {
+    alignItems: 'center',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 8,
+    height: 40,
+    justifyContent: 'center',
+  },
+  liveInlineLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   infoCard: {
     backgroundColor: '#FFFFFF',

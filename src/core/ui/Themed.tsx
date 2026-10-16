@@ -60,7 +60,7 @@ export function Button({ title, variant = 'primary', disabled, style, ...props }
           : { backgroundColor: tokens.fillMuted },
         disabled && styles.buttonDisabled,
         pressed && !disabled && styles.buttonPressed,
-        typeof style === 'function' ? style({ pressed, hovered: false }) : style,
+        typeof style === 'function' ? style({ pressed }) : style,
       ]}
       {...props}>
       <Text
