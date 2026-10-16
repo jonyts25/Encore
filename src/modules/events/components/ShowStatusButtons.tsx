@@ -12,13 +12,14 @@ import type { ShowStatus } from '../types';
 type ShowStatusButtonsProps = {
   showId: string;
   showDate?: string;
+  appearance?: 'default' | 'showDetail';
 };
 
 function hasShowStarted(showDate: string): boolean {
   return Date.now() >= new Date(showDate).getTime();
 }
 
-export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) {
+export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: ShowStatusButtonsProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { status, isLoading, isMutating, requiresAuth, updateStatus, removeStatus, error } =
@@ -42,13 +43,15 @@ export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) 
 
   const showWentButton = Boolean(showDate && hasShowStarted(showDate) && status !== 'fui');
 
+  const isShowDetail = appearance === 'showDetail';
+
   return (
-    <ThemedView style={styles.container}>
-      {requiresAuth ? (
+    <ThemedView style={[styles.container, isShowDetail && styles.containerShowDetail]}>
+      {!isShowDetail && requiresAuth ? (
         <ThemedText style={styles.authHint}>{t('events.statusRequiresAuth')}</ThemedText>
       ) : null}
 
-      {!requiresAuth && status ? (
+      {!isShowDetail && !requiresAuth && status ? (
         <ThemedText style={styles.currentStatus}>
           {t('events.currentStatus', { status: t(`events.status.${status}`) })}
         </ThemedText>
@@ -71,7 +74,7 @@ export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) 
         onChange={(value) => handlePress(value)}
       />
 
-      {!requiresAuth && status ? (
+      {!isShowDetail && !requiresAuth && status ? (
         <Button
           disabled={isLoading || isMutating}
           title={isLoading || isMutating ? t('common.loading') : t('events.removeFromMyShows')}
@@ -105,6 +108,9 @@ const styles = StyleSheet.create({
   container: {
     gap: 10,
     marginTop: 8,
+  },
+  containerShowDetail: {
+    marginTop: 0,
   },
   currentStatus: {
     color: '#2E9B4F',

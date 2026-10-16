@@ -5,7 +5,8 @@
     "showPackDownloading": "Descargando…",
     "showPackPartial": "Faltan letras · reintentar",
     "showPackReady": "Listo sin señal · {{cached}}/{{total}} letras",
-    "showPackReadyEmpty": "Listo sin señal"
+    "showPackReadyEmpty": "Listo sin señal",
+    "showPackCardTitle": "Listo sin señal"
   },
   "common": {
     "appName": "Encore",
@@ -129,8 +130,14 @@
     "currentStatus": "Estado actual: {{status}}",
     "statusRequiresAuth": "Inicia sesión para marcar si vas o te interesa.",
     "removeFromMyShows": "Quitar de mis shows",
+    "shareShow": "Compartir",
+    "shareMessage": "{{artist}} · {{date}} · {{venue}}",
+    "practiceLyrics": "Practicar letras",
+    "openLiveFab": "Abrir LIVE",
+    "packUpdated": "actualizado {{relative}}",
+    "packLyricsProgress": "{{cached}} de {{total}} letras",
     "status": {
-      "interesado": "Me interesa",
+      "interesado": "Interesado",
       "voy": "Voy",
       "fui": "Fui"
     }
@@ -166,6 +173,7 @@
     "english": "English"
   },
   "setlist": {
+    "probableTitle": "Setlist probable",
     "predictionTitle": "Setlist predicho",
     "predictionSubtitle": "Basado en shows de la misma gira.",
     "confidence": "Confianza: {{pct}}",
@@ -283,6 +291,8 @@
     "floatingSize": "Tamaño flotante",
     "hideLyrics": "Ocultar letra",
     "showLyrics": "Mostrar letra",
+    "diagnosticsNativeCamera": "Cámara: nativa (Encore)",
+    "diagnosticsExpoCamera": "Cámara: expo-camera",
     "layout": {
       "overlay": "Franja superior",
       "split": "Split 50/50",

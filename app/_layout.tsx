@@ -91,18 +91,10 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
-      <Stack>
+      <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="artist/[id]" options={{ title: '', headerLargeTitle: false }} />
-        <Stack.Screen
-          name="show/[id]"
-          options={{
-            title: '',
-            headerTransparent: true,
-            headerShadowVisible: false,
-            headerTintColor: '#FFFFFF',
-          }}
-        />
+        <Stack.Screen name="show/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="lyrics" options={{ title: '' }} />
         <Stack.Screen
           name="live"

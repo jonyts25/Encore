@@ -1,24 +1,157 @@
-import { RefreshControl, Image, ScrollView, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useMemo } from 'react';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
 import { useIsOffline } from '@/core/network/useIsOffline';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
+import { GlassIconButton, PillButton } from '@/core/ui';
+import { useEncoreTheme } from '@/core/ui/theme';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import {
+  getSetlistPredictionMetaLine,
+  SetlistPredictionPanel,
+  useShowPrediction,
+} from '@/modules/setlist';
+import type { SetlistPredictionStructure } from '@/modules/setlist/types';
 
-import { SetlistPredictionPanel } from '@/modules/setlist';
-
-import { formatShowDate, formatShowVenueLine } from '../api';
+import { formatShowDate } from '../api';
+import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShow } from '../hooks/useShow';
+import { getShowPhase } from '../visibility';
 import { ShowStatusButtons } from './ShowStatusButtons';
+
+const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
+  'mostly_fixed',
+  'rotating',
+  'no_tour_data_fallback',
+];
 
 type ShowDetailContentProps = {
   showId: string;
 };
 
+function formatRelativeUpdated(timestamp: number, locale: string): string {
+  const tag = locale.startsWith('en') ? 'en-US' : 'es-MX';
+  const diffMs = Date.now() - timestamp;
+  const minutes = Math.round(diffMs / 60_000);
+  if (minutes < 1) {
+    return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(0, 'minute');
+  }
+  if (minutes < 60) {
+    return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(-minutes, 'minute');
+  }
+  const hours = Math.round(minutes / 60);
+  return new Intl.RelativeTimeFormat(tag, { numeric: 'auto' }).format(-hours, 'hour');
+}
+
+function sortSongsForPractice(
+  songs: { title: string; confidence?: number | null; avg_position?: number | null }[],
+  showConfidence: boolean
+) {
+  if (showConfidence) {
+    return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
+  }
+  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
+}
+
 export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { t, i18n } = useTranslation();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { tokens } = useEncoreTheme();
   const isOffline = useIsOffline();
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
+  const { prediction } = useShowPrediction(showId);
+  const { record: packRecord, label: packLabel, isPartial, retry } = useShowPackStatus(
+    show,
+    Boolean(show)
+  );
+
+  const showConfidence = prediction
+    ? CONFIDENCE_STRUCTURES.includes(prediction.structure)
+    : false;
+  const predictionMeta = prediction
+    ? getSetlistPredictionMetaLine(prediction, t, showConfidence)
+    : null;
+
+  const heroSubtitle = useMemo(() => {
+    if (show?.artist.genres?.length) return show.artist.genres.join(' · ');
+    return t('setlist.predictionSubtitle');
+  }, [show?.artist.genres, t]);
+
+  const primarySongTitle = useMemo(() => {
+    if (!prediction?.songs.length) return null;
+    const sorted = sortSongsForPractice(prediction.songs, showConfidence);
+    return sorted[0]?.title ?? null;
+  }, [prediction, showConfidence]);
+
+  const phase = show ? getShowPhase(show.show_date) : 'upcoming';
+
+  const packSubtitle = useMemo(() => {
+    if (!packRecord || packRecord.status === 'idle') return packLabel;
+    const updated =
+      packRecord.statusUpdatedAt > 0
+        ? t('events.packUpdated', {
+            relative: formatRelativeUpdated(packRecord.statusUpdatedAt, i18n.language),
+          })
+        : null;
+    if (packRecord.status === 'ready' && packRecord.lyricsTotal > 0) {
+      const lyricsLine = t('events.packLyricsProgress', {
+        cached: packRecord.lyricsCached,
+        total: packRecord.lyricsTotal,
+      });
+      return updated ? `${lyricsLine} · ${updated}` : lyricsLine;
+    }
+    if (packLabel && updated) return `${packLabel} · ${updated}`;
+    return packLabel ?? updated;
+  }, [packLabel, packRecord, i18n.language, t]);
+
+  const handleShare = () => {
+    if (!show) return;
+    void Share.share({
+      message: t('events.shareMessage', {
+        artist: show.artist.name,
+        date: formatShowDate(show.show_date, i18n.language),
+        venue: show.venue.name,
+      }),
+    });
+  };
+
+  const handleFab = () => {
+    if (!show) return;
+    if (phase === 'today') {
+      router.push({
+        pathname: '/live',
+        params: {
+          artist: show.artist.name,
+          title: primarySongTitle ?? '',
+          showId: show.id,
+        },
+      });
+      return;
+    }
+    if (primarySongTitle) {
+      router.push({
+        pathname: '/lyrics',
+        params: { artist: show.artist.name, title: primarySongTitle, showId: show.id },
+      });
+      return;
+    }
+    router.push(`/show/${show.id}`);
+  };
 
   if (isLoading) {
     return (
@@ -36,51 +169,104 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     );
   }
 
+  const fabTitle = phase === 'today' ? t('events.openLiveFab') : t('events.practiceLyrics');
+
   return (
-    <ScrollView
-      contentContainerStyle={styles.scroll}
-      refreshControl={
-        <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />
-      }>
-      <ThemedView style={styles.container}>
-        <OfflineBanner visible={isOffline && Boolean(show)} />
+    <View style={[styles.root, { backgroundColor: tokens.background }]}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
+        refreshControl={
+          <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />
+        }>
+        <View style={styles.hero}>
+          <Image
+            contentFit="cover"
+            source={show.artist.image_url ? { uri: show.artist.image_url } : undefined}
+            style={styles.heroImage}
+          />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.82)']}
+            locations={[0, 0.3, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={[styles.heroActions, { top: insets.top + 8 }]}>
+            <GlassIconButton
+              accessibilityLabel={t('live.back')}
+              icon="chevron-back"
+              onPress={() => router.back()}
+            />
+            <GlassIconButton
+              accessibilityLabel={t('events.shareShow')}
+              icon="share-outline"
+              onPress={handleShare}
+            />
+          </View>
+          <View style={styles.heroText}>
+            <Text style={styles.heroArtist}>{show.artist.name}</Text>
+            <Text style={styles.heroTour}>{heroSubtitle}</Text>
+          </View>
+        </View>
 
-        {show.artist.image_url ? (
-          <Image source={{ uri: show.artist.image_url }} style={styles.heroImage} />
-        ) : (
-          <ThemedView style={styles.heroPlaceholder}>
-            <ThemedText style={styles.heroInitial}>{show.artist.name.charAt(0)}</ThemedText>
-          </ThemedView>
-        )}
+        <View style={styles.body}>
+          <OfflineBanner visible={isOffline} />
 
-        {show.venue.photo_url ? (
-          <Image source={{ uri: show.venue.photo_url }} style={styles.venueImage} />
-        ) : null}
+          <View style={styles.infoCard}>
+            <View style={styles.infoRow}>
+              <Ionicons color={tokens.accent} name="calendar-outline" size={20} />
+              <Text style={styles.infoText}>{formatShowDate(show.show_date, i18n.language)}</Text>
+            </View>
+            <View style={[styles.infoRow, styles.infoRowLast]}>
+              <Ionicons color={tokens.accent} name="location-outline" size={20} />
+              <Text numberOfLines={2} style={[styles.infoText, styles.infoVenue]}>
+                {show.venue.name}
+              </Text>
+              <Ionicons color="#AEAEB2" name="chevron-forward" size={16} />
+            </View>
+          </View>
 
-        <ThemedText style={styles.artist}>{show.artist.name}</ThemedText>
-        <ThemedText style={styles.venue}>{formatShowVenueLine(show.venue)}</ThemedText>
-        <ThemedText style={styles.date}>{formatShowDate(show.show_date, i18n.language)}</ThemedText>
+          <ShowStatusButtons appearance="showDetail" showDate={show.show_date} showId={show.id} />
 
-        {show.artist.genres?.length ? (
-          <>
-            <ThemedText style={styles.sectionLabel}>{t('events.genres')}</ThemedText>
-            <ThemedText style={styles.genres}>{show.artist.genres.join(' · ')}</ThemedText>
-          </>
-        ) : null}
+          {packRecord && packRecord.status !== 'idle' ? (
+            <Pressable
+              accessibilityRole="button"
+              disabled={!isPartial}
+              onPress={isPartial ? retry : undefined}
+              style={({ pressed }) => [styles.packCard, pressed && isPartial && styles.pressed]}>
+              <View style={styles.packIcon}>
+                <Ionicons color="#1E7A34" name="checkmark" size={18} />
+              </View>
+              <View style={styles.packText}>
+                <Text style={styles.packTitle}>{t('offline.showPackCardTitle')}</Text>
+                {packSubtitle ? <Text style={styles.packSubtitle}>{packSubtitle}</Text> : null}
+              </View>
+            </Pressable>
+          ) : null}
 
-        <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} />
+          <View style={styles.setlistHeader}>
+            <Text style={styles.setlistTitle}>{t('setlist.probableTitle')}</Text>
+            {predictionMeta ? <Text style={styles.setlistMeta}>{predictionMeta}</Text> : null}
+          </View>
 
-        <ThemedText style={styles.sectionLabel}>{t('events.yourStatus')}</ThemedText>
-        <ShowStatusButtons showId={show.id} showDate={show.show_date} />
-      </ThemedView>
-    </ScrollView>
+          <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} variant="compact" />
+        </View>
+      </ScrollView>
+
+      <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
+        <LinearGradient
+          colors={[`${tokens.background}00`, `${tokens.background}E6`]}
+          style={styles.fabGradient}
+        />
+        <PillButton style={styles.fabButton} title={fabTitle} onPress={handleFab} />
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  artist: {
-    fontSize: 32,
-    fontWeight: '700',
+  body: {
+    gap: 14,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
   centered: {
     alignItems: 'center',
@@ -88,60 +274,134 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  container: {
-    gap: 8,
-    padding: 24,
-  },
-  date: {
-    fontSize: 16,
-    marginBottom: 8,
-    opacity: 0.9,
-  },
   error: {
     color: '#D64545',
     textAlign: 'center',
   },
-  genres: {
-    fontSize: 16,
-    marginBottom: 8,
+  fabButton: {
+    marginHorizontal: 20,
+  },
+  fabGradient: {
+    ...StyleSheet.absoluteFill,
+  },
+  fabWrap: {
+    bottom: 0,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  hero: {
+    height: 300,
+    overflow: 'hidden',
+    position: 'relative',
+    width: '100%',
+  },
+  heroActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    left: 16,
+    position: 'absolute',
+    right: 16,
+    zIndex: 2,
+  },
+  heroArtist: {
+    color: '#FFFFFF',
+    fontSize: 36,
+    fontWeight: '800',
+    letterSpacing: -0.8,
   },
   heroImage: {
-    borderRadius: 16,
-    height: 200,
-    marginBottom: 8,
-    width: '100%',
+    ...StyleSheet.absoluteFill,
+    backgroundColor: '#1B1024',
   },
-  heroInitial: {
-    fontSize: 64,
-    fontWeight: '700',
+  heroText: {
+    bottom: 18,
+    left: 20,
+    position: 'absolute',
+    right: 20,
   },
-  heroPlaceholder: {
+  heroTour: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 15,
+    marginTop: 4,
+  },
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    paddingHorizontal: 16,
+  },
+  infoRow: {
     alignItems: 'center',
-    backgroundColor: '#E8EEF8',
-    borderRadius: 16,
-    height: 200,
+    borderBottomColor: '#E5E5EA',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    flexDirection: 'row',
+    gap: 12,
+    minHeight: 54,
+    paddingVertical: 12,
+  },
+  infoRowLast: {
+    borderBottomWidth: 0,
+  },
+  infoText: {
+    color: '#111114',
+    flex: 1,
+    fontSize: 16,
+  },
+  infoVenue: {
+    flex: 1,
+  },
+  packCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  packIcon: {
+    alignItems: 'center',
+    backgroundColor: '#E3F4E6',
+    borderRadius: 18,
+    height: 36,
     justifyContent: 'center',
-    marginBottom: 8,
-    width: '100%',
+    width: 36,
+  },
+  packSubtitle: {
+    color: '#5E5E63',
+    fontSize: 13,
+  },
+  packText: {
+    flex: 1,
+    gap: 2,
+  },
+  packTitle: {
+    color: '#111114',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pressed: {
+    opacity: 0.85,
+  },
+  root: {
+    flex: 1,
   },
   scroll: {
     flexGrow: 1,
   },
-  sectionLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 12,
-    opacity: 0.7,
-    textTransform: 'uppercase',
+  setlistHeader: {
+    gap: 2,
+    marginTop: 4,
   },
-  venue: {
-    fontSize: 18,
-    opacity: 0.8,
+  setlistMeta: {
+    color: '#5E5E63',
+    fontSize: 14,
   },
-  venueImage: {
-    borderRadius: 12,
-    height: 160,
-    marginBottom: 8,
-    width: '100%',
+  setlistTitle: {
+    color: '#111114',
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
 });

@@ -5,7 +5,8 @@
     "showPackDownloading": "Downloading…",
     "showPackPartial": "Missing lyrics · retry",
     "showPackReady": "Ready offline · {{cached}}/{{total}} lyrics",
-    "showPackReadyEmpty": "Ready offline"
+    "showPackReadyEmpty": "Ready offline",
+    "showPackCardTitle": "Ready offline"
   },
   "common": {
     "appName": "Encore",
@@ -129,6 +130,12 @@
     "currentStatus": "Current status: {{status}}",
     "statusRequiresAuth": "Sign in to mark interested or going.",
     "removeFromMyShows": "Remove from my shows",
+    "shareShow": "Share",
+    "shareMessage": "{{artist}} · {{date}} · {{venue}}",
+    "practiceLyrics": "Practice lyrics",
+    "openLiveFab": "Open LIVE",
+    "packUpdated": "updated {{relative}}",
+    "packLyricsProgress": "{{cached}} of {{total}} lyrics",
     "status": {
       "interesado": "Interested",
       "voy": "Going",
@@ -166,6 +173,7 @@
     "english": "English"
   },
   "setlist": {
+    "probableTitle": "Likely setlist",
     "predictionTitle": "Predicted setlist",
     "predictionSubtitle": "Based on shows from the same tour.",
     "confidence": "Confidence: {{pct}}",
@@ -283,6 +291,8 @@
     "floatingSize": "Floating size",
     "hideLyrics": "Hide lyrics",
     "showLyrics": "Show lyrics",
+    "diagnosticsNativeCamera": "Camera: native (Encore)",
+    "diagnosticsExpoCamera": "Camera: expo-camera",
     "layout": {
       "overlay": "Top band",
       "split": "Split 50/50",

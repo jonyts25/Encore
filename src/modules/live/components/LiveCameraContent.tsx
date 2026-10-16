@@ -37,6 +37,7 @@ import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
 
 import { formatLiveError } from '../liveErrors';
+import { shouldFallbackFromNativeCamera } from '../nativeCameraFallback';
 import {
   notifyRecordingSaveFinished,
   waitForRecordingSave,
@@ -134,6 +135,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const wantsNativePreview = shouldUseEncoreNativeCamera();
   const [nativeCameraFailed, setNativeCameraFailed] = useState(false);
   const useNativePreview = wantsNativePreview && !nativeCameraFailed;
+  const nativeCameraReadyRef = useRef(false);
   const [appIsActive, setAppIsActive] = useState(AppState.currentState === 'active');
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -803,8 +805,15 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         torchOn={torchOn}
         zoom={zoom}
         style={StyleSheet.absoluteFill}
-        onNativeCameraError={() => {
-          setNativeCameraFailed(true);
+        onCameraReady={() => {
+          nativeCameraReadyRef.current = true;
+        }}
+        onNativeCameraError={(message) => {
+          if (shouldFallbackFromNativeCamera(message, nativeCameraReadyRef.current)) {
+            setNativeCameraFailed(true);
+            return;
+          }
+          setStatusMessage(formatLiveError(message, t));
         }}
         onNativeCameraState={useNativePreview ? handleNativeCameraState : undefined}
         onNativeZoomChanged={useNativePreview ? handleNativeZoomChanged : undefined}
@@ -865,17 +874,26 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           </Glass>
         </Pressable>
 
-        {showKeepAwakeDiagnostic && keepAwakeDiagnostic ? (
+        {showKeepAwakeDiagnostic ? (
           <Text
-            style={[
-              styles.keepAwakeDiagnostic,
-              { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 },
-              keepAwakeDiagnostic === 'Pantalla activa ✓'
-                ? styles.keepAwakeDiagnosticOk
-                : styles.keepAwakeDiagnosticError,
-            ]}
-            numberOfLines={2}>
-            {keepAwakeDiagnostic}
+            style={[styles.keepAwakeDiagnostic, { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 }]}
+            numberOfLines={3}>
+            <Text style={styles.keepAwakeDiagnosticOk}>
+              {useNativePreview ? t('live.diagnosticsNativeCamera') : t('live.diagnosticsExpoCamera')}
+            </Text>
+            {keepAwakeDiagnostic ? (
+              <>
+                {' · '}
+                <Text
+                  style={
+                    keepAwakeDiagnostic === 'Pantalla activa ✓'
+                      ? styles.keepAwakeDiagnosticOk
+                      : styles.keepAwakeDiagnosticError
+                  }>
+                  {keepAwakeDiagnostic}
+                </Text>
+              </>
+            ) : null}
           </Text>
         ) : null}
 

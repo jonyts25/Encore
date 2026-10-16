@@ -1,6 +1,10 @@
 import { requireNativeViewManager } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
+import { isNativeCameraOptedOut } from './nativeCameraFlag';
+
+export { isNativeCameraOptedOut } from './nativeCameraFlag';
+
 export function isEncoreNativeCameraAvailable(): boolean {
   if (Platform.OS !== 'ios') return false;
   try {
@@ -12,6 +16,6 @@ export function isEncoreNativeCameraAvailable(): boolean {
 }
 
 export function shouldUseEncoreNativeCamera(): boolean {
-  const flag = process.env.EXPO_PUBLIC_USE_NATIVE_CAMERA?.trim().toLowerCase();
-  return isEncoreNativeCameraAvailable() && (flag === 'true' || flag === '1');
+  if (!isEncoreNativeCameraAvailable()) return false;
+  return !isNativeCameraOptedOut();
 }
