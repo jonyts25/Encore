@@ -119,20 +119,14 @@ export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): P
   return data.shows;
 }
 
-export async function fetchHomeShowSections(accessToken: string): Promise<HomeShowSections> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    throw new ApiError('Unauthorized', 401);
-  }
-
+export async function fetchHomeShowSections(
+  userId: string,
+  accessToken: string
+): Promise<HomeShowSections> {
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
-    .eq('user_id', user.id);
+    .eq('user_id', userId);
 
   if (userShowsError) throw userShowsError;
 
@@ -158,22 +152,18 @@ export async function fetchHomeShowSections(accessToken: string): Promise<HomeSh
 
 export async function fetchArtistShowSections(
   artistId: string,
-  _accessToken?: string | null
+  userId: string | null
 ): Promise<ArtistShowSections> {
   const upcomingForArtist = await listUpcomingShowsForArtistFromSupabase(artistId);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  if (!userId) {
     return { yours: [], other: upcomingForArtist, attended: [] };
   }
 
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .in('status', ['voy', 'interesado', 'fui']);
 
   if (userShowsError) throw userShowsError;

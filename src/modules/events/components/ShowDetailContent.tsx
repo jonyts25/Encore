@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet } from 'react-native';
+import { RefreshControl, Image, ScrollView, StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { useIsOffline } from '@/core/network/useIsOffline';
+import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { SetlistPredictionPanel } from '@/modules/setlist';
 
-import { fetchShowById, formatShowDate, formatShowVenueLine } from '../api';
+import { formatShowDate, formatShowVenueLine } from '../api';
+import { useShow } from '../hooks/useShow';
 import { ShowStatusButtons } from './ShowStatusButtons';
-import type { Show } from '../types';
 
 type ShowDetailContentProps = {
   showId: string;
@@ -16,32 +17,8 @@ type ShowDetailContentProps = {
 
 export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { t, i18n } = useTranslation();
-  const [show, setShow] = useState<Show | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchShowById(showId);
-      if (!data) {
-        setError(t('events.showNotFound'));
-        setShow(null);
-        return;
-      }
-      setShow(data);
-    } catch (err) {
-      setShow(null);
-      setError(err instanceof Error ? err.message : t('events.loadError'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [showId, t]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const isOffline = useIsOffline();
+  const { show, isLoading, error, refetch, isFetching } = useShow(showId);
 
   if (isLoading) {
     return (
@@ -60,8 +37,14 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
+    <ScrollView
+      contentContainerStyle={styles.scroll}
+      refreshControl={
+        <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />
+      }>
       <ThemedView style={styles.container}>
+        <OfflineBanner visible={isOffline && Boolean(show)} />
+
         {show.artist.image_url ? (
           <Image source={{ uri: show.artist.image_url }} style={styles.heroImage} />
         ) : (

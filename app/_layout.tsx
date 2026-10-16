@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { bootLog } from '@/core/bootLog';
 import '@/core/i18n';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
+import { QueryProvider } from '@/core/query';
 import { SessionProvider } from '@/modules/identity';
 import { useColorScheme } from '@/core/ui/useColorScheme';
 
@@ -60,7 +61,9 @@ export default function RootLayout() {
     <BootGestureHandlerRootView>
       <I18nProvider>
         <SessionProvider>
-          <RootLayoutNav />
+          <QueryProvider>
+            <RootLayoutNav />
+          </QueryProvider>
         </SessionProvider>
       </I18nProvider>
     </BootGestureHandlerRootView>

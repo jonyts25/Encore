@@ -9,16 +9,17 @@ type ShowSectionProps = {
   title: string;
   shows: Show[];
   emptyMessage?: string;
+  showPackStatus?: boolean;
 };
 
-export function ShowSection({ title, shows, emptyMessage }: ShowSectionProps) {
+export function ShowSection({ title, shows, emptyMessage, showPackStatus }: ShowSectionProps) {
   return (
     <ThemedView style={styles.section}>
       <ThemedText style={styles.title}>{title}</ThemedText>
       {shows.length > 0 ? (
         <ThemedView style={styles.list}>
           {shows.map((show) => (
-            <ShowListItem key={show.id} show={show} />
+            <ShowListItem key={show.id} show={show} showPackStatus={showPackStatus} />
           ))}
         </ThemedView>
       ) : emptyMessage ? (

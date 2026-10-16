@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { useTranslation } from '@/core/i18n';
+import { queryKeys } from '@/core/query';
 
 import { fetchShowPrediction } from '../api';
 import type { SetlistPrediction } from '../types';
@@ -12,34 +13,21 @@ type UseShowPredictionOptions = {
 export function useShowPrediction(showId: string, options: UseShowPredictionOptions = {}) {
   const { enabled = true } = options;
   const { t } = useTranslation();
-  const [prediction, setPrediction] = useState<SetlistPrediction | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const refetch = useCallback(async () => {
-    if (!enabled || !showId) {
-      setPrediction(null);
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: queryKeys.prediction(showId),
+    queryFn: () => fetchShowPrediction(showId),
+    enabled: enabled && Boolean(showId),
+  });
 
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await fetchShowPrediction(showId);
-      setPrediction(data);
-    } catch (err) {
-      setPrediction(null);
-      setError(err instanceof Error ? err.message : t('setlist.loadError'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [enabled, showId, t]);
+  const prediction: SetlistPrediction | null = query.data ?? null;
+  const isLoading = query.isPending && query.data === undefined;
+  const error =
+    query.isError && !prediction
+      ? query.error instanceof Error
+        ? query.error.message
+        : t('setlist.loadError')
+      : null;
 
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
-
-  return { prediction, isLoading, error, refetch };
+  return { prediction, isLoading, error, refetch: query.refetch, isFetching: query.isFetching };
 }

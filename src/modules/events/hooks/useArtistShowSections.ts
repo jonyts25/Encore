@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+
+import { queryKeys } from '@/core/query';
 
 import { fetchArtistShowSections } from '../api';
 import type { ArtistShowSections } from '../types';
 
 type UseArtistShowSectionsOptions = {
   artistId: string;
-  accessToken?: string | null;
+  userId?: string | null;
   enabled?: boolean;
 };
 
@@ -15,37 +17,27 @@ const EMPTY_SECTIONS: ArtistShowSections = {
   attended: [],
 };
 
+function hasSectionData(sections: ArtistShowSections): boolean {
+  return sections.yours.length > 0 || sections.other.length > 0 || sections.attended.length > 0;
+}
+
 export function useArtistShowSections(options: UseArtistShowSectionsOptions) {
-  const { artistId, accessToken = null, enabled = true } = options;
-  const [sections, setSections] = useState<ArtistShowSections>(EMPTY_SECTIONS);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { artistId, userId = null, enabled = true } = options;
 
-  const refetch = useCallback(async () => {
-    if (!enabled || !artistId) {
-      setSections(EMPTY_SECTIONS);
-      setError(null);
-      setIsLoading(false);
-      return;
-    }
+  const query = useQuery({
+    queryKey: queryKeys.artistShows(artistId, userId),
+    queryFn: () => fetchArtistShowSections(artistId, userId),
+    enabled: enabled && Boolean(artistId),
+  });
 
-    setIsLoading(true);
-    setError(null);
+  const sections = query.data ?? EMPTY_SECTIONS;
+  const isLoading = query.isPending && !query.data;
+  const error =
+    query.isError && !hasSectionData(sections)
+      ? query.error instanceof Error
+        ? query.error.message
+        : 'Failed to load artist shows'
+      : null;
 
-    try {
-      const data = await fetchArtistShowSections(artistId, accessToken);
-      setSections(data);
-    } catch (err) {
-      setSections(EMPTY_SECTIONS);
-      setError(err instanceof Error ? err.message : 'Failed to load artist shows');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [accessToken, artistId, enabled]);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
-
-  return { sections, isLoading, error, refetch };
+  return { sections, isLoading, error, refetch: query.refetch, isFetching: query.isFetching };
 }

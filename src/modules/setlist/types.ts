@@ -1,3 +1,10 @@
+export type PredictionOtherSong = {
+  song_id: string;
+  title: string;
+  frequency: number;
+  frequency_pct: number;
+};
+
 export type PredictedSong = {
   song_id: string;
   title: string;
@@ -26,4 +33,5 @@ export type SetlistPrediction = {
   reference_show_dates?: string[];
   songs: PredictedSong[];
   generated_at: string;
+  others?: PredictionOtherSong[];
 };

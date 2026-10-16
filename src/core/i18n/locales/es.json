@@ -1,4 +1,11 @@
 {
+  "offline": {
+    "banner": "Sin conexión · mostrando lo guardado",
+    "requiresConnection": "Necesitas señal para esto",
+    "showPackDownloading": "Descargando…",
+    "showPackReady": "Listo sin señal · {{cached}}/{{total}} letras",
+    "showPackReadyEmpty": "Listo sin señal"
+  },
   "common": {
     "appName": "Encore",
     "loading": "Cargando…",

@@ -1,82 +1,117 @@
-import { useCallback, useEffect, useState } from 'react';
+import { onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useState } from 'react';
 
+import { useTranslation } from '@/core/i18n';
+import { queryKeys } from '@/core/query';
 import { useSession } from '@/modules/identity';
 
-import { getUserShowStatus, removeShowStatus, setShowStatus } from '../api';
-import type { ShowStatus } from '../types';
+import { fetchShowById, getUserShowStatus, removeShowStatus, setShowStatus } from '../api';
+import { prefetchShowPack } from '../showPack';
+import type { Show, ShowStatus } from '../types';
 
 export function useShowStatus(showId: string) {
-  const { isGuest, session } = useSession();
-  const [status, setStatus] = useState<ShowStatus | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isMutating, setIsMutating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { t } = useTranslation();
+  const { isGuest, session, user } = useSession();
+  const queryClient = useQueryClient();
+  const userId = user?.id ?? null;
+  const [offlineMessage, setOfflineMessage] = useState<string | null>(null);
 
-  const refetch = useCallback(async () => {
-    if (isGuest || !session) {
-      setStatus(null);
-      setError(null);
-      return;
+  const statusQuery = useQuery({
+    queryKey: userId ? queryKeys.showStatus(showId, userId) : ['showStatus', 'disabled'],
+    queryFn: () => getUserShowStatus(showId),
+    enabled: !isGuest && Boolean(session && userId && showId),
+  });
+
+  const invalidateRelated = useCallback(async () => {
+    if (!userId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.home(userId) }),
+      queryClient.invalidateQueries({ queryKey: ['artistShows'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.upcoming(true, userId) }),
+    ]);
+  }, [queryClient, userId]);
+
+  const triggerShowPack = useCallback(
+    async (nextStatus: ShowStatus) => {
+      if (nextStatus !== 'voy' && nextStatus !== 'interesado') return;
+
+      let show =
+        queryClient.getQueryData<Show | null>(queryKeys.show(showId)) ?? (await fetchShowById(showId));
+      if (show) {
+        void prefetchShowPack(show, queryClient, { force: true });
+      }
+    },
+    [queryClient, showId]
+  );
+
+  const updateMutation = useMutation({
+    mutationFn: (nextStatus: ShowStatus) =>
+      setShowStatus(showId, nextStatus, session!.access_token!),
+    onSuccess: async (row) => {
+      if (userId) {
+        queryClient.setQueryData(queryKeys.showStatus(showId, userId), row.status);
+      }
+      await invalidateRelated();
+      await triggerShowPack(row.status);
+    },
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: () => removeShowStatus(showId, session!.access_token!),
+    onSuccess: async () => {
+      if (userId) {
+        queryClient.setQueryData(queryKeys.showStatus(showId, userId), null);
+      }
+      await invalidateRelated();
+    },
+  });
+
+  const ensureOnline = useCallback(() => {
+    if (onlineManager.isOnline()) {
+      setOfflineMessage(null);
+      return true;
     }
-
-    setIsLoading(true);
-    setError(null);
-    try {
-      const current = await getUserShowStatus(showId);
-      setStatus(current);
-    } catch (err) {
-      setStatus(null);
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isGuest, session, showId]);
-
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
+    setOfflineMessage(t('offline.requiresConnection'));
+    return false;
+  }, [t]);
 
   const updateStatus = useCallback(
     async (nextStatus: ShowStatus) => {
       if (!session?.access_token) return;
-
-      setIsMutating(true);
-      setError(null);
-      try {
-        const row = await setShowStatus(showId, nextStatus, session.access_token);
-        setStatus(row.status);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        throw err;
-      } finally {
-        setIsMutating(false);
+      if (!ensureOnline()) {
+        throw new Error(t('offline.requiresConnection'));
       }
+      setOfflineMessage(null);
+      await updateMutation.mutateAsync(nextStatus);
     },
-    [session, showId]
+    [ensureOnline, session?.access_token, t, updateMutation]
   );
 
   const removeStatus = useCallback(async () => {
     if (!session?.access_token) return;
-
-    setIsMutating(true);
-    setError(null);
-    try {
-      await removeShowStatus(showId, session.access_token);
-      setStatus(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      throw err;
-    } finally {
-      setIsMutating(false);
+    if (!ensureOnline()) {
+      throw new Error(t('offline.requiresConnection'));
     }
-  }, [session, showId]);
+    setOfflineMessage(null);
+    await removeMutation.mutateAsync();
+  }, [ensureOnline, removeMutation, session?.access_token, t]);
+
+  const mutationError =
+    updateMutation.error instanceof Error
+      ? updateMutation.error.message
+      : removeMutation.error instanceof Error
+        ? removeMutation.error.message
+        : null;
 
   return {
-    status,
-    isLoading,
-    isMutating,
-    error,
-    refetch,
+    status: statusQuery.data ?? null,
+    isLoading: statusQuery.isPending && statusQuery.data === undefined,
+    isMutating: updateMutation.isPending || removeMutation.isPending,
+    error:
+      offlineMessage ??
+      mutationError ??
+      (statusQuery.isError && statusQuery.data === undefined ? t('events.loadError') : null),
+    refetch: statusQuery.refetch,
     updateStatus,
     removeStatus,
     requiresAuth: isGuest,

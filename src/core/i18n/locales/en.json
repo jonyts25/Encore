@@ -1,4 +1,11 @@
 {
+  "offline": {
+    "banner": "Offline · showing saved data",
+    "requiresConnection": "You need a connection for this",
+    "showPackDownloading": "Downloading…",
+    "showPackReady": "Ready offline · {{cached}}/{{total}} lyrics",
+    "showPackReadyEmpty": "Ready offline"
+  },
   "common": {
     "appName": "Encore",
     "loading": "Loading…",

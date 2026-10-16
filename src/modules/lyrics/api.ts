@@ -49,7 +49,15 @@ function mapResponse(data: LyricsSearchResponse): LyricsResult {
   return normalizeLyricsResult(data.lyrics, data.attribution);
 }
 
-export async function fetchLyrics(artist: string, title: string): Promise<LyricsResult | null> {
+type FetchLyricsOptions = {
+  expiresAt?: number;
+};
+
+export async function fetchLyrics(
+  artist: string,
+  title: string,
+  options?: FetchLyricsOptions
+): Promise<LyricsResult | null> {
   const cached = await getCachedLyrics(artist, title);
   if (cached) return normalizeCachedResult(cached);
 
@@ -58,7 +66,7 @@ export async function fetchLyrics(artist: string, title: string): Promise<Lyrics
   try {
     const data = await apiFetch<LyricsSearchResponse>(`/api/lyrics/search?${params.toString()}`);
     const result = mapResponse(data);
-    await setCachedLyrics(artist, title, result);
+    await setCachedLyrics(artist, title, result, { expiresAt: options?.expiresAt });
     return result;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {

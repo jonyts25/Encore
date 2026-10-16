@@ -14,7 +14,11 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
+    "@react-native-community/netinfo": "^12.0.1",
     "@supabase/supabase-js": "^2.112.4",
+    "@tanstack/query-sync-storage-persister": "^5.104.3",
+    "@tanstack/react-query": "^5.104.3",
+    "@tanstack/react-query-persist-client": "^5.104.3",
     "encore-camera": "file:./modules/encore-camera",
     "expo": "~57.0.18",
     "expo-camera": "~57.0.4",

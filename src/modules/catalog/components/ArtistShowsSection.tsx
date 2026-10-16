@@ -11,11 +11,11 @@ type ArtistShowsSectionProps = {
 
 export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
   const { t } = useTranslation();
-  const { isGuest, session, isLoading: sessionLoading } = useSession();
+  const { isGuest, user, isLoading: sessionLoading } = useSession();
 
   const { sections, isLoading, error } = useArtistShowSections({
     artistId,
-    accessToken: session?.access_token ?? null,
+    userId: user?.id ?? null,
     enabled: !sessionLoading,
   });
 
