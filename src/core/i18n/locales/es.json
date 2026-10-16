@@ -2,7 +2,7 @@
   "offline": {
     "banner": "Sin conexión · mostrando lo guardado",
     "requiresConnection": "Necesitas señal para esto",
-    "showPackDownloading": "Descargando…",
+    "showPackDownloading": "Descargando letras…",
     "showPackPartial": "Faltan letras · reintentar",
     "showPackReady": "Listo sin señal · {{cached}}/{{total}} letras",
     "showPackReadyEmpty": "Listo sin señal",
@@ -201,6 +201,9 @@
   "lyrics": {
     "screenTitle": "Letra",
     "loadError": "No se pudo cargar la letra",
+    "busy": "El servicio de letras está saturado, reintenta en un momento",
+    "retry": "Reintentar",
+    "openLive": "Abrir LIVE",
     "notFoundTitle": "Letra no disponible",
     "notFoundSubtitle": "LRCLIB no tiene esta canción. Puedes buscarla en Genius o Spotify.",
     "openGenius": "Buscar en Genius",
@@ -237,6 +240,8 @@
     "flipShort": "Flip",
     "torchShort": "Luz",
     "multiCamShort": "MultiCam",
+    "videoModeSingle": "Video",
+    "videoModeDual": "Doble",
     "multiCamUnavailable": "MultiCam requiere la cámara nativa en un iPhone compatible.",
     "multiCamFailed": "No se pudo iniciar el preview MultiCam.",
     "savedMultiCamToCameraRoll": "Videos trasero y frontal guardados por separado en el carrete.",

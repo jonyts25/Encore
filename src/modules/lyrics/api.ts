@@ -1,4 +1,6 @@
 import { apiFetch, ApiError } from '@/core/api/client';
+
+import { LyricsBusyError, toLyricsFetchError } from './errors';
 import { getCachedLyrics, setCachedLyrics } from '@/core/db';
 
 import {
@@ -77,9 +79,11 @@ export async function fetchLyrics(
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
-    throw error;
+    throw toLyricsFetchError(error);
   }
 }
+
+export { LyricsBusyError, isLyricsNetworkFailure } from './errors';
 
 export function buildGeniusSearchUrl(artist: string, title: string): string {
   const query = encodeURIComponent(`${artist} ${title}`);

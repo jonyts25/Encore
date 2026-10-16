@@ -2,6 +2,7 @@ import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import {
   EncoreMultiCamBackPreview,
   EncoreMultiCamFrontPreview,
+  getMultiCamSupport,
   setCameraMode,
   shouldUseEncoreNativeCamera,
   startMultiCamPreview,
@@ -13,7 +14,7 @@ import {
 } from 'encore-camera';
 import { Paths } from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -46,8 +47,10 @@ import {
 import { saveMultiCamRecordings, saveRecordingToCameraRoll } from '../saveRecording';
 
 import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
+import { useLiveSession } from '../context/LiveSessionContext';
 import { LiveConcertBottomBar } from './LiveConcertBottomBar';
 import { LiveConcertLyricsStrip } from './LiveConcertLyricsStrip';
+import { LiveZoomDial } from './LiveZoomDial';
 import { useLiveHardwareShutter } from '../hooks/useLiveHardwareShutter';
 import {
   activateRecordingKeepAwake,
@@ -152,12 +155,13 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [lyricsVisible, setLyricsVisible] = useState(true);
   const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
   const [multiCamActive, setMultiCamActive] = useState(false);
+  const [dualVideoAvailable, setDualVideoAvailable] = useState(false);
   const [nativeCameraState, setNativeCameraState] = useState<EncoreCameraState | null>(null);
   const [nativeZoom, setNativeZoom] = useState(1);
   const lastRoundedNativeZoomRef = useRef<number | null>(null);
   const [selectedLensId, setSelectedLensId] = useState<string>('wide');
 
-  const [activeTitle, setActiveTitle] = useState(title);
+  const { activeTitle, setActiveTitle } = useLiveSession();
   const [isRecording, setIsRecording] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -165,7 +169,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [keepAwakeDiagnostic, setKeepAwakeDiagnostic] = useState<string | null>(null);
   const showKeepAwakeDiagnostic = isLiveDiagnosticsEnabled();
 
-  const routeParams = useLocalSearchParams<{ title?: string }>();
   const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
 
   const pickerSongs = useMemo(() => {
@@ -221,10 +224,14 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   }, [title]);
 
   useEffect(() => {
-    if (typeof routeParams.title === 'string' && routeParams.title.trim()) {
-      setActiveTitle(routeParams.title);
+    if (Platform.OS === 'ios' && useNativePreview) {
+      void getMultiCamSupport()
+        .then((support) => setDualVideoAvailable(support.isMultiCamSupported))
+        .catch(() => setDualVideoAvailable(false));
+      return;
     }
-  }, [routeParams.title]);
+    setDualVideoAvailable(false);
+  }, [useNativePreview]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -379,16 +386,22 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   }, Platform.OS === 'ios' && permissionsGranted);
   const showLyricsPanel = lyricsVisible;
 
-  const handleToggleMultiCam = async () => {
+  const handleNativeZoomDial = useCallback((factor: number) => {
+    void previewRef.current?.setNativeZoom(factor);
+  }, []);
+
+  const handleSelectDualVideo = async (enabled: boolean) => {
     if (Platform.OS !== 'ios' || !useNativePreview) {
       setErrorMessage(t('live.multiCamUnavailable'));
       return;
     }
 
+    if (enabled === multiCamActive) return;
+
     setErrorMessage(null);
     setStatusMessage(null);
 
-    if (multiCamActive) {
+    if (!enabled) {
       try {
         await stopMultiCamPreview();
         await setCameraMode('single');
@@ -919,23 +932,35 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           {flashTip ? <Text style={styles.flashTip}>{flashTip}</Text> : null}
 
           <LiveConcertBottomBar
+            dualVideoActive={multiCamActive}
+            dualVideoAvailable={dualVideoAvailable && useNativePreview}
             flipDisabled={isRecording || multiCamActive}
             isRecording={isRecording}
             isSaving={isSaving}
-            lensChips={multiCamActive ? [] : lensChips}
-            multiCamActive={multiCamActive}
-            multiCamDisabled={!useNativePreview || isRecording}
+            lensChips={!useNativePreview && !multiCamActive ? lensChips : []}
             selectedLensId={useNativePreview ? (nativeSelectedLensId ?? 'zoom-1') : selectedLensId}
             torchDisabled={facing === 'front' || multiCamActive}
             torchOn={torchOn}
+            zoomControl={
+              useNativePreview && !multiCamActive && nativeCameraState ? (
+                <LiveZoomDial
+                  currentZoom={nativeZoom}
+                  disabled={isRecording}
+                  lensFactors={buildNativeZoomFactors(nativeCameraState)}
+                  maxZoom={Math.min(nativeCameraState.maxZoom ?? 10, 10)}
+                  minZoom={nativeCameraState.minZoom ?? 1}
+                  onSetZoom={handleNativeZoomDial}
+                />
+              ) : undefined
+            }
             onFlip={() => {
               void handleFlipCamera();
             }}
+            onSelectDualVideo={(enabled) => {
+              void handleSelectDualVideo(enabled);
+            }}
             onSelectLens={(id) => {
               void handleSelectLens(id);
-            }}
-            onToggleMultiCam={() => {
-              void handleToggleMultiCam();
             }}
             onToggleRecording={() => {
               void handleToggleRecording();

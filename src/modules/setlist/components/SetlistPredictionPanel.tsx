@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { useEncoreTheme } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useShowPrediction } from '../hooks/useShowPrediction';
@@ -72,6 +73,7 @@ export function SetlistPredictionPanel({
   variant = 'default',
 }: SetlistPredictionPanelProps) {
   const { t, i18n } = useTranslation();
+  const { tokens } = useEncoreTheme();
   const locale = i18n.language;
   const router = useRouter();
   const { prediction, isLoading, error } = useShowPrediction(showId);
@@ -141,7 +143,12 @@ export function SetlistPredictionPanel({
 
           {!isCompact && metaLine ? <ThemedText style={styles.meta}>{metaLine}</ThemedText> : null}
 
-          <View style={[styles.list, isCompact && styles.listCompact]}>
+          <View
+            style={[
+              styles.list,
+              isCompact && styles.listCompact,
+              isCompact && { backgroundColor: tokens.surface },
+            ]}>
             {sortedSongs.map((song, index) =>
               isCompact ? (
                 <Pressable
@@ -150,15 +157,20 @@ export function SetlistPredictionPanel({
                   onPress={() => openLyrics(song.title)}
                   style={({ pressed }) => [
                     styles.compactRow,
-                    index < sortedSongs.length - 1 && styles.compactRowBorder,
+                    index < sortedSongs.length - 1 && {
+                      borderBottomColor: tokens.separator,
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                    },
                     pressed && styles.compactRowPressed,
                   ]}>
-                  <Text style={styles.compactRank}>{index + 1}</Text>
-                  <Text numberOfLines={1} style={styles.compactTitle}>
+                  <Text style={[styles.compactRank, { color: tokens.tabIconDefault }]}>{index + 1}</Text>
+                  <Text numberOfLines={1} style={[styles.compactTitle, { color: tokens.text }]}>
                     {song.title}
                   </Text>
                   {showConfidence && song.confidence != null ? (
-                    <Text style={styles.compactPct}>{formatConfidence(song.confidence)}</Text>
+                    <Text style={[styles.compactPct, { color: tokens.textSecondary }]}>
+                      {formatConfidence(song.confidence)}
+                    </Text>
                   ) : null}
                 </Pressable>
               ) : (

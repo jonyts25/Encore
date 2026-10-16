@@ -2,7 +2,7 @@
   "offline": {
     "banner": "Offline · showing saved data",
     "requiresConnection": "You need a connection for this",
-    "showPackDownloading": "Downloading…",
+    "showPackDownloading": "Downloading lyrics…",
     "showPackPartial": "Missing lyrics · retry",
     "showPackReady": "Ready offline · {{cached}}/{{total}} lyrics",
     "showPackReadyEmpty": "Ready offline",
@@ -201,6 +201,9 @@
   "lyrics": {
     "screenTitle": "Lyrics",
     "loadError": "Could not load lyrics",
+    "busy": "Lyrics service is busy, try again in a moment",
+    "retry": "Retry",
+    "openLive": "Open LIVE",
     "notFoundTitle": "Lyrics not available",
     "notFoundSubtitle": "LRCLIB does not have this song. You can search on Genius or Spotify.",
     "openGenius": "Search on Genius",
@@ -237,6 +240,8 @@
     "flipShort": "Flip",
     "torchShort": "Torch",
     "multiCamShort": "MultiCam",
+    "videoModeSingle": "Video",
+    "videoModeDual": "Dual",
     "multiCamUnavailable": "MultiCam requires the native camera on a supported iPhone.",
     "multiCamFailed": "Could not start MultiCam preview.",
     "savedMultiCamToCameraRoll": "Back and front videos saved separately to camera roll.",

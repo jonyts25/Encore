@@ -16,11 +16,13 @@ import { hasCachedLyrics } from '@/core/db/lyricsCache';
 import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { queryKeys } from '@/core/query';
-import { Glass, ListRow, PillButton, SegmentedControl } from '@/core/ui';
+import { ListRow, PillButton, SegmentedControl } from '@/core/ui';
 import { fetchArtistSongs } from '@/modules/catalog/api';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong } from '@/modules/setlist/types';
+
+import { useLiveSession } from '../context/LiveSessionContext';
 
 type SongSegment = 'predicted' | 'others' | 'all';
 
@@ -41,6 +43,7 @@ export function LiveSongsSheetContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activeTitle, setActiveTitle } = useLiveSession();
   const params = useLocalSearchParams<{
     artist?: string;
     showId?: string;
@@ -49,7 +52,7 @@ export function LiveSongsSheetContent() {
 
   const artistName = typeof params.artist === 'string' ? params.artist : '';
   const showId = typeof params.showId === 'string' ? params.showId : '';
-  const activeTitle = typeof params.activeTitle === 'string' ? params.activeTitle : '';
+  const initialTitle = typeof params.activeTitle === 'string' ? params.activeTitle : '';
 
   const [search, setSearch] = useState('');
   const [segment, setSegment] = useState<SongSegment>('predicted');
@@ -58,6 +61,12 @@ export function LiveSongsSheetContent() {
   const { prediction } = useShowPrediction(showId, { enabled: Boolean(showId) });
   const { show } = useShow(showId);
   const artistId = show?.artist_id ?? '';
+
+  useEffect(() => {
+    if (initialTitle.trim()) {
+      setActiveTitle(initialTitle);
+    }
+  }, [initialTitle, setActiveTitle]);
 
   const artistSongsQuery = useQuery({
     queryKey: queryKeys.artistSongs(artistId),
@@ -142,81 +151,65 @@ export function LiveSongsSheetContent() {
 
   const selectTitle = (title: string) => {
     hapticSelection();
-    router.replace({
-      pathname: '/live',
-      params: {
-        artist: artistName,
-        showId,
-        title,
-      },
-    });
+    setActiveTitle(title);
     router.back();
   };
 
   return (
     <View style={[styles.root, { paddingBottom: insets.bottom + 12 }]}>
-      <Glass style={styles.sheet}>
-        <View style={styles.grabber} />
-        <View style={styles.headerRow}>
-          <Text style={styles.title}>{t('live.songsSheetTitle')}</Text>
-          <PillButton
-            title={t('live.songsSheetDone')}
-            variant="glass"
-            onPress={() => router.back()}
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{t('live.songsSheetTitle')}</Text>
+        <PillButton title={t('live.songsSheetDone')} variant="glass" onPress={() => router.back()} />
+      </View>
+
+      <TextInput
+        placeholder={t('live.songPickerSearch')}
+        placeholderTextColor="#A1A1A6"
+        style={styles.search}
+        value={search}
+        onChangeText={setSearch}
+      />
+
+      <SegmentedControl
+        options={[
+          { value: 'predicted' as const, label: t('live.songsSegmentPredicted') },
+          { value: 'others' as const, label: t('live.songsSegmentOthers') },
+          { value: 'all' as const, label: t('live.songsSegmentAll') },
+        ]}
+        value={segment}
+        onChange={setSegment}
+      />
+
+      <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
+        {rows.map((row) => (
+          <ListRow
+            key={row.key}
+            leading={<Text style={styles.rowIndex}>{row.index}</Text>}
+            selected={row.active}
+            subtitle={row.detail}
+            title={row.title}
+            trailing={
+              cachedTitles.has(row.title) ? (
+                <Ionicons
+                  accessibilityLabel={t('live.songHasCachedLyrics')}
+                  color={row.active ? '#FFFFFF' : '#A1A1A6'}
+                  name="document-text-outline"
+                  size={18}
+                />
+              ) : null
+            }
+            onPress={() => selectTitle(row.title)}
           />
-        </View>
+        ))}
 
-        <TextInput
-          placeholder={t('live.songPickerSearch')}
-          placeholderTextColor="#A1A1A6"
-          style={styles.search}
-          value={search}
-          onChangeText={setSearch}
-        />
-
-        <SegmentedControl
-          options={[
-            { value: 'predicted' as const, label: t('live.songsSegmentPredicted') },
-            { value: 'others' as const, label: t('live.songsSegmentOthers') },
-            { value: 'all' as const, label: t('live.songsSegmentAll') },
-          ]}
-          value={segment}
-          onChange={setSegment}
-        />
-
-        <ScrollView contentContainerStyle={styles.list} keyboardShouldPersistTaps="handled">
-          {rows.map((row) => (
-            <ListRow
-              key={row.key}
-              leading={
-                <Text style={styles.rowIndex}>{row.index}</Text>
-              }
-              selected={row.active}
-              subtitle={row.detail}
-              title={row.title}
-              trailing={
-                cachedTitles.has(row.title) ? (
-                  <Ionicons
-                    accessibilityLabel={t('live.songHasCachedLyrics')}
-                    color={row.active ? '#FFFFFF' : '#A1A1A6'}
-                    name="document-text-outline"
-                    size={18}
-                  />
-                ) : null
-              }
-              onPress={() => selectTitle(row.title)}
-            />
-          ))}
-
-          {rows.length === 0 && query ? (
-            <Pressable onPress={() => selectTitle(search.trim())} style={styles.customRow}>
-              <Text style={styles.customText}>
-                {t('live.songPickerUseCustom', { title: search.trim() })}
-              </Text>
-            </Pressable>
-          ) : null}
-        </ScrollView>
-      </Glass>
+        {rows.length === 0 && query ? (
+          <Pressable onPress={() => selectTitle(search.trim())} style={styles.customRow}>
+            <Text style={styles.customText}>
+              {t('live.songPickerUseCustom', { title: search.trim() })}
+            </Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -232,29 +225,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  grabber: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    borderRadius: 3,
-    height: 5,
-    marginBottom: 12,
-    width: 36,
-  },
   headerRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 12,
+    paddingHorizontal: 8,
   },
   list: {
     gap: 4,
     paddingBottom: 16,
+    paddingHorizontal: 8,
     paddingTop: 8,
   },
   root: {
+    backgroundColor: 'transparent',
     flex: 1,
-    justifyContent: 'flex-end',
-    paddingHorizontal: 8,
+    paddingTop: 8,
   },
   rowIndex: {
     color: '#A1A1A6',
@@ -268,15 +255,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     marginBottom: 12,
+    marginHorizontal: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-  },
-  sheet: {
-    borderRadius: 38,
-    flex: 1,
-    maxHeight: '92%',
-    paddingHorizontal: 16,
-    paddingTop: 8,
   },
   title: {
     color: '#FFFFFF',

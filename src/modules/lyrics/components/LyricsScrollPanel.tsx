@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+
+import { Glass } from '@/core/ui';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
@@ -21,6 +23,9 @@ type LyricsScrollPanelProps = {
   autoStart?: boolean;
   style?: ViewStyle;
   showModeLabel?: boolean;
+  showControls?: boolean;
+  footerActions?: ReactNode;
+  fixedGlassToolbar?: boolean;
 };
 
 // Fallback strides until onLayout measures each row (incl. multi-line wrap).
@@ -63,6 +68,9 @@ export function LyricsScrollPanel({
   autoStart = false,
   style,
   showModeLabel = true,
+  showControls = true,
+  footerActions,
+  fixedGlassToolbar = false,
 }: LyricsScrollPanelProps) {
   const { t } = useTranslation();
   const scrollRef = useRef<ScrollView>(null);
@@ -183,40 +191,67 @@ export function LyricsScrollPanel({
         })}
       </ScrollView>
 
-      <View style={[styles.controls, compactControls && styles.controlsCompact]}>
-        {compactControls ? (
-          <>
-            <Pressable
-              accessibilityRole="button"
-              onPress={playPause}
-              style={({ pressed }) => [
-                styles.compactControl,
-                styles.compactControlPrimary,
-                pressed && styles.compactControlPressed,
-              ]}>
-              <Text style={styles.compactControlPrimaryText}>{primaryActionLabel}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={reset}
-              style={({ pressed }) => [
-                styles.compactControl,
-                styles.compactControlSecondary,
-                pressed && styles.compactControlPressed,
-              ]}>
-              <Text style={styles.compactControlSecondaryText}>{t('lyrics.restart')}</Text>
-            </Pressable>
-          </>
+      {showControls ? (
+        fixedGlassToolbar ? (
+          <Glass style={styles.glassToolbar}>
+            <View style={[styles.controls, styles.controlsCompact]}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={playPause}
+                style={({ pressed }) => [
+                  styles.compactControl,
+                  styles.compactControlPrimary,
+                  pressed && styles.compactControlPressed,
+                ]}>
+                <Text style={styles.compactControlPrimaryText}>{primaryActionLabel}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={reset}
+                style={({ pressed }) => [
+                  styles.compactControl,
+                  styles.compactControlSecondary,
+                  pressed && styles.compactControlPressed,
+                ]}>
+                <Text style={styles.compactControlSecondaryText}>{t('lyrics.restart')}</Text>
+              </Pressable>
+            </View>
+            {footerActions}
+          </Glass>
         ) : (
-          <>
-            <Button
-              title={primaryActionLabel}
-              onPress={playPause}
-            />
-            <Button title={t('lyrics.restart')} variant="secondary" onPress={reset} />
-          </>
-        )}
-      </View>
+          <View style={[styles.controls, compactControls && styles.controlsCompact]}>
+            {compactControls ? (
+              <>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={playPause}
+                  style={({ pressed }) => [
+                    styles.compactControl,
+                    styles.compactControlPrimary,
+                    pressed && styles.compactControlPressed,
+                  ]}>
+                  <Text style={styles.compactControlPrimaryText}>{primaryActionLabel}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={reset}
+                  style={({ pressed }) => [
+                    styles.compactControl,
+                    styles.compactControlSecondary,
+                    pressed && styles.compactControlPressed,
+                  ]}>
+                  <Text style={styles.compactControlSecondaryText}>{t('lyrics.restart')}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Button title={primaryActionLabel} onPress={playPause} />
+                <Button title={t('lyrics.restart')} variant="secondary" onPress={reset} />
+              </>
+            )}
+          </View>
+        )
+      ) : null}
     </ThemedView>
   );
 }
@@ -239,6 +274,12 @@ const styles = StyleSheet.create({
   controlsCompact: {
     flexDirection: 'row',
     gap: 6,
+  },
+  glassToolbar: {
+    borderRadius: 24,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
   compactControl: {
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import { jsonError, jsonOk } from '@/lib/http';
-import { getLyricsProvider } from '@/lib/providers/lyrics';
+import { getLyricsProvider, LyricsBusyError, resolveLyricsSearch } from '@/lib/providers/lyrics/lrclib';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,20 +12,7 @@ export async function GET(request: Request) {
 
   try {
     const provider = getLyricsProvider();
-    const matches = await provider.search(artist, title);
-
-    const withLyrics = matches.filter((match) => match.hasPlainLyrics);
-    if (withLyrics.length === 0) {
-      return jsonError('Lyrics not found', 404, { matches });
-    }
-
-    const bestMatch =
-      withLyrics.find((match) => match.hasSyncedLyrics) ??
-      withLyrics.find((match) => match.duration !== null) ??
-      withLyrics[0];
-
-    const lyrics = await provider.fetch(bestMatch.id);
-    const synced = await provider.fetchSynced(bestMatch.id);
+    const { lyrics, synced, matches } = await resolveLyricsSearch(artist, title);
 
     return jsonOk({
       lyrics: {
@@ -39,9 +26,13 @@ export async function GET(request: Request) {
         synced_lines: synced?.lines ?? [],
       },
       attribution: provider.attribution,
-      matches: withLyrics,
+      matches,
     });
   } catch (error) {
+    if (error instanceof LyricsBusyError) {
+      return jsonError('lyrics_busy', 503);
+    }
+
     const message = error instanceof Error ? error.message : 'Lyrics search failed';
     if (message.includes('not found')) {
       return jsonError('Lyrics not found', 404);

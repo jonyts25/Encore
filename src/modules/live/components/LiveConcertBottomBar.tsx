@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type ReactNode } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Glass, GlassIconButton } from '@/core/ui';
@@ -11,42 +12,47 @@ type LensChip = {
 };
 
 type LiveConcertBottomBarProps = {
-  lensChips: LensChip[];
-  selectedLensId: string | null;
+  zoomControl?: ReactNode;
+  lensChips?: LensChip[];
+  selectedLensId?: string | null;
   isRecording: boolean;
   isSaving: boolean;
   torchOn: boolean;
   torchDisabled: boolean;
   flipDisabled: boolean;
-  multiCamActive: boolean;
-  multiCamDisabled: boolean;
-  onSelectLens: (id: string) => void;
+  dualVideoAvailable: boolean;
+  dualVideoActive: boolean;
+  onSelectLens?: (id: string) => void;
   onToggleRecording: () => void;
   onFlip: () => void;
-  onToggleMultiCam: () => void;
+  onSelectDualVideo: (enabled: boolean) => void;
   onToggleTorch: () => void;
 };
 
 export function LiveConcertBottomBar({
-  lensChips,
+  zoomControl,
+  lensChips = [],
   selectedLensId,
   isRecording,
   isSaving,
   torchOn,
   torchDisabled,
   flipDisabled,
-  multiCamDisabled,
+  dualVideoAvailable,
+  dualVideoActive,
   onSelectLens,
   onToggleRecording,
   onFlip,
-  onToggleMultiCam,
+  onSelectDualVideo,
   onToggleTorch,
 }: LiveConcertBottomBarProps) {
   const { t } = useTranslation();
 
   return (
     <View style={styles.root}>
-      {lensChips.length > 0 ? (
+      {zoomControl ? (
+        zoomControl
+      ) : lensChips.length > 0 ? (
         <Glass style={styles.zoomPill}>
           <View style={styles.lensRow}>
             {lensChips.map((chip) => {
@@ -55,7 +61,7 @@ export function LiveConcertBottomBar({
                 <Pressable
                   key={chip.id}
                   accessibilityRole="button"
-                  onPress={() => onSelectLens(chip.id)}
+                  onPress={() => onSelectLens?.(chip.id)}
                   style={[styles.lensChip, selected && styles.lensChipSelected]}>
                   <Text style={[styles.lensChipText, selected && styles.lensChipTextSelected]}>
                     {chip.label}
@@ -63,6 +69,31 @@ export function LiveConcertBottomBar({
                 </Pressable>
               );
             })}
+          </View>
+        </Glass>
+      ) : null}
+
+      {dualVideoAvailable ? (
+        <Glass style={styles.modePill}>
+          <View style={styles.modeRow}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isRecording}
+              onPress={() => onSelectDualVideo(false)}
+              style={[styles.modeChip, !dualVideoActive && styles.modeChipSelected]}>
+              <Text style={[styles.modeText, !dualVideoActive && styles.modeTextSelected]}>
+                {t('live.videoModeSingle')}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isRecording}
+              onPress={() => onSelectDualVideo(true)}
+              style={[styles.modeChip, dualVideoActive && styles.modeChipSelected]}>
+              <Text style={[styles.modeText, dualVideoActive && styles.modeTextSelected]}>
+                {t('live.videoModeDual')}
+              </Text>
+            </Pressable>
           </View>
         </Glass>
       ) : null}
@@ -90,9 +121,6 @@ export function LiveConcertBottomBar({
           accessibilityLabel={t('live.flipCamera')}
           disabled={flipDisabled}
           icon="camera-reverse"
-          onLongPress={
-            Platform.OS === 'ios' && !multiCamDisabled ? onToggleMultiCam : undefined
-          }
           onPress={onFlip}
         />
       </View>
@@ -140,6 +168,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     width: '100%',
   },
+  modeChip: {
+    borderRadius: 16,
+    flex: 1,
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+  },
+  modeChipSelected: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  modePill: {
+    borderRadius: 18,
+    padding: 4,
+    width: '72%',
+  },
+  modeRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  modeText: {
+    color: 'rgba(255,255,255,0.82)',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  modeTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   recordInner: {
     backgroundColor: darkTokens.recording,
     borderRadius: 999,
@@ -162,7 +219,7 @@ const styles = StyleSheet.create({
   },
   root: {
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
     width: '100%',
   },
   zoomPill: {

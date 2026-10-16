@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { Appearance } from 'react-native';
 
+import { LiveSessionProvider } from '@/modules/live/context/LiveSessionContext';
 import {
   applyNativeColorScheme,
   EncoreThemeProvider,
@@ -22,8 +23,9 @@ function LiveNativeAppearanceLock() {
 export default function LiveStackLayout() {
   return (
     <EncoreThemeProvider forceScheme="dark">
-      <LiveNativeAppearanceLock />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000' } }}>
+      <LiveSessionProvider>
+        <LiveNativeAppearanceLock />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000' } }}>
         <Stack.Screen name="index" />
         <Stack.Screen
           name="songs"
@@ -34,7 +36,8 @@ export default function LiveStackLayout() {
             contentStyle: { backgroundColor: 'transparent' },
           }}
         />
-      </Stack>
+        </Stack>
+      </LiveSessionProvider>
     </EncoreThemeProvider>
   );
 }

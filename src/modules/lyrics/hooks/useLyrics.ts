@@ -4,6 +4,7 @@ import { useTranslation } from '@/core/i18n';
 import { queryKeys } from '@/core/query';
 
 import { fetchLyrics } from '../api';
+import { LyricsBusyError } from '../errors';
 import type { LyricsResult } from '../types';
 
 export function useLyrics(artist: string, title: string) {
@@ -21,12 +22,23 @@ export function useLyrics(artist: string, title: string) {
   const lyrics: LyricsResult | null = query.data ?? null;
   const isLoading = enabled && query.isPending && query.data === undefined;
   const notFound = enabled && query.isSuccess && !lyrics;
+  const isBusy = query.isError && query.error instanceof LyricsBusyError;
   const error =
     query.isError && !lyrics
-      ? query.error instanceof Error
-        ? query.error.message
-        : t('lyrics.loadError')
+      ? isBusy
+        ? t('lyrics.busy')
+        : query.error instanceof Error
+          ? query.error.message
+          : t('lyrics.loadError')
       : null;
 
-  return { lyrics, isLoading, error, notFound, refetch: query.refetch, isFetching: query.isFetching };
+  return {
+    lyrics,
+    isLoading,
+    error,
+    isBusy,
+    notFound,
+    refetch: query.refetch,
+    isFetching: query.isFetching,
+  };
 }

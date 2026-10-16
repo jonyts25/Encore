@@ -99,6 +99,13 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
   const phase = show ? getShowPhase(show.show_date) : 'upcoming';
 
+  const packCardTitle = useMemo(() => {
+    if (!packRecord || packRecord.status === 'idle') return null;
+    if (packRecord.status === 'downloading') return t('offline.showPackDownloading');
+    if (packRecord.status === 'partial') return t('offline.showPackPartial');
+    return t('offline.showPackCardTitle');
+  }, [packRecord, t]);
+
   const packSubtitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return packLabel;
     const updated =
@@ -209,17 +216,19 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
         <View style={styles.body}>
           <OfflineBanner visible={isOffline} />
 
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
+          <View style={[styles.infoCard, { backgroundColor: tokens.surface }]}>
+            <View style={[styles.infoRow, { borderBottomColor: tokens.separator }]}>
               <Ionicons color={tokens.accent} name="calendar-outline" size={20} />
-              <Text style={styles.infoText}>{formatShowDate(show.show_date, i18n.language)}</Text>
+              <Text style={[styles.infoText, { color: tokens.text }]}>
+                {formatShowDate(show.show_date, i18n.language)}
+              </Text>
             </View>
             <View style={[styles.infoRow, styles.infoRowLast]}>
               <Ionicons color={tokens.accent} name="location-outline" size={20} />
-              <Text numberOfLines={2} style={[styles.infoText, styles.infoVenue]}>
+              <Text numberOfLines={2} style={[styles.infoText, styles.infoVenue, { color: tokens.text }]}>
                 {show.venue.name}
               </Text>
-              <Ionicons color="#AEAEB2" name="chevron-forward" size={16} />
+              <Ionicons color={tokens.tabIconDefault} name="chevron-forward" size={16} />
             </View>
           </View>
 
@@ -230,20 +239,28 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
               accessibilityRole="button"
               disabled={!isPartial}
               onPress={isPartial ? retry : undefined}
-              style={({ pressed }) => [styles.packCard, pressed && isPartial && styles.pressed]}>
-              <View style={styles.packIcon}>
-                <Ionicons color="#1E7A34" name="checkmark" size={18} />
+              style={({ pressed }) => [
+                styles.packCard,
+                { backgroundColor: tokens.surface },
+                pressed && isPartial && styles.pressed,
+              ]}>
+              <View style={[styles.packIcon, { backgroundColor: tokens.fillMuted }]}>
+                <Ionicons color={tokens.success} name="checkmark" size={18} />
               </View>
               <View style={styles.packText}>
-                <Text style={styles.packTitle}>{t('offline.showPackCardTitle')}</Text>
-                {packSubtitle ? <Text style={styles.packSubtitle}>{packSubtitle}</Text> : null}
+                <Text style={[styles.packTitle, { color: tokens.text }]}>{packCardTitle}</Text>
+                {packSubtitle ? (
+                  <Text style={[styles.packSubtitle, { color: tokens.textSecondary }]}>{packSubtitle}</Text>
+                ) : null}
               </View>
             </Pressable>
           ) : null}
 
           <View style={styles.setlistHeader}>
-            <Text style={styles.setlistTitle}>{t('setlist.probableTitle')}</Text>
-            {predictionMeta ? <Text style={styles.setlistMeta}>{predictionMeta}</Text> : null}
+            <Text style={[styles.setlistTitle, { color: tokens.text }]}>{t('setlist.probableTitle')}</Text>
+            {predictionMeta ? (
+              <Text style={[styles.setlistMeta, { color: tokens.textSecondary }]}>{predictionMeta}</Text>
+            ) : null}
           </View>
 
           <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} variant="compact" />

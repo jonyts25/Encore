@@ -1,11 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query';
 
+import { ApiError } from '@/core/api/client';
+
 import { lyricsExpiresAfterShow } from '@/core/db/lyricsCache';
 import { getShowPackRecord, setShowPackRecord } from '@/core/db/showPackCache';
 import { queryKeys } from '@/core/query';
 
 import { fetchArtistSongs } from '@/modules/catalog/api';
-import { fetchLyrics } from '@/modules/lyrics/api';
+import { fetchLyrics, isLyricsNetworkFailure } from '@/modules/lyrics/api';
 import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
@@ -13,7 +15,8 @@ import { fetchShowById } from './api';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
 
-const LYRICS_BATCH_SIZE = 4;
+const LYRICS_BATCH_SIZE = 2;
+const LYRICS_BATCH_PAUSE_MS = 500;
 const GOING_PREFETCH_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 const STUCK_DOWNLOADING_MS = 10 * 60 * 1000;
 const READY_STALE_MS = 24 * 60 * 60 * 1000;
@@ -151,8 +154,10 @@ export async function prefetchShowPack(
           if (result) {
             lyricsCached += 1;
           }
-        } catch {
-          lyricsFailed += 1;
+        } catch (error) {
+          if (isLyricsNetworkFailure(error) || !(error instanceof ApiError && error.status === 404)) {
+            lyricsFailed += 1;
+          }
         }
       })
     );
@@ -166,6 +171,10 @@ export async function prefetchShowPack(
       downloadedAt: null,
       statusUpdatedAt: Date.now(),
     });
+
+    if (index + LYRICS_BATCH_SIZE < targets.length) {
+      await new Promise((resolve) => setTimeout(resolve, LYRICS_BATCH_PAUSE_MS));
+    }
   }
 
   const finishedAt = Date.now();
