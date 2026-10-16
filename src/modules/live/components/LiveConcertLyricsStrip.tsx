@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { typography } from '@/core/ui/theme';
 import {
   LyricsResyncModal,
   normalizeDurationSeconds,
@@ -231,14 +232,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   currentLine: {
+    ...typography.liveCurrentLine,
     color: '#fff',
-    fontSize: 28,
-    fontWeight: '800',
-    lineHeight: 34,
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.65)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 8,
+    textShadowColor: 'rgba(0,0,0,0.75)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 12,
   },
   expandedBackdrop: {
     backgroundColor: 'rgba(0,0,0,0.72)',

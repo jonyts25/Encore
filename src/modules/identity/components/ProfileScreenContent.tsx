@@ -2,8 +2,11 @@ import { StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
-import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
+import { Card, ListRow, PillButton } from '@/core/ui';
+import { spacing } from '@/core/ui/theme';
+import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
+import { AppearanceSettings } from './AppearanceSettings';
 import { useProfile } from '../hooks/useProfile';
 import { useSession } from '../hooks/useSession';
 
@@ -58,24 +61,19 @@ export function ProfileScreenContent() {
   }
 
   return (
-    <ThemedView style={styles.card}>
-      <ThemedText style={styles.label}>{t('identity.displayName')}</ThemedText>
-      <ThemedText style={styles.value}>{profile?.display_name ?? '—'}</ThemedText>
-
-      <ThemedText style={styles.label}>{t('identity.locale')}</ThemedText>
-      <ThemedText style={styles.value}>{profile?.locale ?? '—'}</ThemedText>
-
-      <ThemedText style={styles.label}>{t('identity.role')}</ThemedText>
-      <ThemedText style={styles.value}>{role}</ThemedText>
-
-      <Button
+    <Card style={{ gap: spacing.md }}>
+      <ListRow title={profile?.display_name ?? '—'} subtitle={t('identity.displayName')} />
+      <ListRow title={profile?.locale ?? '—'} subtitle={t('identity.locale')} />
+      <ListRow title={role} subtitle={t('identity.role')} />
+      <AppearanceSettings />
+      <PillButton
         title={t('identity.logout')}
         variant="secondary"
         onPress={() => {
           void signOut();
         }}
       />
-    </ThemedView>
+    </Card>
   );
 }
 

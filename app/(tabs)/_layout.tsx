@@ -1,73 +1,32 @@
-import { SymbolView } from 'expo-symbols';
-import { Tabs } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 
-import Colors from '@/core/ui/theme/Colors';
-import { useColorScheme } from '@/core/ui/useColorScheme';
-import { useClientOnlyValue } from '@/core/ui/useClientOnlyValue';
 import { useTranslation } from '@/core/i18n';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
   const { t } = useTranslation();
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme].tint,
-        headerShown: useClientOnlyValue(false, true),
-      }}>
-      <Tabs.Screen
-        name="shows"
-        options={{
-          title: t('events.tab'),
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'calendar', android: 'event', web: 'event' }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="catalog"
-        options={{
-          title: t('catalog.tab'),
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'music.note.list', android: 'queue_music', web: 'queue_music' }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('home.tab'),
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'house', android: 'home', web: 'home' }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('identity.tab'),
-          tabBarIcon: ({ color }) => (
-            <SymbolView
-              name={{ ios: 'person.circle', android: 'person', web: 'person' }}
-              tintColor={color}
-              size={28}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+    <NativeTabs>
+      <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Label>{t('home.tab')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} md="home" />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="explore">
+        <NativeTabs.Trigger.Label>{t('explore.tab')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'safari', selected: 'safari.fill' }}
+          md="explore"
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="profile">
+        <NativeTabs.Trigger.Label>{t('identity.tab')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'person.circle', selected: 'person.circle.fill' }}
+          md="person"
+        />
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="shows" hidden />
+      <NativeTabs.Trigger name="catalog" hidden />
+    </NativeTabs>
   );
 }

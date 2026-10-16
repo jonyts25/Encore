@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Hoja de canciones</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:#FF7A5E}a:hover{color:#FF9A84}
+button{font-family:inherit}
+input::placeholder{color:#A1A1A6}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 72%, rgba(255,190,120,0.55), rgba(255,190,120,0) 38%), radial-gradient(circle at 22% 18%, rgba(110,80,255,0.7), rgba(110,80,255,0) 30%), linear-gradient(180deg, #0A0612 0%, #160D10 70%, #050404 100%); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif; color: #FFFFFF">
+<div style="position: absolute; inset: 0; background: rgba(0,0,0,0.35)"></div>
+
+<div style="position: absolute; left: 8px; right: 8px; top: 214px; bottom: 8px; border-radius: 38px; background: rgba(36,36,40,0.72); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 -10px 40px rgba(0,0,0,0.4); padding: 8px 16px 0 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; overflow: hidden">
+<div style="width: 36px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.3); align-self: center"></div>
+
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h2 style="margin: 0; font-size: 22px; font-weight: 700">Canciones</h2>
+<button style="height: 36px; padding: 0 14px; border-radius: 18px; border: none; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 15px; font-weight: 600">Listo</button>
+</div>
+
+<label style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; border-radius: 12px; background: rgba(118,118,128,0.28); color: #A1A1A6">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><line x1="16.5" y1="16.5" x2="21" y2="21"></line></svg>
+<input aria-label="Buscar canción" placeholder="Buscar en todo el repertorio" style="flex: 1; border: none; outline: none; background: transparent; color: #FFFFFF; font-size: 16px; font-family: inherit">
+</label>
+
+<div role="group" aria-label="Lista" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 12px; background: rgba(118,118,128,0.24)">
+<button aria-pressed="true" style="height: 32px; border-radius: 9px; border: none; background: rgba(255,255,255,0.22); color: #FFFFFF; font-size: 14px; font-weight: 700">Probables</button>
+<button style="height: 32px; border-radius: 9px; border: none; background: transparent; color: #D1D1D6; font-size: 14px; font-weight: 500">Otras</button>
+<button style="height: 32px; border-radius: 9px; border: none; background: transparent; color: #D1D1D6; font-size: 14px; font-weight: 500">Todas</button>
+</div>
+
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{songs}}" as="song" hint-placeholder-count="7">
+<button style="display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 10px; border: none; border-radius: 14px; background: {{song.bg}}; color: #FFFFFF; text-align: left">
+<div style="width: 22px; font-size: 15px; color: #A1A1A6; font-variant-numeric: tabular-nums">{{song.n}}</div>
+<div style="flex: 1; display: flex; flex-direction: column; gap: 1px">
+<div style="font-size: 17px; font-weight: {{song.weight}}">{{song.title}}</div>
+<div style="font-size: 13px; color: {{song.subColor}}">{{song.sub}}</div>
+</div>
+<svg aria-label="{{song.iconLabel}}" role="img" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="{{song.iconColor}}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const base = { bg: 'transparent', weight: 500, subColor: '#A1A1A6', iconColor: '#A1A1A6', iconLabel: 'Letra guardada' };
+    return {
+      songs: [
+        { ...base, n: 1, title: 'El que busca encuentra', sub: 'Siempre la tocan' },
+        { ...base, n: 2, title: 'De la noche a la mañana', sub: 'Sonando ahora', bg: 'rgba(200,54,31,0.32)', weight: 700, subColor: '#FFB4A6', iconColor: '#FFFFFF' },
+        { ...base, n: 3, title: 'Durmiendo con la luna', sub: '88% de los shows' },
+        { ...base, n: 4, title: 'La que se fue', sub: '75% de los shows' },
+        { ...base, n: 5, title: 'Sabor a chocolate', sub: '63% de los shows' },
+        { ...base, n: 6, title: 'El abandonao', sub: 'Sin letra disponible', iconColor: 'rgba(161,161,166,0.35)', iconLabel: 'Sin letra' },
+        { ...base, n: 7, title: 'Así es la vida', sub: 'Suele cerrar el show' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

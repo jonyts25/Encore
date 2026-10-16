@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { Glass, GlassIconButton } from '@/core/ui';
+import { darkTokens } from '@/core/ui/theme/tokens';
 
 type LensChip = {
   id: string;
@@ -33,7 +35,6 @@ export function LiveConcertBottomBar({
   torchOn,
   torchDisabled,
   flipDisabled,
-  multiCamActive,
   multiCamDisabled,
   onSelectLens,
   onToggleRecording,
@@ -45,189 +46,125 @@ export function LiveConcertBottomBar({
 
   return (
     <View style={styles.root}>
-      <View style={styles.lensRow}>
-        {lensChips.map((chip) => {
-          const selected = chip.id === selectedLensId;
-          return (
-            <Pressable
-              key={chip.id}
-              accessibilityRole="button"
-              onPress={() => onSelectLens(chip.id)}
-              style={[styles.lensChip, selected && styles.lensChipSelected]}>
-              <Text style={[styles.lensChipText, selected && styles.lensChipTextSelected]}>
-                {chip.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {lensChips.length > 0 ? (
+        <Glass style={styles.zoomPill}>
+          <View style={styles.lensRow}>
+            {lensChips.map((chip) => {
+              const selected = chip.id === selectedLensId;
+              return (
+                <Pressable
+                  key={chip.id}
+                  accessibilityRole="button"
+                  onPress={() => onSelectLens(chip.id)}
+                  style={[styles.lensChip, selected && styles.lensChipSelected]}>
+                  <Text style={[styles.lensChipText, selected && styles.lensChipTextSelected]}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Glass>
+      ) : null}
 
-      <View style={styles.recRow}>
-        {isRecording ? <View style={styles.recDot} /> : null}
+      <View style={styles.mainRow}>
+        <GlassIconButton
+          accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
+          disabled={torchDisabled}
+          icon="flash"
+          onPress={onToggleTorch}
+        />
+
         <Pressable
+          accessibilityLabel={
+            isRecording ? t('live.stopRecording') : t('live.startRecording')
+          }
           accessibilityRole="button"
           disabled={isSaving}
           onPress={onToggleRecording}
-          style={[styles.recordButton, isRecording && styles.recordButtonActive]}>
+          style={styles.recordOuter}>
           <View style={[styles.recordInner, isRecording && styles.recordInnerActive]} />
         </Pressable>
-        <Text style={styles.recLabel}>
-          {isSaving
-            ? t('live.saving')
-            : isRecording
-              ? t('live.stopRecording')
-              : t('live.startRecording')}
-        </Text>
-      </View>
 
-      <View style={styles.actionRow}>
-        <Pressable
+        <GlassIconButton
           accessibilityLabel={t('live.flipCamera')}
-          accessibilityRole="button"
           disabled={flipDisabled}
+          icon="camera-reverse"
+          onLongPress={multiCamDisabled ? undefined : onToggleMultiCam}
           onPress={onFlip}
-          style={[
-            styles.actionButton,
-            styles.flipButton,
-            flipDisabled && styles.actionButtonDisabled,
-          ]}>
-          <Ionicons name="sync-outline" size={20} color="#fff" />
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          disabled={multiCamDisabled}
-          onPress={onToggleMultiCam}
-          style={[
-            styles.actionButton,
-            multiCamActive && styles.actionButtonActive,
-            multiCamDisabled && styles.actionButtonDisabled,
-          ]}>
-          <Text style={[styles.actionText, multiCamActive && styles.actionTextActive]}>
-            {t('live.multiCamShort')}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityLabel={torchOn ? t('live.flashOn') : t('live.flashOff')}
-          accessibilityRole="button"
-          disabled={torchDisabled}
-          onPress={onToggleTorch}
-          style={[
-            styles.actionButton,
-            torchOn && styles.actionButtonActive,
-            torchDisabled && styles.actionButtonDisabled,
-          ]}>
-          <Text style={[styles.actionText, torchOn && styles.actionTextActive]}>
-            {t('live.torchShort')}
-          </Text>
-        </Pressable>
+        />
       </View>
+
+      {isSaving ? <Text style={styles.caption}>{t('live.saving')}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actionButton: {
-    backgroundColor: 'rgba(0,0,0,0.42)',
-    borderColor: 'rgba(255,255,255,0.12)',
-    borderRadius: 999,
-    borderWidth: 1,
-    minWidth: 78,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  actionButtonActive: {
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderColor: 'rgba(255,255,255,0.28)',
-  },
-  actionButtonDisabled: {
-    opacity: 0.35,
-  },
-  flipButton: {
-    alignItems: 'center',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  actionText: {
-    color: '#fff',
+  caption: {
+    color: 'rgba(255,255,255,0.82)',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
     textAlign: 'center',
   },
-  actionTextActive: {
-    color: '#ffe566',
-  },
   lensChip: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 19,
+    height: 38,
+    justifyContent: 'center',
+    minWidth: 38,
+    paddingHorizontal: 8,
   },
   lensChipSelected: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   lensChipText: {
-    color: 'rgba(255,255,255,0.72)',
+    color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   lensChipTextSelected: {
-    color: '#fff',
+    color: darkTokens.zoomSelected,
+    fontWeight: '700',
   },
   lensRow: {
     flexDirection: 'row',
-    gap: 8,
-    justifyContent: 'center',
+    gap: 6,
   },
-  recDot: {
-    backgroundColor: '#ff4d4f',
-    borderRadius: 999,
-    height: 8,
-    position: 'absolute',
-    right: '34%',
-    top: 8,
-    width: 8,
-  },
-  recLabel: {
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  recRow: {
+  mainRow: {
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  recordButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderColor: '#fff',
-    borderRadius: 34,
-    borderWidth: 3,
-    height: 68,
-    justifyContent: 'center',
-    width: 68,
-  },
-  recordButtonActive: {
-    borderColor: '#ff4d4f',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 36,
+    width: '100%',
   },
   recordInner: {
-    backgroundColor: '#ff4d4f',
+    backgroundColor: darkTokens.recording,
     borderRadius: 999,
-    height: 46,
-    width: 46,
+    height: 56,
+    width: 56,
   },
   recordInnerActive: {
     borderRadius: 8,
-    height: 24,
-    width: 24,
+    height: 32,
+    width: 32,
+  },
+  recordOuter: {
+    alignItems: 'center',
+    borderColor: '#FFFFFF',
+    borderRadius: 40,
+    borderWidth: 4,
+    height: 80,
+    justifyContent: 'center',
+    width: 80,
   },
   root: {
+    alignItems: 'center',
     gap: 16,
+    width: '100%',
+  },
+  zoomPill: {
+    borderRadius: 24,
+    padding: 5,
   },
 });

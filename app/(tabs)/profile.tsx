@@ -1,30 +1,42 @@
+import { Stack } from 'expo-router';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { useEncoreTheme } from '@/core/ui/theme';
+import { spacing } from '@/core/ui/theme';
 import { AuthForm } from '@/modules/identity/components/AuthForm';
 import { ProfileScreenContent } from '@/modules/identity/components/ProfileScreenContent';
 import { useSession } from '@/modules/identity';
-import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { Card } from '@/core/ui';
+import { ThemedText } from '@/core/ui/Themed';
 
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { isGuest } = useSession();
+  const { tokens } = useEncoreTheme();
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <ThemedView style={styles.container}>
-        <ThemedText style={styles.title}>{t('identity.profileTitle')}</ThemedText>
-
+    <>
+      <Stack.Screen
+        options={{
+          title: t('identity.profileTitle'),
+          headerLargeTitle: true,
+          headerShadowVisible: false,
+          headerStyle: { backgroundColor: tokens.background },
+        }}
+      />
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { backgroundColor: tokens.background }]}>
         {isGuest ? (
-          <>
+          <Card style={styles.container}>
             <ThemedText style={styles.guestHint}>{t('identity.guestHint')}</ThemedText>
             <AuthForm />
-          </>
+          </Card>
         ) : (
           <ProfileScreenContent />
         )}
-      </ThemedView>
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 

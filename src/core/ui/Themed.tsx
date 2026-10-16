@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type PressableProps, type TextProps, type ViewProps } from 'react-native';
 
 import Colors from '@/core/ui/theme/Colors';
+import { useEncoreTheme } from '@/core/ui/theme';
 import { useColorScheme } from '@/core/ui/useColorScheme';
 
 type ThemeProps = {
@@ -13,11 +14,16 @@ export type ThemedTextProps = TextProps & ThemeProps;
 
 export function useThemeColor(props: ThemeProps, colorName: keyof typeof Colors.light) {
   const theme = useColorScheme();
+  const { tokens } = useEncoreTheme();
   const colorFromProps = props[theme === 'dark' ? 'darkColor' : 'lightColor'];
 
   if (colorFromProps) {
     return colorFromProps;
   }
+
+  if (colorName === 'background') return tokens.background;
+  if (colorName === 'text') return tokens.text;
+  if (colorName === 'tint') return tokens.tint;
 
   return Colors[theme][colorName];
 }
@@ -41,7 +47,7 @@ type ButtonProps = PressableProps & {
 
 export function Button({ title, variant = 'primary', disabled, style, ...props }: ButtonProps) {
   const theme = useColorScheme();
-  const palette = Colors[theme];
+  const { tokens } = useEncoreTheme();
 
   return (
     <Pressable
@@ -50,8 +56,8 @@ export function Button({ title, variant = 'primary', disabled, style, ...props }
       style={({ pressed }) => [
         styles.button,
         variant === 'primary'
-          ? { backgroundColor: palette.tint }
-          : { backgroundColor: theme === 'dark' ? '#2A2A2A' : '#ECECEC' },
+          ? { backgroundColor: tokens.accent }
+          : { backgroundColor: tokens.fillMuted },
         disabled && styles.buttonDisabled,
         pressed && !disabled && styles.buttonPressed,
         typeof style === 'function' ? style({ pressed, hovered: false }) : style,
@@ -60,7 +66,7 @@ export function Button({ title, variant = 'primary', disabled, style, ...props }
       <Text
         style={[
           styles.buttonText,
-          { color: variant === 'primary' ? '#FFFFFF' : palette.text },
+          { color: variant === 'primary' ? '#FFFFFF' : tokens.text },
         ]}>
         {title}
       </Text>

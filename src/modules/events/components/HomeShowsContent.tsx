@@ -1,18 +1,23 @@
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
-import { OfflineBanner } from '@/core/ui/OfflineBanner';
+import { Card, PillButton, SectionHeader, StatusPill } from '@/core/ui';
+import { useEncoreTheme } from '@/core/ui/theme';
+import { spacing, typography } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 import { useSession } from '@/modules/identity';
 
+import { formatShowDate } from '../api';
+import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import { useHomeShowSections } from '../hooks/useHomeShowSections';
 import { useShowStatus } from '../hooks/useShowStatus';
 import type { Show } from '../types';
 import { AttendancePromptCard } from './AttendancePromptCard';
-import { ShowSection } from './ShowSection';
-import { getTodayGoingShow, TodayShowCta } from './TodayShowCta';
+import { HomeHeroShowCard } from './HomeHeroShowCard';
+import { getTodayGoingShow } from './TodayShowCta';
 
 const TAB_BAR_CLEARANCE = 56;
 
@@ -49,10 +54,38 @@ function AttendancePromptItem({ show }: { show: Show }) {
   );
 }
 
+function pickHeroShow(going: Show[]): Show | null {
+  if (going.length === 0) return null;
+  return [...going].sort(
+    (a, b) => new Date(a.show_date).getTime() - new Date(b.show_date).getTime()
+  )[0];
+}
+
+function UpcomingCarouselItem({ show }: { show: Show }) {
+  const router = useRouter();
+  const { i18n } = useTranslation();
+  const { tokens } = useEncoreTheme();
+
+  return (
+    <Pressable style={styles.carouselItem} onPress={() => router.push(`/show/${show.id}`)}>
+      <Image
+        contentFit="cover"
+        source={show.artist.image_url ? { uri: show.artist.image_url } : undefined}
+        style={styles.carouselImage}
+      />
+      <Text style={[typography.bodySemibold, { color: tokens.text }]}>{show.artist.name}</Text>
+      <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+        {formatShowDate(show.show_date, i18n.language)} · {show.venue.name}
+      </Text>
+    </Pressable>
+  );
+}
+
 export function HomeShowsContent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { tokens } = useEncoreTheme();
   const { isGuest, session, user, isLoading: sessionLoading } = useSession();
 
   const { sections, isLoading, error, refetch, isOffline, isFetching } = useHomeShowSections({
@@ -91,11 +124,29 @@ export function HomeShowsContent() {
   }
 
   const todayShow = getTodayGoingShow(sections.going);
+  const { prediction: todayPrediction } = useShowPrediction(todayShow?.id ?? '', {
+    enabled: Boolean(todayShow?.id),
+  });
+  const heroShow = pickHeroShow(sections.going);
   const hasData = hasAnyShows(sections);
+  const carouselShows = sections.going.filter((show) => show.id !== heroShow?.id).slice(0, 8);
+
+  const openLiveForShow = (show: Show) => {
+    const defaultTitle =
+      show.id === todayShow?.id ? (todayPrediction?.songs[0]?.title ?? '') : '';
+    router.push({
+      pathname: '/live',
+      params: {
+        artist: show.artist.name,
+        showId: show.id,
+        title: defaultTitle,
+      },
+    });
+  };
 
   return (
     <ScrollView
-      style={styles.scrollView}
+      style={[styles.scrollView, { backgroundColor: tokens.background }]}
       contentContainerStyle={[
         styles.scrollContent,
         { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
@@ -103,13 +154,35 @@ export function HomeShowsContent() {
       refreshControl={
         <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />
       }>
-      <ThemedView style={styles.container}>
-        <ThemedText style={styles.title}>{t('home.title')}</ThemedText>
-        <ThemedText style={styles.subtitle}>{t('home.subtitle')}</ThemedText>
+      <View style={styles.container}>
+        <Text style={[typography.footnoteSemibold, { color: tokens.textSecondary }]}>
+          {new Intl.DateTimeFormat(i18n.language, {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+          }).format(new Date())}
+        </Text>
+        <Text style={[typography.largeTitle, { color: tokens.text }]}>{t('home.hero.pageTitle')}</Text>
 
-        <OfflineBanner visible={isOffline && hasData} />
+        {isOffline && hasData ? (
+          <StatusPill label={t('offline.banner')} />
+        ) : null}
 
-        {!isLoading && !error && todayShow ? <TodayShowCta show={todayShow} /> : null}
+        {isLoading ? <Text style={{ color: tokens.textSecondary }}>{t('common.loading')}</Text> : null}
+        {!isLoading && error ? (
+          <Card>
+            <Text style={{ color: tokens.textSecondary }}>{error}</Text>
+            <PillButton title={t('explore.retry')} variant="secondary" onPress={() => void refetch()} />
+          </Card>
+        ) : null}
+
+        {!isLoading && !error && heroShow ? (
+          <HomeHeroShowCard
+            show={heroShow}
+            statusLabel={t('home.hero.nextShowKicker')}
+            onOpenLive={todayShow?.id === heroShow.id ? () => openLiveForShow(heroShow) : undefined}
+          />
+        ) : null}
 
         {!isLoading && !error && sections.goingAttendancePending.length > 0
           ? sections.goingAttendancePending.map((show) => (
@@ -117,44 +190,33 @@ export function HomeShowsContent() {
             ))
           : null}
 
-        {isLoading ? (
-          <ThemedView style={styles.centered}>
-            <ThemedText>{t('common.loading')}</ThemedText>
-          </ThemedView>
+        {!isLoading && !error && carouselShows.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              actionLabel={t('home.hero.seeAll')}
+              title={t('home.hero.upcoming')}
+              onActionPress={() => router.push('/explore')}
+            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {carouselShows.map((show) => (
+                <UpcomingCarouselItem key={show.id} show={show} />
+              ))}
+            </ScrollView>
+          </View>
         ) : null}
 
-        {!isLoading && error ? (
-          <ThemedView style={styles.centered}>
-            <ThemedText style={styles.error}>{error}</ThemedText>
-          </ThemedView>
+        {!isLoading && !error && !hasData ? (
+          <Card>
+            <Text style={[typography.bodySemibold, { color: tokens.text }]}>
+              {t('home.sections.goingEmpty')}
+            </Text>
+            <PillButton
+              title={t('home.hero.exploreShows')}
+              onPress={() => router.push('/explore')}
+            />
+          </Card>
         ) : null}
-
-        {!isLoading && !error ? (
-          <>
-            <ShowSection
-              title={t('home.sections.going')}
-              shows={sections.going}
-              emptyMessage={t('home.sections.goingEmpty')}
-              showPackStatus
-            />
-            <ShowSection
-              title={t('home.sections.interested')}
-              shows={sections.interested}
-              emptyMessage={t('home.sections.interestedEmpty')}
-            />
-            <ShowSection
-              title={t('home.sections.forYou')}
-              shows={sections.forYou}
-              emptyMessage={t('home.sections.forYouEmpty')}
-            />
-            <ShowSection
-              title={t('home.sections.attended')}
-              shows={sections.attended}
-              emptyMessage={t('home.sections.attendedEmpty')}
-            />
-          </>
-        ) : null}
-      </ThemedView>
+      </View>
     </ScrollView>
   );
 }
@@ -169,9 +231,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  carousel: {
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  carouselImage: {
+    backgroundColor: '#222',
+    borderRadius: 18,
+    height: 120,
+    width: 164,
+  },
+  carouselItem: {
+    gap: spacing.xs,
+    width: 164,
+  },
   container: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
+    gap: spacing.xl,
+    paddingHorizontal: spacing.screenHorizontal,
+    paddingTop: spacing.lg,
+  },
+  section: {
+    gap: spacing.md,
   },
   error: {
     color: '#D64545',

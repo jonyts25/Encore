@@ -1,10 +1,13 @@
 import { HomeShowsContent } from '@/modules/events';
-import { ThemedView } from '@/core/ui/Themed';
+import { useEncoreTheme } from '@/core/ui/theme';
+import { View } from 'react-native';
 
 export default function HomeScreen() {
+  const { tokens } = useEncoreTheme();
+
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: tokens.background }}>
       <HomeShowsContent />
-    </ThemedView>
+    </View>
   );
 }

@@ -2,6 +2,7 @@ import 'react-native-gesture-handler';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, type ReactNode } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import 'react-native-reanimated';
@@ -11,7 +12,7 @@ import '@/core/i18n';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { QueryProvider } from '@/core/query';
 import { SessionProvider } from '@/modules/identity';
-import { useColorScheme } from '@/core/ui/useColorScheme';
+import { EncoreThemeProvider, useEncoreTheme } from '@/core/ui/theme';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -62,7 +63,9 @@ export default function RootLayout() {
       <I18nProvider>
         <SessionProvider>
           <QueryProvider>
-            <RootLayoutNav />
+            <EncoreThemeProvider>
+              <RootLayoutNav />
+            </EncoreThemeProvider>
           </QueryProvider>
         </SessionProvider>
       </I18nProvider>
@@ -71,14 +74,35 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const { resolvedScheme, tokens } = useEncoreTheme();
+  const baseTheme = resolvedScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navigationTheme = {
+    ...baseTheme,
+    colors: {
+      ...baseTheme.colors,
+      background: tokens.background,
+      card: tokens.surface,
+      text: tokens.text,
+      border: tokens.separator,
+      primary: tokens.accent,
+    },
+  };
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={navigationTheme}>
+      <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="artist/[id]" options={{ title: '' }} />
-        <Stack.Screen name="show/[id]" options={{ title: '' }} />
+        <Stack.Screen name="artist/[id]" options={{ title: '', headerLargeTitle: false }} />
+        <Stack.Screen
+          name="show/[id]"
+          options={{
+            title: '',
+            headerTransparent: true,
+            headerShadowVisible: false,
+            headerTintColor: '#FFFFFF',
+          }}
+        />
         <Stack.Screen name="lyrics" options={{ title: '' }} />
         <Stack.Screen
           name="live"

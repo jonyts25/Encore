@@ -1,7 +1,9 @@
 import { useRouter } from 'expo-router';
 import { StyleSheet } from 'react-native';
 
+import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
+import { SegmentedControl } from '@/core/ui';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useShowStatus } from '../hooks/useShowStatus';
@@ -28,6 +30,7 @@ export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) 
       return;
     }
 
+    hapticSelection();
     void (async () => {
       try {
         await updateStatus(nextStatus);
@@ -51,29 +54,22 @@ export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) 
         </ThemedText>
       ) : null}
 
-      <ThemedView style={styles.buttonRow}>
-        <Button
-          disabled={isLoading || isMutating}
-          title={isLoading || isMutating ? t('common.loading') : t('events.status.interesado')}
-          variant={status === 'interesado' ? 'primary' : 'secondary'}
-          onPress={() => handlePress('interesado')}
-        />
-        <Button
-          disabled={isLoading || isMutating}
-          title={isLoading || isMutating ? t('common.loading') : t('events.status.voy')}
-          variant={status === 'voy' ? 'primary' : 'secondary'}
-          onPress={() => handlePress('voy')}
-        />
-      </ThemedView>
-
-      {!requiresAuth && showWentButton ? (
-        <Button
-          disabled={isLoading || isMutating}
-          title={isLoading || isMutating ? t('common.loading') : t('events.status.fui')}
-          variant={status === 'fui' ? 'primary' : 'secondary'}
-          onPress={() => handlePress('fui')}
-        />
-      ) : null}
+      <SegmentedControl
+        disabled={isLoading || isMutating}
+        options={[
+          { value: 'interesado' as const, label: t('events.status.interesado') },
+          { value: 'voy' as const, label: t('events.status.voy') },
+          ...(showWentButton
+            ? [{ value: 'fui' as const, label: t('events.status.fui') }]
+            : []),
+        ]}
+        value={
+          status === 'voy' || status === 'fui' || status === 'interesado'
+            ? status
+            : 'interesado'
+        }
+        onChange={(value) => handlePress(value)}
+      />
 
       {!requiresAuth && status ? (
         <Button

@@ -12,8 +12,8 @@ import {
   type EncoreCameraZoomState,
 } from 'encore-camera';
 import { Paths } from 'expo-file-system';
-import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -28,11 +28,10 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { finishRecordingSession, startRecordingSession } from '@/core/db/recordingsDb';
+import { hapticImpactMedium } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
-import { queryKeys } from '@/core/query';
+import { Glass, GlassIconButton, StatusPill } from '@/core/ui';
 import { Button, ThemedText } from '@/core/ui/Themed';
-import { fetchArtistSongs } from '@/modules/catalog/api';
-import { useShow } from '@/modules/events/hooks/useShow';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
@@ -47,7 +46,6 @@ import { saveMultiCamRecordings, saveRecordingToCameraRoll } from '../saveRecord
 import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
 import { LiveConcertBottomBar } from './LiveConcertBottomBar';
 import { LiveConcertLyricsStrip } from './LiveConcertLyricsStrip';
-import { LiveSongPickerModal } from './LiveSongPickerModal';
 import { useLiveHardwareShutter } from '../hooks/useLiveHardwareShutter';
 import {
   activateRecordingKeepAwake,
@@ -118,6 +116,12 @@ function parseZoomChipId(id: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function formatRecordingClock(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 export function LiveCameraContent({ artist, title, showId }: LiveCameraContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
@@ -143,7 +147,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   const [zoom, setZoom] = useState(0);
   const [lyricsVisible, setLyricsVisible] = useState(true);
-  const [songPickerOpen, setSongPickerOpen] = useState(false);
+  const [recordingElapsedSeconds, setRecordingElapsedSeconds] = useState(0);
   const [multiCamActive, setMultiCamActive] = useState(false);
   const [nativeCameraState, setNativeCameraState] = useState<EncoreCameraState | null>(null);
   const [nativeZoom, setNativeZoom] = useState(1);
@@ -158,18 +162,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const [keepAwakeDiagnostic, setKeepAwakeDiagnostic] = useState<string | null>(null);
   const showKeepAwakeDiagnostic = isLiveDiagnosticsEnabled();
 
+  const routeParams = useLocalSearchParams<{ title?: string }>();
   const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
-  const { show } = useShow(showId ?? '');
-  const artistId = show?.artist_id ?? '';
-
-  const artistSongsQuery = useQuery({
-    queryKey: queryKeys.artistSongs(artistId),
-    queryFn: () => fetchArtistSongs(artistId),
-    enabled: Boolean(artistId),
-  });
-
-  const repertoireSongs = artistSongsQuery.data ?? [];
-  const otherSongs = prediction?.others ?? [];
 
   const pickerSongs = useMemo(() => {
     if (!prediction?.songs) return [];
@@ -222,6 +216,24 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       setActiveTitle(title);
     }
   }, [title]);
+
+  useEffect(() => {
+    if (typeof routeParams.title === 'string' && routeParams.title.trim()) {
+      setActiveTitle(routeParams.title);
+    }
+  }, [routeParams.title]);
+
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingElapsedSeconds(0);
+      return undefined;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setRecordingElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isRecording]);
 
   useEffect(() => {
     if (!title.trim() && pickerSongs[0]?.title) {
@@ -509,6 +521,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const handleToggleRecording = async () => {
     if (isSaving) return;
 
+    hapticImpactMedium();
     setErrorMessage(null);
     setStatusMessage(null);
 
@@ -712,6 +725,22 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     router.back();
   }, [isRecording, router, stopRecordingAndWaitForSave, t]);
 
+  const activeSongIndex = useMemo(() => {
+    const index = pickerSongs.findIndex((song) => song.title === activeTitle);
+    return index >= 0 ? index + 1 : null;
+  }, [activeTitle, pickerSongs]);
+
+  const openSongSheet = () => {
+    router.push({
+      pathname: '/live/songs',
+      params: {
+        artist,
+        showId: showId ?? '',
+        activeTitle,
+      },
+    });
+  };
+
   const handleSelectLens = async (id: string) => {
     if (useNativePreview) {
       const factor = parseZoomChipId(id);
@@ -800,22 +829,41 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
       <View pointerEvents="box-none" style={styles.uiOverlay}>
         <View pointerEvents="box-none" style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Pressable onPress={handleBackPress} style={styles.headerSideButton}>
-            <Text style={styles.headerSideText}>{t('live.back')}</Text>
-          </Pressable>
-
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {activeTitle} · {artist}
-          </Text>
-
-          <Pressable
-            accessibilityLabel={t('live.more')}
-            accessibilityRole="button"
-            onPress={() => setSongPickerOpen(true)}
-            style={styles.headerSideButton}>
-            <Text style={styles.headerSideText}>{t('live.more')}</Text>
-          </Pressable>
+          <GlassIconButton
+            accessibilityLabel={t('live.exit')}
+            icon="close"
+            onPress={handleBackPress}
+          />
+          {isRecording ? (
+            <StatusPill label={formatRecordingClock(recordingElapsedSeconds)} tone="recording" />
+          ) : (
+            <View style={styles.headerSpacer} />
+          )}
+          <GlassIconButton
+            accessibilityLabel={lyricsVisible ? t('live.hideLyrics') : t('live.showLyrics')}
+            icon={lyricsVisible ? 'menu' : 'menu-outline'}
+            onPress={() => setLyricsVisible((current) => !current)}
+          />
         </View>
+
+        <Pressable onPress={openSongSheet} style={styles.songCapsuleWrap}>
+          <Glass style={styles.songCapsule}>
+            <View style={styles.songCapsuleText}>
+              <Text numberOfLines={1} style={styles.songCapsuleTitle}>
+                {activeTitle || t('live.pickSong')}
+              </Text>
+              <Text style={styles.songCapsuleSubtitle}>
+                {activeSongIndex && pickerSongs.length
+                  ? t('live.songProgress', {
+                      current: activeSongIndex,
+                      total: pickerSongs.length,
+                    })
+                  : t('live.songPickerSubtitle')}
+              </Text>
+            </View>
+            <Ionicons color="#FFFFFF" name="chevron-down" size={18} />
+          </Glass>
+        </Pressable>
 
         {showKeepAwakeDiagnostic && keepAwakeDiagnostic ? (
           <Text
@@ -876,16 +924,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           />
         </View>
 
-        <LiveSongPickerModal
-          activeTitle={activeTitle}
-          artistName={artist}
-          otherSongs={otherSongs}
-          predictedSongs={pickerSongs}
-          repertoireSongs={repertoireSongs}
-          visible={songPickerOpen}
-          onClose={() => setSongPickerOpen(false)}
-          onSelect={setActiveTitle}
-        />
       </View>
     </View>
   );
@@ -983,29 +1021,42 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     left: 0,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     position: 'absolute',
     right: 0,
     top: 0,
     zIndex: 30,
   },
-  headerSideButton: {
-    minWidth: 56,
-    paddingHorizontal: 4,
+  headerSpacer: {
+    flex: 1,
+  },
+  songCapsule: {
+    alignItems: 'center',
+    borderRadius: 20,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
     paddingVertical: 8,
   },
-  headerSideText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+  songCapsuleSubtitle: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 12,
   },
-  headerTitle: {
-    color: '#fff',
-    flex: 1,
-    fontSize: 13,
+  songCapsuleTitle: {
+    color: '#FFFFFF',
+    fontSize: 15,
     fontWeight: '700',
-    opacity: 0.92,
-    textAlign: 'center',
+    maxWidth: 240,
+  },
+  songCapsuleText: {
+    alignItems: 'center',
+    flexShrink: 1,
+  },
+  songCapsuleWrap: {
+    alignSelf: 'center',
+    position: 'absolute',
+    top: '12%',
+    zIndex: 28,
   },
   lyricsRegion: {
     justifyContent: 'center',

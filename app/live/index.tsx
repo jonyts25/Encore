@@ -1,8 +1,7 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
-import { useTranslation } from '@/core/i18n';
 import { LiveCameraContent } from '@/modules/live';
 
 const LIVE_KEEP_AWAKE_TAG = 'encore-live';
@@ -10,7 +9,6 @@ const LIVE_KEEP_AWAKE_TAG = 'encore-live';
 export default function LiveScreen() {
   useKeepAwake(LIVE_KEEP_AWAKE_TAG);
 
-  const { t } = useTranslation();
   const params = useLocalSearchParams<{ artist?: string; title?: string; showId?: string }>();
   const artist = typeof params.artist === 'string' ? params.artist : '';
   const title = typeof params.title === 'string' ? params.title : '';
@@ -19,14 +17,6 @@ export default function LiveScreen() {
   return (
     <>
       <StatusBar style="light" />
-      <Stack.Screen
-        options={{
-          title: t('live.screenTitle'),
-          headerShown: false,
-          gestureEnabled: false,
-          fullScreenGestureEnabled: false,
-        }}
-      />
       <LiveCameraContent artist={artist} showId={showId} title={title} />
     </>
   );

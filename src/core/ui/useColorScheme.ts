@@ -1,6 +1,5 @@
-import { useColorScheme as useColorSchemeCore } from 'react-native';
+import { useEncoreTheme } from './theme';
 
-export const useColorScheme = () => {
-  const coreScheme = useColorSchemeCore();
-  return coreScheme === 'unspecified' ? 'light' : coreScheme;
-};
+export function useColorScheme(): 'light' | 'dark' {
+  return useEncoreTheme().resolvedScheme;
+}
