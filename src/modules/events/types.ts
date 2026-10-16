@@ -45,6 +45,7 @@ export type ShowStatusState = {
 
 export type HomeShowSections = {
   going: Show[];
+  goingAttendancePending: Show[];
   interested: Show[];
   forYou: Show[];
   attended: Show[];

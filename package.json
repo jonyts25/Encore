@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/modules/lyrics/scrollLogic.test.ts",
+    "test": "node --import tsx --test src/modules/lyrics/scrollLogic.test.ts src/modules/events/visibility.test.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

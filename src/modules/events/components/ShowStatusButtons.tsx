@@ -9,9 +9,14 @@ import type { ShowStatus } from '../types';
 
 type ShowStatusButtonsProps = {
   showId: string;
+  showDate?: string;
 };
 
-export function ShowStatusButtons({ showId }: ShowStatusButtonsProps) {
+function hasShowStarted(showDate: string): boolean {
+  return Date.now() >= new Date(showDate).getTime();
+}
+
+export function ShowStatusButtons({ showId, showDate }: ShowStatusButtonsProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { status, isLoading, isMutating, requiresAuth, updateStatus, removeStatus, error } =
@@ -31,6 +36,8 @@ export function ShowStatusButtons({ showId }: ShowStatusButtonsProps) {
       }
     })();
   };
+
+  const showWentButton = Boolean(showDate && hasShowStarted(showDate) && status !== 'fui');
 
   return (
     <ThemedView style={styles.container}>
@@ -58,6 +65,15 @@ export function ShowStatusButtons({ showId }: ShowStatusButtonsProps) {
           onPress={() => handlePress('voy')}
         />
       </ThemedView>
+
+      {!requiresAuth && showWentButton ? (
+        <Button
+          disabled={isLoading || isMutating}
+          title={isLoading || isMutating ? t('common.loading') : t('events.status.fui')}
+          variant={status === 'fui' ? 'primary' : 'secondary'}
+          onPress={() => handlePress('fui')}
+        />
+      ) : null}
 
       {!requiresAuth && status ? (
         <Button

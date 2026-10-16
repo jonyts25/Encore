@@ -1,10 +1,16 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useState } from 'react';
 
 import { useTranslation } from '@/core/i18n';
 import { getShowPackRecord, type ShowPackRecord } from '@/core/db/showPackCache';
 
-export function useShowPackStatus(showId: string, enabled: boolean) {
+import { prefetchShowPack } from '../showPack';
+import type { Show } from '../types';
+
+export function useShowPackStatus(show: Show | null, enabled: boolean) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const showId = show?.id ?? '';
   const [record, setRecord] = useState<ShowPackRecord | null>(null);
 
   const refresh = useCallback(async () => {
@@ -30,9 +36,21 @@ export function useShowPackStatus(showId: string, enabled: boolean) {
     return () => clearInterval(interval);
   }, [enabled, record?.status, refresh, showId]);
 
+  const retry = useCallback(() => {
+    if (!show) return;
+    void prefetchShowPack(show, queryClient, { force: true }).finally(() => {
+      void refresh();
+    });
+  }, [queryClient, refresh, show]);
+
   let label: string | null = null;
+  let isPartial = false;
+
   if (record?.status === 'downloading') {
     label = t('offline.showPackDownloading');
+  } else if (record?.status === 'partial') {
+    isPartial = true;
+    label = t('offline.showPackPartial');
   } else if (record?.status === 'ready' && record.lyricsTotal > 0) {
     label = t('offline.showPackReady', {
       cached: record.lyricsCached,
@@ -42,5 +60,5 @@ export function useShowPackStatus(showId: string, enabled: boolean) {
     label = t('offline.showPackReadyEmpty');
   }
 
-  return { record, label, refresh };
+  return { record, label, isPartial, retry, refresh };
 }

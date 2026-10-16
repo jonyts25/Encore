@@ -16,7 +16,10 @@ type ShowListItemProps = {
 export function ShowListItem({ show, showPackStatus = false }: ShowListItemProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const { label: packLabel } = useShowPackStatus(show.id, showPackStatus);
+  const { label: packLabel, isPartial, retry } = useShowPackStatus(
+    showPackStatus ? show : null,
+    showPackStatus
+  );
 
   return (
     <Pressable
@@ -28,7 +31,20 @@ export function ShowListItem({ show, showPackStatus = false }: ShowListItemProps
         <ThemedText style={styles.artist}>{show.artist.name}</ThemedText>
         <ThemedText style={styles.venue}>{formatShowVenueLine(show.venue)}</ThemedText>
         <ThemedText style={styles.date}>{formatShowDate(show.show_date, i18n.language)}</ThemedText>
-        {packLabel ? <ThemedText style={styles.pack}>{packLabel}</ThemedText> : null}
+        {packLabel ? (
+          isPartial ? (
+            <Pressable
+              onPress={(event) => {
+                event.stopPropagation();
+                retry();
+              }}
+              hitSlop={8}>
+              <ThemedText style={styles.packRetry}>{packLabel}</ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText style={styles.pack}>{packLabel}</ThemedText>
+          )
+        ) : null}
       </ThemedView>
       <ThemedText style={styles.chevron}>{t('events.viewDetail')}</ThemedText>
     </Pressable>
@@ -58,6 +74,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     opacity: 0.7,
+  },
+  packRetry: {
+    color: '#C45A00',
+    fontSize: 12,
+    marginTop: 4,
+    textDecorationLine: 'underline',
   },
   row: {
     alignItems: 'center',

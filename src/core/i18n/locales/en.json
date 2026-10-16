@@ -3,6 +3,7 @@
     "banner": "Offline · showing saved data",
     "requiresConnection": "You need a connection for this",
     "showPackDownloading": "Downloading…",
+    "showPackPartial": "Missing lyrics · retry",
     "showPackReady": "Ready offline · {{cached}}/{{total}} lyrics",
     "showPackReadyEmpty": "Ready offline"
   },
@@ -37,6 +38,11 @@
       "kicker": "Today",
       "title": "Your show is today — {{show}}",
       "openLive": "Open LIVE"
+    },
+    "attendance": {
+      "title": "Did you go?",
+      "yes": "Yes, I went",
+      "no": "I did not go"
     }
   },
   "catalog": {

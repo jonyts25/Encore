@@ -71,7 +71,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
         <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} />
 
         <ThemedText style={styles.sectionLabel}>{t('events.yourStatus')}</ThemedText>
-        <ShowStatusButtons showId={show.id} />
+        <ShowStatusButtons showId={show.id} showDate={show.show_date} />
       </ThemedView>
     </ScrollView>
   );

@@ -10,6 +10,7 @@ import type {
   UserShow,
   VenueSummary,
 } from './types';
+import { activeCutoffIso, getShowPhase, hasConfirmedTime } from './visibility';
 
 type UpcomingShowsResponse = {
   shows: Show[];
@@ -76,8 +77,7 @@ async function listShowsByIdsFromSupabase(
   let query = supabase.from('shows').select(SHOW_SELECT).in('id', showIds);
 
   if (options?.upcomingOnly !== false) {
-    const now = new Date().toISOString();
-    query = query.gte('show_date', now).order('show_date', { ascending: true });
+    query = query.gte('show_date', activeCutoffIso()).order('show_date', { ascending: true });
   } else {
     query = query.order('show_date', { ascending: false });
   }
@@ -89,12 +89,11 @@ async function listShowsByIdsFromSupabase(
 }
 
 async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise<Show[]> {
-  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('shows')
     .select(SHOW_SELECT)
     .eq('artist_id', artistId)
-    .gte('show_date', now)
+    .gte('show_date', activeCutoffIso())
     .order('show_date', { ascending: true });
 
   if (error) throw error;
@@ -138,16 +137,20 @@ export async function fetchHomeShowSections(
     .map((row) => row.show_id);
   const attendedIds = rows.filter((row) => row.status === 'fui').map((row) => row.show_id);
 
-  const [going, interested, attended, followedShows] = await Promise.all([
-    listShowsByIdsFromSupabase(goingIds),
+  const [allGoing, interested, attended, followedShows] = await Promise.all([
+    listShowsByIdsFromSupabase(goingIds, { upcomingOnly: false }),
     listShowsByIdsFromSupabase(interestedIds),
     listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false }),
     fetchUpcomingShows({ followed: true, accessToken }),
   ]);
 
+  const cutoff = activeCutoffIso();
+  const going = allGoing.filter((show) => show.show_date >= cutoff);
+  const goingAttendancePending = allGoing.filter((show) => getShowPhase(show.show_date) === 'past');
+
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
 
-  return { going, interested, forYou, attended };
+  return { going, goingAttendancePending, interested, forYou, attended };
 }
 
 export async function fetchArtistShowSections(
@@ -243,6 +246,19 @@ export async function getUserShowStatus(showId: string): Promise<ShowStatus | nu
 export function formatShowDate(showDate: string, locale: string): string {
   const date = new Date(showDate);
   const tag = locale.startsWith('en') ? 'en-US' : 'es-MX';
+
+  if (!hasConfirmedTime(showDate)) {
+    const dateOnly = new Intl.DateTimeFormat(tag, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).format(date);
+    const unconfirmed =
+      locale.startsWith('en') ? 'Time to be confirmed' : 'Hora por confirmar';
+    return `${dateOnly} · ${unconfirmed}`;
+  }
+
   return new Intl.DateTimeFormat(tag, {
     weekday: 'long',
     year: 'numeric',

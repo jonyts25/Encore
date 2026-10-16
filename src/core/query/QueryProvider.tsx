@@ -14,8 +14,8 @@ type QueryProviderProps = {
 };
 
 export function QueryProvider({ children }: QueryProviderProps) {
-  const { user } = useSession();
-  const userId = user?.id ?? 'guest';
+  const { user, lastKnownUser } = useSession();
+  const userId = user?.id ?? lastKnownUser?.id ?? 'guest';
 
   const persistOptions = useMemo(
     () => ({

@@ -1,6 +1,7 @@
 import { StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useProfile } from '../hooks/useProfile';
@@ -8,7 +9,8 @@ import { useSession } from '../hooks/useSession';
 
 export function ProfileScreenContent() {
   const { t } = useTranslation();
-  const { isGuest, isLoading: sessionLoading, signOut } = useSession();
+  const { isGuest, isOfflineSession, isLoading: sessionLoading, lastKnownUser, signOut } =
+    useSession();
   const { profile, isLoading: profileLoading, error, role } = useProfile();
 
   if (sessionLoading) {
@@ -21,6 +23,22 @@ export function ProfileScreenContent() {
 
   if (isGuest) {
     return null;
+  }
+
+  if (isOfflineSession) {
+    return (
+      <ThemedView style={styles.card}>
+        <OfflineBanner visible />
+        <ThemedText style={styles.label}>{t('identity.displayName')}</ThemedText>
+        <ThemedText style={styles.value}>{lastKnownUser?.display_name ?? '—'}</ThemedText>
+        {lastKnownUser?.email ? (
+          <>
+            <ThemedText style={styles.label}>{t('identity.email')}</ThemedText>
+            <ThemedText style={styles.value}>{lastKnownUser.email}</ThemedText>
+          </>
+        ) : null}
+      </ThemedView>
+    );
   }
 
   if (profileLoading) {

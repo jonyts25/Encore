@@ -2,13 +2,22 @@ import type { AuthError, Session, User } from '@supabase/supabase-js';
 
 import { supabase } from '@/core/api/supabase';
 
+import { isAuthNetworkError, isSessionInvalidError } from './authErrors';
 import type { Profile, SignUpResult, SystemRole } from './types';
 
 const PROFILE_COLUMNS = 'user_id, display_name, locale, home_city, role';
 
 export async function getCurrentSession() {
   const { data, error } = await supabase.auth.getSession();
-  if (error) throw error;
+  if (error) {
+    if (isAuthNetworkError(error)) {
+      return data.session ?? null;
+    }
+    if (isSessionInvalidError(error)) {
+      throw error;
+    }
+    throw error;
+  }
   return data.session;
 }
 
@@ -138,10 +147,10 @@ export function resolveRole(profile: Profile | null, user: User | null): SystemR
 }
 
 export function subscribeToAuthChanges(
-  onChange: (session: Session | null) => void
+  onChange: (event: string, session: Session | null) => void
 ) {
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    onChange(session);
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    onChange(event, session);
   });
 
   return () => {

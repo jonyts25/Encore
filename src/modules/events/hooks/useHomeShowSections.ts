@@ -16,6 +16,7 @@ type UseHomeShowSectionsOptions = {
 
 const EMPTY_SECTIONS: HomeShowSections = {
   going: [],
+  goingAttendancePending: [],
   interested: [],
   forYou: [],
   attended: [],
@@ -24,6 +25,7 @@ const EMPTY_SECTIONS: HomeShowSections = {
 function hasSectionData(sections: HomeShowSections): boolean {
   return (
     sections.going.length > 0 ||
+    sections.goingAttendancePending.length > 0 ||
     sections.interested.length > 0 ||
     sections.forYou.length > 0 ||
     sections.attended.length > 0

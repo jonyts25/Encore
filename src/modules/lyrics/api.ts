@@ -59,7 +59,12 @@ export async function fetchLyrics(
   options?: FetchLyricsOptions
 ): Promise<LyricsResult | null> {
   const cached = await getCachedLyrics(artist, title);
-  if (cached) return normalizeCachedResult(cached);
+  if (cached) {
+    if (options?.expiresAt != null) {
+      await setCachedLyrics(artist, title, cached, { expiresAt: options.expiresAt });
+    }
+    return normalizeCachedResult(cached);
+  }
 
   const params = new URLSearchParams({ artist, title });
 

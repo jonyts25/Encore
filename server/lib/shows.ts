@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseClient } from './supabase';
+import { activeCutoffIso } from './visibility';
 import type { ShowStatus, ShowWithRelations, UserShow } from './types';
 
 const SHOW_SELECT = `
@@ -34,12 +35,11 @@ export async function listUpcomingShows(options?: {
   userId?: string;
 }): Promise<ShowWithRelations[]> {
   const supabase = options?.supabase ?? createSupabaseClient();
-  const now = new Date().toISOString();
 
   let query = supabase
     .from('shows')
     .select(SHOW_SELECT)
-    .gte('show_date', now)
+    .gte('show_date', activeCutoffIso())
     .order('show_date', { ascending: true });
 
   if (options?.followedOnly && options.userId) {
@@ -72,8 +72,7 @@ async function listShowsByIds(
   let query = supabase.from('shows').select(SHOW_SELECT).in('id', showIds);
 
   if (options?.upcomingOnly !== false) {
-    const now = new Date().toISOString();
-    query = query.gte('show_date', now).order('show_date', { ascending: true });
+    query = query.gte('show_date', activeCutoffIso()).order('show_date', { ascending: true });
   } else {
     query = query.order('show_date', { ascending: false });
   }
@@ -88,12 +87,11 @@ async function listUpcomingShowsForArtist(
   artistId: string,
   supabase: SupabaseClient = createSupabaseClient()
 ): Promise<ShowWithRelations[]> {
-  const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('shows')
     .select(SHOW_SELECT)
     .eq('artist_id', artistId)
-    .gte('show_date', now)
+    .gte('show_date', activeCutoffIso())
     .order('show_date', { ascending: true });
 
   if (error) throw error;

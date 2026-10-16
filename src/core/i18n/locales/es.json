@@ -3,6 +3,7 @@
     "banner": "Sin conexión · mostrando lo guardado",
     "requiresConnection": "Necesitas señal para esto",
     "showPackDownloading": "Descargando…",
+    "showPackPartial": "Faltan letras · reintentar",
     "showPackReady": "Listo sin señal · {{cached}}/{{total}} letras",
     "showPackReadyEmpty": "Listo sin señal"
   },
@@ -37,6 +38,11 @@
       "kicker": "Hoy",
       "title": "Tu show es hoy — {{show}}",
       "openLive": "Abrir LIVE"
+    },
+    "attendance": {
+      "title": "¿Fuiste?",
+      "yes": "Sí, fui",
+      "no": "No fui"
     }
   },
   "catalog": {
