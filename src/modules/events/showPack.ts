@@ -4,6 +4,7 @@ import { lyricsExpiresAfterShow } from '@/core/db/lyricsCache';
 import { getShowPackRecord, setShowPackRecord } from '@/core/db/showPackCache';
 import { queryKeys } from '@/core/query';
 
+import { fetchArtistSongs } from '@/modules/catalog/api';
 import { fetchLyrics } from '@/modules/lyrics/api';
 import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
@@ -111,6 +112,11 @@ export async function prefetchShowPack(
     queryClient,
     queryKeys.prediction(showId)
   );
+
+  void queryClient.prefetchQuery({
+    queryKey: queryKeys.artistSongs(show.artist_id),
+    queryFn: () => fetchArtistSongs(show.artist_id),
+  });
 
   if (showQueryFailed || predictionQueryFailed) {
     const failedAt = Date.now();

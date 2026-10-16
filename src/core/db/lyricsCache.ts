@@ -56,6 +56,10 @@ export async function purgeExpiredLyrics(): Promise<void> {
   ]);
 }
 
+export async function hasCachedLyrics(artist: string, title: string): Promise<boolean> {
+  return (await getCachedLyrics(artist, title)) !== null;
+}
+
 export async function getCachedLyrics(
   artist: string,
   title: string

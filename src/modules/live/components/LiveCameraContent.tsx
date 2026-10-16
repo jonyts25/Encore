@@ -2,7 +2,6 @@ import { useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import {
   EncoreMultiCamBackPreview,
   EncoreMultiCamFrontPreview,
-  saveToPhotos,
   setCameraMode,
   shouldUseEncoreNativeCamera,
   startMultiCamPreview,
@@ -12,12 +11,13 @@ import {
   type EncoreCameraState,
   type EncoreCameraZoomState,
 } from 'encore-camera';
-import { Asset } from 'expo-media-library';
-import * as MediaLibrary from 'expo-media-library';
+import { Paths } from 'expo-file-system';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   AppState,
   Pressable,
   StyleSheet,
@@ -27,11 +27,22 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { finishRecordingSession, startRecordingSession } from '@/core/db/recordingsDb';
 import { useTranslation } from '@/core/i18n';
+import { queryKeys } from '@/core/query';
 import { Button, ThemedText } from '@/core/ui/Themed';
+import { fetchArtistSongs } from '@/modules/catalog/api';
+import { useShow } from '@/modules/events/hooks/useShow';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
+
+import { formatLiveError } from '../liveErrors';
+import {
+  notifyRecordingSaveFinished,
+  waitForRecordingSave,
+} from '../recordingSaveTracker';
+import { saveMultiCamRecordings, saveRecordingToCameraRoll } from '../saveRecording';
 
 import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
 import { LiveConcertBottomBar } from './LiveConcertBottomBar';
@@ -51,6 +62,7 @@ type LiveCameraContentProps = {
 };
 
 const TOP_BAR_CONTENT_HEIGHT = 44;
+const MIN_FREE_STORAGE_BYTES = 1024 ** 3;
 
 const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
   'mostly_fixed',
@@ -113,6 +125,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const previewRef = useRef<LiveCameraPreviewRef>(null);
   const isMountedRef = useRef(true);
   const isRecordingRef = useRef(false);
+  const activeRecordingIdRef = useRef<string | null>(null);
+  const recordingSongTitleRef = useRef(title);
   const wantsNativePreview = shouldUseEncoreNativeCamera();
   const [nativeCameraFailed, setNativeCameraFailed] = useState(false);
   const useNativePreview = wantsNativePreview && !nativeCameraFailed;
@@ -145,6 +159,18 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const showKeepAwakeDiagnostic = isLiveDiagnosticsEnabled();
 
   const { prediction } = useShowPrediction(showId ?? '', { enabled: Boolean(showId) });
+  const { show } = useShow(showId ?? '');
+  const artistId = show?.artist_id ?? '';
+
+  const artistSongsQuery = useQuery({
+    queryKey: queryKeys.artistSongs(artistId),
+    queryFn: () => fetchArtistSongs(artistId),
+    enabled: Boolean(artistId),
+  });
+
+  const repertoireSongs = artistSongsQuery.data ?? [];
+  const otherSongs = prediction?.others ?? [];
+
   const pickerSongs = useMemo(() => {
     if (!prediction?.songs) return [];
     const showConfidence = CONFIDENCE_STRUCTURES.includes(prediction.structure);
@@ -186,6 +212,10 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       void requestMicPermission();
     }
   }, [permissionsRequested, micPermission?.granted, requestMicPermission]);
+
+  useEffect(() => {
+    recordingSongTitleRef.current = activeTitle;
+  }, [activeTitle]);
 
   useEffect(() => {
     if (title.trim()) {
@@ -387,10 +417,97 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     }
   };
 
+  const beginRecordingSession = useCallback(async () => {
+    try {
+      const id = await startRecordingSession({
+        showId: showId ?? null,
+        songTitle: recordingSongTitleRef.current,
+      });
+      activeRecordingIdRef.current = id;
+    } catch {
+      activeRecordingIdRef.current = null;
+    }
+  }, [showId]);
+
+  const finalizeRecordingSession = useCallback(async (saved: boolean) => {
+    const recordingId = activeRecordingIdRef.current;
+    activeRecordingIdRef.current = null;
+    if (!recordingId) return;
+    try {
+      await finishRecordingSession({ recordingId, saved });
+    } catch {
+      // Local log only; save to camera roll already attempted.
+    }
+  }, []);
+
+  const persistRecordingToCameraRoll = useCallback(
+    async (uri: string) => {
+      const target = useNativePreview ? 'native' : 'expo';
+      if (isMountedRef.current) {
+        setIsSaving(true);
+      }
+      try {
+        await saveRecordingToCameraRoll(uri, target);
+        await finalizeRecordingSession(true);
+        if (isMountedRef.current) {
+          setStatusMessage(t('live.savedToCameraRoll'));
+        }
+      } catch (error) {
+        await finalizeRecordingSession(false);
+        if (isMountedRef.current) {
+          setErrorMessage(formatLiveError(error, t));
+        }
+        throw error;
+      } finally {
+        if (isMountedRef.current) {
+          setIsSaving(false);
+        }
+        notifyRecordingSaveFinished();
+      }
+    },
+    [finalizeRecordingSession, t, useNativePreview]
+  );
+
+  const persistMultiCamToCameraRoll = useCallback(
+    async (backUri: string, frontUri: string) => {
+      if (isMountedRef.current) {
+        setIsSaving(true);
+      }
+      try {
+        await saveMultiCamRecordings(backUri, frontUri);
+        await finalizeRecordingSession(true);
+        if (isMountedRef.current) {
+          setStatusMessage(t('live.savedMultiCamToCameraRoll'));
+        }
+      } catch (error) {
+        await finalizeRecordingSession(false);
+        if (isMountedRef.current) {
+          setErrorMessage(formatLiveError(error, t));
+        }
+        throw error;
+      } finally {
+        if (isMountedRef.current) {
+          setIsSaving(false);
+        }
+        notifyRecordingSaveFinished();
+      }
+    },
+    [finalizeRecordingSession, t]
+  );
+
+  const warnIfLowStorage = useCallback(async () => {
+    try {
+      const free = Paths.availableDiskSpace;
+      if (free >= MIN_FREE_STORAGE_BYTES) return;
+      if (!isMountedRef.current) return;
+      Alert.alert(t('live.lowStorageTitle'), t('live.lowStorageMessage'));
+    } catch {
+      // Ignore; recording may still succeed.
+    }
+  }, [t]);
+
   const handleToggleRecording = async () => {
     if (isSaving) return;
-
-    if (!isMountedRef.current) return;
 
     setErrorMessage(null);
     setStatusMessage(null);
@@ -400,43 +517,41 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         try {
           const result = await stopMultiCamRecording();
           isRecordingRef.current = false;
-          setIsRecording(false);
-          releaseRecordingKeepAwake();
-          setIsSaving(true);
-          await saveToPhotos(result.backVideoURL);
-          await saveToPhotos(result.frontVideoURL);
-          if (isMountedRef.current) {
-            setStatusMessage(t('live.savedMultiCamToCameraRoll'));
-          }
-        } catch (error) {
-          isRecordingRef.current = false;
-          releaseRecordingKeepAwake();
           if (isMountedRef.current) {
             setIsRecording(false);
-            setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
           }
-        } finally {
+          releaseRecordingKeepAwake();
+          await persistMultiCamToCameraRoll(result.backVideoURL, result.frontVideoURL);
+        } catch {
+          isRecordingRef.current = false;
+          releaseRecordingKeepAwake();
+          notifyRecordingSaveFinished();
           if (isMountedRef.current) {
-            setIsSaving(false);
+            setIsRecording(false);
           }
         }
         return;
       }
 
+      await warnIfLowStorage();
+      await beginRecordingSession();
       isRecordingRef.current = true;
-      setIsRecording(true);
-      setStatusMessage(t('live.recording'));
+      if (isMountedRef.current) {
+        setIsRecording(true);
+        setStatusMessage(t('live.recording'));
+      }
       const keepAwakeResult = await activateRecordingKeepAwake();
       applyKeepAwakeDiagnostic(keepAwakeResult);
       try {
         await startMultiCamRecording();
       } catch (error) {
         isRecordingRef.current = false;
+        activeRecordingIdRef.current = null;
         releaseRecordingKeepAwake();
         if (isMountedRef.current) {
           setIsRecording(false);
           setStatusMessage(null);
-          setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+          setErrorMessage(formatLiveError(error, t));
         }
       }
       return;
@@ -457,59 +572,43 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       return;
     }
 
+    await warnIfLowStorage();
+    await beginRecordingSession();
     isRecordingRef.current = true;
-    setIsRecording(true);
-    setStatusMessage(t('live.recording'));
+    if (isMountedRef.current) {
+      setIsRecording(true);
+      setStatusMessage(t('live.recording'));
+    }
 
     const keepAwakeResult = await activateRecordingKeepAwake();
     applyKeepAwakeDiagnostic(keepAwakeResult);
 
     try {
-      const video = await previewRef.current.recordAsync({ maxDuration: 900 });
+      const video = await previewRef.current.recordAsync();
       isRecordingRef.current = false;
-
-      if (!isMountedRef.current) return;
-
-      setIsRecording(false);
+      if (isMountedRef.current) {
+        setIsRecording(false);
+      }
       releaseRecordingKeepAwake();
 
       if (!video?.uri) {
-        setErrorMessage(t('live.recordFailed'));
+        await finalizeRecordingSession(false);
+        notifyRecordingSaveFinished();
+        if (isMountedRef.current) {
+          setErrorMessage(formatLiveError(new Error('EMPTY_RECORDING_FILE'), t));
+        }
         return;
       }
 
-      setIsSaving(true);
-
-      if (useNativePreview) {
-        await saveToPhotos(video.uri);
-      } else {
-        const mediaPermission = await MediaLibrary.requestPermissionsAsync();
-        if (!mediaPermission.granted) {
-          setErrorMessage(t('live.mediaPermissionDenied'));
-          return;
-        }
-
-        await Asset.create(video.uri);
-      }
-
-      if (isMountedRef.current) {
-        setStatusMessage(t('live.savedToCameraRoll'));
-      }
+      await persistRecordingToCameraRoll(video.uri);
     } catch (error) {
       isRecordingRef.current = false;
       releaseRecordingKeepAwake();
+      await finalizeRecordingSession(false);
+      notifyRecordingSaveFinished();
       if (isMountedRef.current) {
         setIsRecording(false);
-        const message = error instanceof Error ? error.message : '';
-        setErrorMessage(
-          message.includes('Photo') || message.includes('PHOTOS')
-            ? t('live.mediaPermissionDenied')
-            : t('live.recordFailed')
-        );
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsSaving(false);
+        setErrorMessage(formatLiveError(error, t));
       }
     }
   };
@@ -526,42 +625,28 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   const handleNativeRecordingFinished = async (uri: string) => {
     isRecordingRef.current = false;
-    setIsRecording(false);
+    if (isMountedRef.current) {
+      setIsRecording(false);
+      setErrorMessage(null);
+      setStatusMessage(null);
+    }
     releaseRecordingKeepAwake();
 
-    if (!isMountedRef.current) return;
-
-    setErrorMessage(null);
-    setStatusMessage(null);
-    setIsSaving(true);
-
     try {
-      await saveToPhotos(uri);
-      if (isMountedRef.current) {
-        setStatusMessage(t('live.savedToCameraRoll'));
-      }
-    } catch (error) {
-      if (isMountedRef.current) {
-        const message = error instanceof Error ? error.message : '';
-        setErrorMessage(
-          message.includes('Photo') || message.includes('PHOTOS')
-            ? t('live.mediaPermissionDenied')
-            : t('live.recordFailed')
-        );
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsSaving(false);
-      }
+      await persistRecordingToCameraRoll(uri);
+    } catch {
+      // Error state set in persistRecordingToCameraRoll when mounted.
     }
   };
 
   const handleNativeRecordingError = (message: string) => {
     isRecordingRef.current = false;
     releaseRecordingKeepAwake();
+    void finalizeRecordingSession(false);
+    notifyRecordingSaveFinished();
     if (isMountedRef.current) {
       setIsRecording(false);
-      setErrorMessage(message || t('live.recordFailed'));
+      setErrorMessage(formatLiveError(new Error(message), t));
     }
   };
 
@@ -577,6 +662,55 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
   };
+
+  const stopRecordingAndWaitForSave = useCallback(async () => {
+    const saveWait = waitForRecordingSave();
+
+    if (multiCamActive && isRecordingRef.current) {
+      try {
+        const result = await stopMultiCamRecording();
+        isRecordingRef.current = false;
+        if (isMountedRef.current) {
+          setIsRecording(false);
+        }
+        releaseRecordingKeepAwake();
+        await persistMultiCamToCameraRoll(result.backVideoURL, result.frontVideoURL);
+      } catch {
+        notifyRecordingSaveFinished();
+      }
+      await saveWait;
+      return;
+    }
+
+    if (isRecordingRef.current && previewRef.current) {
+      try {
+        previewRef.current.stopRecording();
+      } catch {
+        notifyRecordingSaveFinished();
+      }
+      await saveWait;
+    }
+  }, [multiCamActive, persistMultiCamToCameraRoll, releaseRecordingKeepAwake]);
+
+  const handleBackPress = useCallback(() => {
+    if (isRecording || isRecordingRef.current) {
+      Alert.alert(t('live.exitWhileRecordingTitle'), t('live.exitWhileRecordingMessage'), [
+        { text: t('live.keepRecording'), style: 'cancel' },
+        {
+          text: t('live.stopAndSave'),
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              await stopRecordingAndWaitForSave();
+              router.back();
+            })();
+          },
+        },
+      ]);
+      return;
+    }
+    router.back();
+  }, [isRecording, router, stopRecordingAndWaitForSave, t]);
 
   const handleSelectLens = async (id: string) => {
     if (useNativePreview) {
@@ -666,7 +800,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
       <View pointerEvents="box-none" style={styles.uiOverlay}>
         <View pointerEvents="box-none" style={[styles.header, { paddingTop: insets.top + 8 }]}>
-          <Pressable onPress={() => router.back()} style={styles.headerSideButton}>
+          <Pressable onPress={handleBackPress} style={styles.headerSideButton}>
             <Text style={styles.headerSideText}>{t('live.back')}</Text>
           </Pressable>
 
@@ -744,7 +878,10 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
         <LiveSongPickerModal
           activeTitle={activeTitle}
-          songs={pickerSongs}
+          artistName={artist}
+          otherSongs={otherSongs}
+          predictedSongs={pickerSongs}
+          repertoireSongs={repertoireSongs}
           visible={songPickerOpen}
           onClose={() => setSongPickerOpen(false)}
           onSelect={setActiveTitle}

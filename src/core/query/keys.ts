@@ -9,4 +9,5 @@ export const queryKeys = {
   lyrics: (artist: string, title: string) =>
     ['lyrics', artist.trim().toLowerCase(), title.trim().toLowerCase()] as const,
   show: (showId: string) => ['show', showId] as const,
+  artistSongs: (artistId: string) => ['artistSongs', artistId] as const,
 };

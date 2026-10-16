@@ -1,7 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import {
+  Modal,
   PanResponder,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -27,6 +29,7 @@ type LiveConcertLyricsStripProps = {
 };
 
 const SWIPE_THRESHOLD = 40;
+const EXPAND_THRESHOLD = 28;
 
 export function LiveConcertLyricsStrip({
   plainLyrics,
@@ -37,6 +40,7 @@ export function LiveConcertLyricsStrip({
 }: LiveConcertLyricsStripProps) {
   const { t } = useTranslation();
   const [resyncOpen, setResyncOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
   const safeSyncedLines = normalizeSyncedLines(syncedLines);
@@ -49,6 +53,8 @@ export function LiveConcertLyricsStrip({
     playPause,
     stepLine,
     seekToLine,
+    pause,
+    start,
   } = useLyricsAutoScroll({
     plainLyrics: safePlainLyrics,
     syncedLines: safeSyncedLines,
@@ -59,13 +65,27 @@ export function LiveConcertLyricsStrip({
   const stepLineRef = useRef(stepLine);
   stepLineRef.current = stepLine;
 
+  const openExpanded = () => {
+    pause();
+    setExpanded(true);
+  };
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gestureState) =>
-          Math.abs(gestureState.dx) > 12 &&
-          Math.abs(gestureState.dx) > Math.abs(gestureState.dy) * 1.2,
+        onMoveShouldSetPanResponder: (_, gestureState) => {
+          const absX = Math.abs(gestureState.dx);
+          const absY = Math.abs(gestureState.dy);
+          if (absY > EXPAND_THRESHOLD && absY > absX * 1.1) return true;
+          return absX > 12 && absX > absY * 1.2;
+        },
         onPanResponderRelease: (_, gestureState) => {
+          const absX = Math.abs(gestureState.dx);
+          const absY = Math.abs(gestureState.dy);
+          if (absY > EXPAND_THRESHOLD && absY > absX) {
+            openExpanded();
+            return;
+          }
           if (gestureState.dx <= -SWIPE_THRESHOLD) {
             stepLineRef.current(1);
             return;
@@ -75,7 +95,7 @@ export function LiveConcertLyricsStrip({
           }
         },
       }),
-    []
+    [pause]
   );
 
   const accessibilityLabel = useMemo(() => {
@@ -153,6 +173,40 @@ export function LiveConcertLyricsStrip({
         </Text>
       </Pressable>
 
+      <Modal animationType="fade" transparent visible={expanded} onRequestClose={() => setExpanded(false)}>
+        <View style={styles.expandedBackdrop}>
+          <View style={styles.expandedSheet}>
+            <ScrollView contentContainerStyle={styles.expandedList}>
+              {displayLines.map((line, index) => {
+                const active = index === activeLineIndex;
+                return (
+                  <Pressable
+                    key={`${index}-${line.slice(0, 12)}`}
+                    onPress={() => {
+                      seekToLine(index);
+                      start();
+                    }}
+                    style={[styles.expandedLineRow, active && styles.expandedLineRowActive]}>
+                    <Text style={[styles.expandedLineText, active && styles.expandedLineTextActive]}>
+                      {line}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+
+            <Pressable
+              onPress={() => {
+                setExpanded(false);
+                start();
+              }}
+              style={styles.backToCurrentButton}>
+              <Text style={styles.backToCurrentText}>{t('live.backToCurrentLine')}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <LyricsResyncModal
         activeLineIndex={activeLineIndex}
         lines={displayLines}
@@ -165,6 +219,17 @@ export function LiveConcertLyricsStrip({
 }
 
 const styles = StyleSheet.create({
+  backToCurrentButton: {
+    alignItems: 'center',
+    backgroundColor: '#111',
+    borderRadius: 12,
+    marginTop: 12,
+    paddingVertical: 12,
+  },
+  backToCurrentText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
   currentLine: {
     color: '#fff',
     fontSize: 28,
@@ -174,6 +239,41 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.65)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 8,
+  },
+  expandedBackdrop: {
+    backgroundColor: 'rgba(0,0,0,0.72)',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  expandedLineRow: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  expandedLineRowActive: {
+    backgroundColor: 'rgba(255,255,255,0.14)',
+  },
+  expandedLineText: {
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 18,
+    lineHeight: 26,
+    textAlign: 'center',
+  },
+  expandedLineTextActive: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  expandedList: {
+    gap: 4,
+    paddingVertical: 8,
+  },
+  expandedSheet: {
+    backgroundColor: 'rgba(20,20,20,0.95)',
+    borderRadius: 16,
+    maxHeight: '78%',
+    padding: 16,
   },
   message: {
     color: 'rgba(255,255,255,0.8)',

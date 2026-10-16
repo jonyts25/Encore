@@ -4,8 +4,9 @@ Modo concierto: cámara + overlay de letra con scroll automático.
 
 ## Public API
 
-- `LiveCameraContent` — preview + overlay + grabación + zoom + selector de canciones
-- `LiveLyricsOverlay` — letra en overlay, split o flotante
+- `LiveCameraContent` — preview + franja de letra + grabación + selector de canciones
+- `LiveConcertLyricsStrip` — letra (3 líneas + lista expandible)
+- `LiveSongPickerModal` — predichas, otras posibles y repertorio completo
 
 ## Flujo en la app
 

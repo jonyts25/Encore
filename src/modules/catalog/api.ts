@@ -5,6 +5,22 @@ import type { Artist, ArtistLink, ArtistSearchResponse, UserArtist } from './typ
 
 const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
 
+export type ArtistSongTitle = {
+  id: string;
+  title: string;
+};
+
+export async function fetchArtistSongs(artistId: string): Promise<ArtistSongTitle[]> {
+  const { data, error } = await supabase
+    .from('songs')
+    .select('id, title')
+    .eq('artist_id', artistId)
+    .order('title', { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as ArtistSongTitle[];
+}
+
 export async function listPublicArtists(limit = 100): Promise<Artist[]> {
   const { data, error } = await supabase
     .from('artists')
