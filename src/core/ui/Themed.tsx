@@ -53,14 +53,14 @@ export function Button({ title, variant = 'primary', disabled, style, ...props }
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      style={({ pressed }) => [
+      style={(state) => [
         styles.button,
         variant === 'primary'
           ? { backgroundColor: tokens.accent }
           : { backgroundColor: tokens.fillMuted },
         disabled && styles.buttonDisabled,
-        pressed && !disabled && styles.buttonPressed,
-        typeof style === 'function' ? style({ pressed }) : style,
+        state.pressed && !disabled && styles.buttonPressed,
+        typeof style === 'function' ? style(state) : style,
       ]}
       {...props}>
       <Text

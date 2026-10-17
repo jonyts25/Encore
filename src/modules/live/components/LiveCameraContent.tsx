@@ -905,29 +905,6 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           </Glass>
         </Pressable>
 
-        {showKeepAwakeDiagnostic ? (
-          <Text
-            style={[styles.keepAwakeDiagnostic, { top: insets.top + TOP_BAR_CONTENT_HEIGHT + 4 }]}
-            numberOfLines={3}>
-            <Text style={styles.keepAwakeDiagnosticOk}>
-              {useNativePreview ? t('live.diagnosticsNativeCamera') : t('live.diagnosticsExpoCamera')}
-            </Text>
-            {keepAwakeDiagnostic ? (
-              <>
-                {' · '}
-                <Text
-                  style={
-                    keepAwakeDiagnostic === 'Pantalla activa ✓'
-                      ? styles.keepAwakeDiagnosticOk
-                      : styles.keepAwakeDiagnosticError
-                  }>
-                  {keepAwakeDiagnostic}
-                </Text>
-              </>
-            ) : null}
-          </Text>
-        ) : null}
-
         {showLyricsPanel ? (
           <View pointerEvents="box-none" style={styles.lyricsRegion}>
             <LiveConcertLyricsStrip
@@ -938,6 +915,16 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
               syncedLines={lyrics?.syncedLines}
             />
           </View>
+        ) : null}
+
+        {showKeepAwakeDiagnostic ? (
+          <Text
+            numberOfLines={2}
+            pointerEvents="none"
+            style={[styles.keepAwakeDiagnostic, { bottom: insets.bottom + 88 }]}>
+            {useNativePreview ? t('live.diagnosticsNativeCamera') : t('live.diagnosticsExpoCamera')}
+            {keepAwakeDiagnostic ? ` · ${keepAwakeDiagnostic}` : ''}
+          </Text>
         ) : null}
 
         <View
@@ -1058,19 +1045,13 @@ const styles = StyleSheet.create({
     color: '#ffe566',
   },
   keepAwakeDiagnostic: {
-    fontSize: 11,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 10,
     left: 16,
+    maxWidth: '55%',
     position: 'absolute',
-    right: 16,
-    textAlign: 'center',
-    zIndex: 27,
-  },
-  keepAwakeDiagnosticError: {
-    color: '#ffb4b4',
-  },
-  keepAwakeDiagnosticOk: {
-    color: '#b8ffb8',
+    textAlign: 'left',
+    zIndex: 8,
   },
   permissionSubtitle: {
     opacity: 0.75,
