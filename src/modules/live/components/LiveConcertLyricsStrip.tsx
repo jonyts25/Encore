@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
   Pressable,
@@ -9,8 +9,10 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 
+import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { typography } from '@/core/ui/theme';
 import {
@@ -20,10 +22,8 @@ import {
   normalizeSyncedLines,
   useLyricsAutoScroll,
 } from '@/modules/lyrics';
-import type { SyncedLine } from '@/modules/lyrics';
 
 import {
-  isTapWithoutScroll,
   LIVE_LYRICS_FALLBACK_LINE_HEIGHT,
   LIVE_LYRICS_LINE_GAP,
   scrollOffsetForActiveLine,
@@ -31,15 +31,72 @@ import {
 
 type LiveConcertLyricsStripProps = {
   plainLyrics?: string;
-  syncedLines?: SyncedLine[] | null;
+  syncedLines?: import('@/modules/lyrics').SyncedLine[] | null;
   durationSeconds?: number | null;
   isLoading: boolean;
   isUnavailable: boolean;
-  /** Fixed height for the scrollable lyrics viewport (all LIVE layouts). */
   scrollMaxHeight?: number;
 };
 
 const SWIPE_THRESHOLD = 40;
+const LINE_FLASH_MS = 520;
+
+type LiveLyricsLineRowProps = {
+  index: number;
+  line: string;
+  isActive: boolean;
+  flash: boolean;
+  onContinueFromLine: (index: number) => void;
+  onSingleTap: () => void;
+  onLayoutHeight: (index: number, height: number) => void;
+};
+
+const LiveLyricsLineRow = memo(function LiveLyricsLineRow({
+  index,
+  line,
+  isActive,
+  flash,
+  onContinueFromLine,
+  onSingleTap,
+  onLayoutHeight,
+}: LiveLyricsLineRowProps) {
+  const continueRef = useRef(onContinueFromLine);
+  const singleTapRef = useRef(onSingleTap);
+  continueRef.current = onContinueFromLine;
+  singleTapRef.current = onSingleTap;
+
+  const gesture = useMemo(() => {
+    const doubleTap = Gesture.Tap()
+      .numberOfTaps(2)
+      .maxDelay(320)
+      .onEnd(() => {
+        runOnJS(continueRef.current)(index);
+      });
+    const singleTap = Gesture.Tap()
+      .numberOfTaps(1)
+      .maxDuration(320)
+      .onEnd(() => {
+        runOnJS(singleTapRef.current)();
+      });
+    return Gesture.Exclusive(doubleTap, singleTap);
+  }, [index]);
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        onLayout={(event) => {
+          onLayoutHeight(index, event.nativeEvent.layout.height);
+        }}
+        style={[
+          styles.lineRow,
+          isActive && styles.lineRowActive,
+          flash && styles.lineRowFlash,
+        ]}>
+        <Text style={[styles.lineText, isActive && styles.lineTextActive]}>{line}</Text>
+      </View>
+    </GestureDetector>
+  );
+});
 
 export function LiveConcertLyricsStrip({
   plainLyrics,
@@ -52,11 +109,11 @@ export function LiveConcertLyricsStrip({
   const { t } = useTranslation();
   const [resyncOpen, setResyncOpen] = useState(false);
   const [userBrowsing, setUserBrowsing] = useState(false);
+  const [flashLineIndex, setFlashLineIndex] = useState<number | null>(null);
 
   const scrollRef = useRef<ScrollView>(null);
   const lineHeightsRef = useRef<number[]>([]);
   const didScrollRef = useRef(false);
-  const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
   const safeSyncedLines = normalizeSyncedLines(syncedLines);
@@ -104,6 +161,12 @@ export function LiveConcertLyricsStrip({
     scrollToActiveLine(true);
   }, [activeLineIndex, displayLines.length, scrollToActiveLine, userBrowsing]);
 
+  useEffect(() => {
+    if (flashLineIndex === null) return undefined;
+    const timer = setTimeout(() => setFlashLineIndex(null), LINE_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flashLineIndex]);
+
   const handleLineLayout = useCallback(
     (index: number, height: number) => {
       if (lineHeightsRef.current[index] === height) return;
@@ -133,13 +196,24 @@ export function LiveConcertLyricsStrip({
     didScrollRef.current = false;
   };
 
+  const continueFromLine = useCallback(
+    (lineIndex: number) => {
+      seekToLine(lineIndex);
+      setUserBrowsing(false);
+      start();
+      setFlashLineIndex(lineIndex);
+      hapticSelection();
+      requestAnimationFrame(() => scrollToActiveLine(true));
+    },
+    [scrollToActiveLine, seekToLine, start]
+  );
+
   const backToCurrentLine = () => {
     setUserBrowsing(false);
     scrollToActiveLine(true);
     start();
   };
 
-  /** Horizontal swipe to step lines — never capture on touch start (vertical scroll stays on ScrollView). */
   const horizontalSwipeHandlers = useMemo(
     () =>
       PanResponder.create({
@@ -237,48 +311,21 @@ export function LiveConcertLyricsStrip({
           onMomentumScrollEnd={handleMomentumScrollEnd}
           onScrollBeginDrag={handleScrollBeginDrag}
           onScrollEndDrag={handleScrollEndDrag}
-          onTouchStart={(event) => {
-            didScrollRef.current = false;
-            touchStartRef.current = {
-              x: event.nativeEvent.pageX,
-              y: event.nativeEvent.pageY,
-              t: Date.now(),
-            };
-          }}
-          onTouchEnd={(event) => {
-            const start = touchStartRef.current;
-            touchStartRef.current = null;
-            if (!start) return;
-            if (
-              isTapWithoutScroll({
-                startX: start.x,
-                startY: start.y,
-                endX: event.nativeEvent.pageX,
-                endY: event.nativeEvent.pageY,
-                startTimeMs: start.t,
-                endTimeMs: Date.now(),
-                didScroll: didScrollRef.current,
-              })
-            ) {
-              playPause();
-            }
-          }}
           showsVerticalScrollIndicator={false}
           style={[styles.scrollViewport, { height: scrollMaxHeight }]}>
           <View style={styles.scrollContent}>
-            {displayLines.map((line, index) => {
-              const isActive = index === activeLineIndex;
-              return (
-                <View
-                  key={`${index}-${line.slice(0, 16)}`}
-                  onLayout={(event) => {
-                    handleLineLayout(index, event.nativeEvent.layout.height);
-                  }}
-                  style={[styles.lineRow, isActive && styles.lineRowActive]}>
-                  <Text style={[styles.lineText, isActive && styles.lineTextActive]}>{line}</Text>
-                </View>
-              );
-            })}
+            {displayLines.map((line, index) => (
+              <LiveLyricsLineRow
+                key={`${index}-${line.slice(0, 16)}`}
+                flash={flashLineIndex === index}
+                index={index}
+                isActive={index === activeLineIndex}
+                line={line}
+                onContinueFromLine={continueFromLine}
+                onLayoutHeight={handleLineLayout}
+                onSingleTap={playPause}
+              />
+            ))}
           </View>
         </ScrollView>
 
@@ -295,9 +342,7 @@ export function LiveConcertLyricsStrip({
         visible={resyncOpen}
         onClose={() => setResyncOpen(false)}
         onSelectLine={(index) => {
-          seekToLine(index);
-          setUserBrowsing(false);
-          start();
+          continueFromLine(index);
         }}
       />
     </>
@@ -326,6 +371,9 @@ const styles = StyleSheet.create({
   },
   lineRowActive: {
     backgroundColor: 'rgba(255,255,255,0.12)',
+  },
+  lineRowFlash: {
+    backgroundColor: 'rgba(255,214,10,0.28)',
   },
   lineText: {
     color: 'rgba(255,255,255,0.55)',
