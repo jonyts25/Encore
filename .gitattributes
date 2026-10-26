@@ -1,4 +1,27 @@
 * text=auto eol=lf
+
+# Images
 *.png binary
 *.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg binary
+
+# Fonts
 *.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# Archives / binaries
+*.ipa binary
+*.apk binary
+*.aab binary
+*.zip binary
+*.gz binary
+*.pdf binary
+
+# Native / media (keep as-is)
+*.hbc binary
