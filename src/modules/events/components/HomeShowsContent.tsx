@@ -214,7 +214,12 @@ export function HomeShowsContent() {
               {t('home.sections.goingEmpty')}
             </Text>
             <PillButton
+              title={t('addShow.entryHome')}
+              onPress={() => router.push('/add-show')}
+            />
+            <PillButton
               title={t('home.hero.exploreShows')}
+              variant="secondary"
               onPress={() => router.push('/explore')}
             />
           </Card>

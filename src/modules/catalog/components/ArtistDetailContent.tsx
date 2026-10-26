@@ -1,8 +1,11 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
+import { PillButton } from '@/core/ui';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { useSession } from '@/modules/identity';
 
 import { getArtistById } from '../api';
 import { FollowArtistButton } from './FollowArtistButton';
@@ -16,6 +19,8 @@ type ArtistDetailContentProps = {
 
 export function ArtistDetailContent({ artistId }: ArtistDetailContentProps) {
   const { t } = useTranslation();
+  const router = useRouter();
+  const { isGuest } = useSession();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +87,15 @@ export function ArtistDetailContent({ artistId }: ArtistDetailContentProps) {
         <ArtistLinksRow artistId={artist.id} />
 
         <ThemedText style={styles.sectionLabel}>{t('catalog.upcomingShows')}</ThemedText>
+        {!isGuest ? (
+          <PillButton
+            title={t('addShow.entryArtist')}
+            variant="secondary"
+            onPress={() =>
+              router.push({ pathname: '/add-show', params: { artistId: artist.id } })
+            }
+          />
+        ) : null}
         <ArtistShowsSection artistId={artist.id} />
       </ThemedView>
     </ScrollView>

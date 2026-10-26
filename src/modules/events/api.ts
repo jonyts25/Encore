@@ -89,7 +89,7 @@ async function listShowsByIdsFromSupabase(
   return (data ?? []).map((row) => normalizeShowRow(row as ShowRowFromSupabase));
 }
 
-async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise<Show[]> {
+export async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise<Show[]> {
   const { data, error } = await supabase
     .from('shows')
     .select(SHOW_SELECT)
@@ -207,6 +207,42 @@ export async function fetchArtistShowSections(
   return { yours, other, attended };
 }
 
+export async function fetchShowByIdFromSupabase(showId: string): Promise<Show | null> {
+  const { data, error } = await supabase
+    .from('shows')
+    .select(SHOW_SELECT)
+    .eq('id', showId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  return normalizeShowRow(data as ShowRowFromSupabase);
+}
+
+export async function searchVenues(
+  query: string,
+  options?: { city?: string; limit?: number }
+): Promise<VenueSummary[]> {
+  const limit = options?.limit ?? 20;
+  const trimmed = query.trim();
+  let request = supabase
+    .from('venues')
+    .select('id, name, city, country, lat, lng, capacity')
+    .order('name', { ascending: true })
+    .limit(limit);
+
+  if (trimmed) {
+    request = request.ilike('name', `%${trimmed}%`);
+  }
+  if (options?.city?.trim()) {
+    request = request.ilike('city', `%${options.city.trim()}%`);
+  }
+
+  const { data, error } = await request;
+  if (error) throw error;
+  return (data ?? []) as VenueSummary[];
+}
+
 export async function fetchShowById(showId: string): Promise<Show | null> {
   try {
     const data = await apiFetch<ShowDetailResponse>(`/api/shows/${showId}`);
@@ -214,6 +250,12 @@ export async function fetchShowById(showId: string): Promise<Show | null> {
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       return null;
+    }
+    try {
+      const fromSupabase = await fetchShowByIdFromSupabase(showId);
+      if (fromSupabase) return fromSupabase;
+    } catch {
+      // Prefer original API error when both fail.
     }
     throw error;
   }
@@ -268,13 +310,29 @@ export async function setShowStatus(
     });
     return data.user_show;
   } catch (error) {
-    // Old Railway deploys may reject `no_fui` before the API is updated; RLS allows direct upsert.
-    if (
-      status === 'no_fui' &&
-      error instanceof ApiError &&
-      (error.status === 400 || error.status === 422)
-    ) {
-      return upsertUserShowStatusViaSupabase(showId, status, userId);
+    const canUseSupabaseFallback =
+      status === 'voy' ||
+      status === 'interesado' ||
+      status === 'no_fui' ||
+      status === 'fui';
+    if (canUseSupabaseFallback) {
+      if (
+        status === 'no_fui' &&
+        error instanceof ApiError &&
+        (error.status === 400 || error.status === 422)
+      ) {
+        return upsertUserShowStatusViaSupabase(showId, status, userId);
+      }
+      if (
+        !(error instanceof ApiError) ||
+        error.status >= 500 ||
+        error.status === 408 ||
+        error.status === 404 ||
+        error.status === 502 ||
+        error.status === 503
+      ) {
+        return upsertUserShowStatusViaSupabase(showId, status, userId);
+      }
     }
     throw error;
   }

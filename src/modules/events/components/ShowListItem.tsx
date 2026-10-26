@@ -11,9 +11,10 @@ import type { Show } from '../types';
 type ShowListItemProps = {
   show: Show;
   showPackStatus?: boolean;
+  onPress?: (show: Show) => void;
 };
 
-export function ShowListItem({ show, showPackStatus = false }: ShowListItemProps) {
+export function ShowListItem({ show, showPackStatus = false, onPress }: ShowListItemProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { label: packLabel, isPartial, retry } = useShowPackStatus(
@@ -24,6 +25,10 @@ export function ShowListItem({ show, showPackStatus = false }: ShowListItemProps
   return (
     <Pressable
       onPress={() => {
+        if (onPress) {
+          onPress(show);
+          return;
+        }
         router.push(`/show/${show.id}`);
       }}
       style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>

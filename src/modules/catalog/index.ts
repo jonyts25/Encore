@@ -4,6 +4,7 @@ export {
   getArtistById,
   getArtistFollow,
   listPublicArtists,
+  searchLocalArtists,
   searchPublicArtists,
   unfollowArtist,
 } from './api';
