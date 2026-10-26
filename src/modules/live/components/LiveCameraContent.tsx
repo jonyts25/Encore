@@ -24,6 +24,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
   type AppStateStatus,
 } from 'react-native';
@@ -41,6 +42,7 @@ import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
 
 import { formatLiveError } from '../liveErrors';
+import { liveLyricsScrollMaxHeight } from '../liveLyricsLayout';
 import { shouldFallbackFromNativeCamera } from '../nativeCameraFallback';
 import {
   notifyRecordingSaveFinished,
@@ -127,6 +129,11 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const lyricsScrollMaxHeight = useMemo(
+    () => liveLyricsScrollMaxHeight('strip', windowHeight),
+    [windowHeight]
+  );
   const previewRef = useRef<LiveCameraPreviewRef>(null);
   const navigation = useNavigation();
   const isMountedRef = useRef(true);
@@ -974,13 +981,16 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
         {showLyricsPanel ? (
           <View pointerEvents="box-none" style={styles.lyricsRegion}>
-            <LiveConcertLyricsStrip
-              durationSeconds={lyrics?.durationSeconds}
-              isLoading={lyricsLoading}
-              isUnavailable={lyricsUnavailable}
-              plainLyrics={lyrics?.plainLyrics}
-              syncedLines={lyrics?.syncedLines}
-            />
+            <View pointerEvents="auto" style={styles.lyricsTouchTarget}>
+              <LiveConcertLyricsStrip
+                durationSeconds={lyrics?.durationSeconds}
+                isLoading={lyricsLoading}
+                isUnavailable={lyricsUnavailable}
+                plainLyrics={lyrics?.plainLyrics}
+                scrollMaxHeight={lyricsScrollMaxHeight}
+                syncedLines={lyrics?.syncedLines}
+              />
+            </View>
           </View>
         ) : null}
 
@@ -1179,6 +1189,9 @@ const styles = StyleSheet.create({
     right: 0,
     top: '22%',
     zIndex: 12,
+  },
+  lyricsTouchTarget: {
+    alignSelf: 'stretch',
   },
   multiCamPip: {
     borderColor: 'rgba(255,255,255,0.35)',

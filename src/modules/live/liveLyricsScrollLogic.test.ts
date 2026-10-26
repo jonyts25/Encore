@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { liveLyricsScrollMaxHeight } from './liveLyricsLayout';
 import { isTapWithoutScroll, scrollOffsetForActiveLine } from './liveLyricsScrollLogic';
 
 describe('liveLyricsScrollLogic', () => {
@@ -8,6 +9,13 @@ describe('liveLyricsScrollLogic', () => {
     const heights = [40, 50, 30];
     assert.equal(scrollOffsetForActiveLine(0, heights, 46), 0);
     assert.equal(scrollOffsetForActiveLine(2, heights, 46), 40 + 4);
+  });
+
+  it('returns bounded scroll heights for each LIVE layout', () => {
+    const h = 800;
+    assert.ok(liveLyricsScrollMaxHeight('strip', h) >= 160);
+    assert.ok(liveLyricsScrollMaxHeight('split', h) > liveLyricsScrollMaxHeight('floating', h));
+    assert.ok(liveLyricsScrollMaxHeight('overlay', h) >= 180);
   });
 
   it('detects tap vs scroll', () => {

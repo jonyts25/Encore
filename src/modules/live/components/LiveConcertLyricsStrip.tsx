@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -10,6 +9,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { useTranslation } from '@/core/i18n';
 import { typography } from '@/core/ui/theme';
@@ -35,7 +35,7 @@ type LiveConcertLyricsStripProps = {
   durationSeconds?: number | null;
   isLoading: boolean;
   isUnavailable: boolean;
-  /** Max height for the scrollable lyrics area (all LIVE layouts). */
+  /** Fixed height for the scrollable lyrics viewport (all LIVE layouts). */
   scrollMaxHeight?: number;
 };
 
@@ -83,20 +83,17 @@ export function LiveConcertLyricsStrip({
   const activeLineIndexRef = useRef(activeLineIndex);
   activeLineIndexRef.current = activeLineIndex;
 
-  const scrollToActiveLine = useCallback(
-    (animated: boolean) => {
-      scrollRef.current?.scrollTo({
-        y: scrollOffsetForActiveLine(
-          activeLineIndexRef.current,
-          lineHeightsRef.current,
-          LIVE_LYRICS_FALLBACK_LINE_HEIGHT,
-          false
-        ),
-        animated,
-      });
-    },
-    []
-  );
+  const scrollToActiveLine = useCallback((animated: boolean) => {
+    scrollRef.current?.scrollTo({
+      y: scrollOffsetForActiveLine(
+        activeLineIndexRef.current,
+        lineHeightsRef.current,
+        LIVE_LYRICS_FALLBACK_LINE_HEIGHT,
+        false
+      ),
+      animated,
+    });
+  }, []);
 
   useEffect(() => {
     lineHeightsRef.current = [];
@@ -118,10 +115,18 @@ export function LiveConcertLyricsStrip({
     [scrollToActiveLine, userBrowsing]
   );
 
-  const handleScrollBeginDrag = () => {
+  const enterUserBrowsing = useCallback(() => {
     didScrollRef.current = true;
     pause();
     setUserBrowsing(true);
+  }, [pause]);
+
+  const handleScrollBeginDrag = () => {
+    enterUserBrowsing();
+  };
+
+  const handleScrollEndDrag = () => {
+    didScrollRef.current = false;
   };
 
   const handleMomentumScrollEnd = (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -134,13 +139,21 @@ export function LiveConcertLyricsStrip({
     start();
   };
 
-  const panResponder = useMemo(
+  /** Horizontal swipe to step lines — never capture on touch start (vertical scroll stays on ScrollView). */
+  const horizontalSwipeHandlers = useMemo(
     () =>
       PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onStartShouldSetPanResponderCapture: () => false,
         onMoveShouldSetPanResponder: (_, gestureState) => {
           const absX = Math.abs(gestureState.dx);
           const absY = Math.abs(gestureState.dy);
-          return absX > 12 && absX > absY * 1.2;
+          return absX > 14 && absX > absY * 1.35;
+        },
+        onMoveShouldSetPanResponderCapture: (_, gestureState) => {
+          const absX = Math.abs(gestureState.dx);
+          const absY = Math.abs(gestureState.dy);
+          return absX > 14 && absX > absY * 1.35;
         },
         onPanResponderRelease: (_, gestureState) => {
           if (gestureState.dx <= -SWIPE_THRESHOLD) {
@@ -151,7 +164,7 @@ export function LiveConcertLyricsStrip({
             stepLineRef.current(-1);
           }
         },
-      }),
+      }).panHandlers,
     []
   );
 
@@ -209,48 +222,50 @@ export function LiveConcertLyricsStrip({
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="adjustable"
         onAccessibilityAction={handleAccessibilityAction}
-        onStartShouldSetResponder={() => true}
-        onResponderGrant={(event) => {
-          didScrollRef.current = false;
-          touchStartRef.current = {
-            x: event.nativeEvent.pageX,
-            y: event.nativeEvent.pageY,
-            t: Date.now(),
-          };
-        }}
-        onResponderRelease={(event) => {
-          const start = touchStartRef.current;
-          touchStartRef.current = null;
-          if (!start) return;
-          if (
-            isTapWithoutScroll({
-              startX: start.x,
-              startY: start.y,
-              endX: event.nativeEvent.pageX,
-              endY: event.nativeEvent.pageY,
-              startTimeMs: start.t,
-              endTimeMs: Date.now(),
-              didScroll: didScrollRef.current,
-            })
-          ) {
-            playPause();
-          }
-        }}
+        pointerEvents="box-none"
         style={styles.root}
-        {...panResponder.panHandlers}>
+        {...horizontalSwipeHandlers}>
         {!isPlaying && !userBrowsing ? (
           <Text style={styles.pausedBadge}>{t('lyrics.paused')}</Text>
         ) : null}
 
-        <Pressable delayLongPress={450} onLongPress={() => setResyncOpen(true)}>
-          <ScrollView
-            ref={scrollRef}
-            nestedScrollEnabled
-            onMomentumScrollEnd={handleMomentumScrollEnd}
-            onScrollBeginDrag={handleScrollBeginDrag}
-            showsVerticalScrollIndicator={false}
-            style={{ maxHeight: scrollMaxHeight }}
-            contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          ref={scrollRef}
+          nestedScrollEnabled
+          scrollEnabled
+          scrollEventThrottle={16}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          onScrollBeginDrag={handleScrollBeginDrag}
+          onScrollEndDrag={handleScrollEndDrag}
+          onTouchStart={(event) => {
+            didScrollRef.current = false;
+            touchStartRef.current = {
+              x: event.nativeEvent.pageX,
+              y: event.nativeEvent.pageY,
+              t: Date.now(),
+            };
+          }}
+          onTouchEnd={(event) => {
+            const start = touchStartRef.current;
+            touchStartRef.current = null;
+            if (!start) return;
+            if (
+              isTapWithoutScroll({
+                startX: start.x,
+                startY: start.y,
+                endX: event.nativeEvent.pageX,
+                endY: event.nativeEvent.pageY,
+                startTimeMs: start.t,
+                endTimeMs: Date.now(),
+                didScroll: didScrollRef.current,
+              })
+            ) {
+              playPause();
+            }
+          }}
+          showsVerticalScrollIndicator={false}
+          style={[styles.scrollViewport, { height: scrollMaxHeight }]}>
+          <View style={styles.scrollContent}>
             {displayLines.map((line, index) => {
               const isActive = index === activeLineIndex;
               return (
@@ -264,8 +279,8 @@ export function LiveConcertLyricsStrip({
                 </View>
               );
             })}
-          </ScrollView>
-        </Pressable>
+          </View>
+        </ScrollView>
 
         {userBrowsing ? (
           <Pressable onPress={backToCurrentLine} style={styles.backToCurrentButton}>
@@ -353,5 +368,8 @@ const styles = StyleSheet.create({
   scrollContent: {
     gap: LIVE_LYRICS_LINE_GAP,
     paddingVertical: 4,
+  },
+  scrollViewport: {
+    width: '100%',
   },
 });
