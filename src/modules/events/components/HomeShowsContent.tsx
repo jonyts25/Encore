@@ -38,7 +38,7 @@ function hasAnyShows(sections: {
 }
 
 function AttendancePromptItem({ show }: { show: Show }) {
-  const { updateStatus, removeStatus, isMutating } = useShowStatus(show.id);
+  const { updateStatus, isMutating } = useShowStatus(show.id);
 
   return (
     <AttendancePromptCard
@@ -48,7 +48,7 @@ function AttendancePromptItem({ show }: { show: Show }) {
         void updateStatus('fui');
       }}
       onDeclineAttended={() => {
-        void removeStatus();
+        void updateStatus('no_fui');
       }}
     />
   );

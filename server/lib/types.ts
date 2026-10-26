@@ -1,6 +1,6 @@
-export type ShowStatus = 'interesado' | 'voy' | 'fui';
+export type ShowStatus = 'interesado' | 'voy' | 'fui' | 'no_fui';
 
-export const SHOW_STATUSES: ShowStatus[] = ['interesado', 'voy', 'fui'];
+export const SHOW_STATUSES: ShowStatus[] = ['interesado', 'voy', 'fui', 'no_fui'];
 
 export type ArtistSummary = {
   id: string;

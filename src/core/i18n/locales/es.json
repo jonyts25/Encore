@@ -72,9 +72,9 @@
       "openLive": "Abrir LIVE"
     },
     "attendance": {
-      "title": "¿Fuiste?",
-      "yes": "Sí, fui",
-      "no": "No fui"
+      "title": "¿Fuiste a {{artist}}?",
+      "yes": "Sí",
+      "no": "No"
     }
   },
   "catalog": {
@@ -146,7 +146,8 @@
     "status": {
       "interesado": "Interesado",
       "voy": "Voy",
-      "fui": "Fui"
+      "fui": "Fui",
+      "no_fui": "No fui"
     },
     "relative": {
       "justNow": "justo ahora",

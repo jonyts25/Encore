@@ -72,9 +72,9 @@
       "openLive": "Open LIVE"
     },
     "attendance": {
-      "title": "Did you go?",
-      "yes": "Yes, I went",
-      "no": "I did not go"
+      "title": "Did you go to {{artist}}?",
+      "yes": "Yes",
+      "no": "No"
     }
   },
   "catalog": {
@@ -146,7 +146,8 @@
     "status": {
       "interesado": "Interested",
       "voy": "Going",
-      "fui": "Went"
+      "fui": "Went",
+      "no_fui": "Did not go"
     },
     "relative": {
       "justNow": "just now",

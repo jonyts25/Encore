@@ -101,10 +101,7 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
             disabled={isLoading || isMutating}
             title={t('home.attendance.no')}
             variant="glass"
-            onPress={() => {
-              hapticSelection();
-              void removeStatus();
-            }}
+            onPress={() => handlePress('no_fui')}
           />
         </View>
         {error ? <ThemedText style={[styles.error, { color: tokens.recording }]}>{error}</ThemedText> : null}

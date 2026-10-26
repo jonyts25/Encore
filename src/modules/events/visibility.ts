@@ -31,6 +31,9 @@ export function getShowPhase(
   return 'past';
 }
 
-export function isShowActiveInHomeWindow(showDate: string, now: Date = new Date()): boolean {
-  return showDate >= activeCutoffIso(now);
+/** Show stays on Home while `now` is within 30 hours after `showDate`. */
+export function isShowActive(showDate: string, now: Date = new Date()): boolean {
+  const showTime = new Date(showDate).getTime();
+  const windowEnd = showTime + SHOW_ACTIVE_WINDOW_HOURS * MS_PER_HOUR;
+  return now.getTime() < windowEnd;
 }

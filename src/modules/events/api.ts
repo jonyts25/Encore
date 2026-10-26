@@ -10,7 +10,7 @@ import type {
   UserShow,
   VenueSummary,
 } from './types';
-import { activeCutoffIso, getShowPhase, hasConfirmedTime } from './visibility';
+import { activeCutoffIso, getShowPhase, hasConfirmedTime, isShowActive } from './visibility';
 
 type UpcomingShowsResponse = {
   shows: Show[];
@@ -144,9 +144,10 @@ export async function fetchHomeShowSections(
     fetchUpcomingShows({ followed: true, accessToken }),
   ]);
 
-  const cutoff = activeCutoffIso();
-  const going = allGoing.filter((show) => show.show_date >= cutoff);
-  const goingAttendancePending = allGoing.filter((show) => getShowPhase(show.show_date) === 'past');
+  const going = allGoing.filter((show) => isShowActive(show.show_date));
+  const goingAttendancePending = allGoing.filter(
+    (show) => !isShowActive(show.show_date) && getShowPhase(show.show_date) === 'past'
+  );
 
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
 

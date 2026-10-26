@@ -16,6 +16,7 @@ export async function GET(request: Request) {
 
     return jsonOk({
       going: sections.going,
+      going_attendance_pending: sections.goingAttendancePending,
       interested: sections.interested,
       for_you: sections.forYou,
       attended: sections.attended,

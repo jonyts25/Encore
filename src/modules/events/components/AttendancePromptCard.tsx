@@ -24,7 +24,9 @@ export function AttendancePromptCard({
 
   return (
     <ThemedView style={styles.card}>
-      <ThemedText style={styles.title}>{t('home.attendance.title')}</ThemedText>
+      <ThemedText style={styles.title}>
+        {t('home.attendance.title', { artist: show.artist.name })}
+      </ThemedText>
       <ThemedText style={styles.subtitle}>{showLabel}</ThemedText>
       <ThemedText style={styles.venue}>{formatShowVenueLine(show.venue)}</ThemedText>
       <ThemedView style={styles.actions}>

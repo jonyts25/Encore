@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { createSupabaseClient } from './supabase';
-import { activeCutoffIso } from './visibility';
+import { activeCutoffIso, getShowPhase, isShowActive } from './visibility';
 import type { ShowStatus, ShowWithRelations, UserShow } from './types';
 
 const SHOW_SELECT = `
@@ -100,6 +100,7 @@ async function listUpcomingShowsForArtist(
 
 export type HomeShowSections = {
   going: ShowWithRelations[];
+  goingAttendancePending: ShowWithRelations[];
   interested: ShowWithRelations[];
   forYou: ShowWithRelations[];
   attended: ShowWithRelations[];
@@ -124,16 +125,21 @@ export async function getHomeShowSections(params: {
   const interestedIds = rows.filter((row) => row.status === 'interesado').map((row) => row.show_id);
   const attendedIds = rows.filter((row) => row.status === 'fui').map((row) => row.show_id);
 
-  const [going, interested, attended, followedShows] = await Promise.all([
-    listShowsByIds(goingIds, supabase),
+  const [allGoing, interested, attended, followedShows] = await Promise.all([
+    listShowsByIds(goingIds, supabase, { upcomingOnly: false }),
     listShowsByIds(interestedIds, supabase),
     listShowsByIds(attendedIds, supabase, { upcomingOnly: false }),
     listUpcomingShows({ followedOnly: true, supabase, userId: params.userId }),
   ]);
 
+  const going = allGoing.filter((show) => isShowActive(show.show_date));
+  const goingAttendancePending = allGoing.filter(
+    (show) => !isShowActive(show.show_date) && getShowPhase(show.show_date) === 'past'
+  );
+
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
 
-  return { going, interested, forYou, attended };
+  return { going, goingAttendancePending, interested, forYou, attended };
 }
 
 export type ArtistShowSections = {

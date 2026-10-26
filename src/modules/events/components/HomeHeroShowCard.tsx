@@ -8,7 +8,7 @@ import { PillButton, StatusPill } from '@/core/ui';
 import { spacing, typography } from '@/core/ui/theme';
 import { formatShowDate, formatShowVenueLine } from '@/modules/events/api';
 import type { Show } from '@/modules/events/types';
-import { getShowPhase } from '@/modules/events/visibility';
+import { getShowPhase, isShowActive } from '@/modules/events/visibility';
 
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 
@@ -28,14 +28,15 @@ export function HomeHeroShowCard({ show, statusLabel, onOpenLive }: HomeHeroShow
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const phase = getShowPhase(show.show_date);
+  const showIsActive = isShowActive(show.show_date);
+  const isConcertDay = showIsActive && phase === 'today';
   const { label: packLabel } = useShowPackStatus(show, true);
 
-  const countdownLabel =
-    phase === 'today'
-      ? t('home.hero.today', {
-          time: formatShowDate(show.show_date, i18n.language),
-        })
-      : t('home.hero.inDays', { count: daysUntilShow(show.show_date) });
+  const countdownLabel = isConcertDay
+    ? t('home.hero.today', {
+        time: formatShowDate(show.show_date, i18n.language),
+      })
+    : t('home.hero.inDays', { count: daysUntilShow(show.show_date) });
 
   return (
     <View style={styles.wrap}>
@@ -60,7 +61,7 @@ export function HomeHeroShowCard({ show, statusLabel, onOpenLive }: HomeHeroShow
           {formatShowDate(show.show_date, i18n.language)} · {formatShowVenueLine(show.venue)}
         </Text>
         <View style={styles.actions}>
-          {phase === 'today' && onOpenLive ? (
+          {isConcertDay && onOpenLive ? (
             <PillButton style={styles.actionButton} title={t('home.todayShow.openLive')} onPress={onOpenLive} />
           ) : (
             <PillButton
