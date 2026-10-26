@@ -19,7 +19,7 @@ export function useShowStatus(showId: string) {
   const statusQuery = useQuery({
     queryKey: userId ? queryKeys.showStatus(showId, userId) : ['showStatus', 'disabled'],
     queryFn: () => getUserShowStatus(showId),
-    enabled: !isGuest && Boolean(session && userId && showId),
+    enabled: !isGuest && Boolean(userId && showId),
   });
 
   const invalidateRelated = useCallback(async () => {
@@ -46,7 +46,7 @@ export function useShowStatus(showId: string) {
 
   const updateMutation = useMutation({
     mutationFn: (nextStatus: ShowStatus) =>
-      setShowStatus(showId, nextStatus, session!.access_token!),
+      setShowStatus(showId, nextStatus, session?.access_token ?? null, userId!),
     onSuccess: async (row) => {
       if (userId) {
         queryClient.setQueryData(queryKeys.showStatus(showId, userId), row.status);

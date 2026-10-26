@@ -39,8 +39,8 @@ export function useHomeShowSections(options: UseHomeShowSectionsOptions = {}) {
 
   const query = useQuery({
     queryKey: userId ? queryKeys.home(userId) : ['home', 'disabled'],
-    queryFn: () => fetchHomeShowSections(userId!, accessToken!),
-    enabled: enabled && Boolean(userId && accessToken),
+    queryFn: () => fetchHomeShowSections(userId!, accessToken),
+    enabled: enabled && Boolean(userId),
   });
 
   useEffect(() => {

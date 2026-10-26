@@ -16,9 +16,27 @@ export async function getCurrentSession() {
     if (isSessionInvalidError(error)) {
       throw error;
     }
-    throw error;
+    return data.session ?? null;
   }
-  return data.session;
+  return data.session ?? null;
+}
+
+export async function refreshAuthSession(): Promise<{
+  session: Session | null;
+  error: unknown | null;
+}> {
+  const { data: cached } = await supabase.auth.getSession();
+  const cachedSession = cached.session ?? null;
+
+  if (!cachedSession) {
+    return { session: null, error: null };
+  }
+
+  const { data, error } = await supabase.auth.refreshSession();
+  if (error) {
+    return { session: cachedSession, error };
+  }
+  return { session: data.session ?? cachedSession, error: null };
 }
 
 export async function signInWithPassword(email: string, password: string) {

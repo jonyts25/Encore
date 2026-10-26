@@ -14,7 +14,6 @@ import { supabase } from '@/core/api/supabase';
 import { bootLog } from '@/core/bootLog';
 import { i18n, setLocale, type SupportedLocale } from '@/core/i18n';
 
-import { isAuthNetworkError, isSessionInvalidError } from './authErrors';
 import {
   clearLastKnownUser,
   lastKnownUserFromSession,
@@ -25,7 +24,14 @@ import {
   type LastKnownUser,
 } from './lastKnownUser';
 import {
+  classifyRefreshResult,
+  deriveAuthStatus,
+  shouldClearStoredUserOnAuthError,
+  type AuthStatus,
+} from './sessionStatus';
+import {
   getCurrentSession,
+  refreshAuthSession,
   signInWithPassword,
   signOut as signOutApi,
   signUpWithPassword,
@@ -35,6 +41,7 @@ import { useAuthDeepLink } from './useAuthDeepLink';
 import type { SignUpResult, SystemRole } from './types';
 
 type SessionContextValue = {
+  authStatus: AuthStatus;
   isLoading: boolean;
   isGuest: boolean;
   isOfflineSession: boolean;
@@ -64,6 +71,26 @@ function persistUserFromSession(session: Session | null): LastKnownUser | null {
   return next;
 }
 
+function applyRefreshOutcome(
+  outcome: ReturnType<typeof classifyRefreshResult>,
+  setSession: (session: Session | null) => void,
+  setLastKnownUser: (user: LastKnownUser | null) => void
+) {
+  if (outcome.kind === 'guest') {
+    clearLastKnownUser();
+    setSession(null);
+    setLastKnownUser(null);
+    return;
+  }
+  if (outcome.kind === 'signed_in') {
+    setSession(outcome.session);
+    setLastKnownUser(persistUserFromSession(outcome.session));
+    return;
+  }
+  setSession(outcome.session);
+  setLastKnownUser(readLastKnownUser());
+}
+
 export function SessionProvider({ children }: SessionProviderProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [lastKnownUser, setLastKnownUser] = useState<LastKnownUser | null>(() => readLastKnownUser());
@@ -71,10 +98,22 @@ export function SessionProvider({ children }: SessionProviderProps) {
 
   useAuthDeepLink();
 
+  const syncSessionFromStorage = useCallback(async () => {
+    const saved = readLastKnownUser();
+    const result = await refreshAuthSession();
+    const outcome = classifyRefreshResult({
+      session: result.session,
+      lastKnownUser: saved,
+      error: result.error,
+    });
+    applyRefreshOutcome(outcome, setSession, setLastKnownUser);
+  }, []);
+
   useEffect(() => {
     const handleAppState = (state: AppStateStatus) => {
       if (state === 'active') {
         void supabase.auth.startAutoRefresh();
+        void syncSessionFromStorage();
       } else {
         void supabase.auth.stopAutoRefresh();
       }
@@ -87,7 +126,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       subscription.remove();
       void supabase.auth.stopAutoRefresh();
     };
-  }, []);
+  }, [syncSessionFromStorage]);
 
   useEffect(() => {
     let mounted = true;
@@ -102,7 +141,7 @@ export function SessionProvider({ children }: SessionProviderProps) {
       } catch (error) {
         if (!mounted) return;
 
-        if (isSessionInvalidError(error)) {
+        if (shouldClearStoredUserOnAuthError(error)) {
           clearLastKnownUser();
           setSession(null);
           setLastKnownUser(null);
@@ -176,11 +215,13 @@ export function SessionProvider({ children }: SessionProviderProps) {
     return null;
   }, [lastKnownUser, session?.user]);
 
-  const isOfflineSession = Boolean(lastKnownUser) && !session;
-  const isGuest = !isLoading && !session && !lastKnownUser;
+  const authStatus = deriveAuthStatus({ session, lastKnownUser });
+  const isOfflineSession = authStatus === 'signed_in_offline';
+  const isGuest = !isLoading && authStatus === 'guest';
 
   const value = useMemo<SessionContextValue>(
     () => ({
+      authStatus,
       isLoading,
       isGuest,
       isOfflineSession,
@@ -192,7 +233,18 @@ export function SessionProvider({ children }: SessionProviderProps) {
       signUp,
       signOut,
     }),
-    [effectiveUser, isGuest, isLoading, isOfflineSession, lastKnownUser, session, signIn, signOut, signUp]
+    [
+      authStatus,
+      effectiveUser,
+      isGuest,
+      isLoading,
+      isOfflineSession,
+      lastKnownUser,
+      session,
+      signIn,
+      signOut,
+      signUp,
+    ]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

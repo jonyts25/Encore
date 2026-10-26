@@ -1,5 +1,6 @@
 import { apiFetch, ApiError } from '@/core/api/client';
 import { supabase } from '@/core/api/supabase';
+import { readLastKnownUser } from '@/modules/identity/lastKnownUser';
 
 import type {
   ArtistShowSections,
@@ -100,6 +101,22 @@ async function listUpcomingShowsForArtistFromSupabase(artistId: string): Promise
   return (data ?? []).map((row) => normalizeShowRow(row as ShowRowFromSupabase));
 }
 
+async function resolveAccessToken(accessToken?: string | null): Promise<string | null> {
+  if (accessToken) return accessToken;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+async function resolveUserIdForData(userId: string): Promise<string> {
+  if (userId) return userId;
+  const { data } = await supabase.auth.getSession();
+  const fromSession = data.session?.user?.id;
+  if (fromSession) return fromSession;
+  const saved = readLastKnownUser()?.id;
+  if (saved) return saved;
+  throw new Error('Unauthorized');
+}
+
 export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): Promise<Show[]> {
   const params = new URLSearchParams();
   if (options?.followed) {
@@ -120,12 +137,15 @@ export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): P
 
 export async function fetchHomeShowSections(
   userId: string,
-  accessToken: string
+  accessToken?: string | null
 ): Promise<HomeShowSections> {
+  const resolvedUserId = await resolveUserIdForData(userId);
+  const token = await resolveAccessToken(accessToken);
+
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
-    .eq('user_id', userId);
+    .eq('user_id', resolvedUserId);
 
   if (userShowsError) throw userShowsError;
 
@@ -141,7 +161,7 @@ export async function fetchHomeShowSections(
     listShowsByIdsFromSupabase(goingIds, { upcomingOnly: false }),
     listShowsByIdsFromSupabase(interestedIds),
     listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false }),
-    fetchUpcomingShows({ followed: true, accessToken }),
+    token ? fetchUpcomingShows({ followed: true, accessToken: token }) : Promise.resolve([]),
   ]);
 
   const going = allGoing.filter((show) => isShowActive(show.show_date));
@@ -201,21 +221,17 @@ export async function fetchShowById(showId: string): Promise<Show | null> {
 
 async function upsertUserShowStatusViaSupabase(
   showId: string,
-  status: ShowStatus
+  status: ShowStatus,
+  userId: string
 ): Promise<UserShow> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError) throw authError;
-  if (!user) throw new Error('Unauthorized');
+  const resolvedUserId = await resolveUserIdForData(userId);
 
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('user_shows')
     .upsert(
       {
-        user_id: user.id,
+        user_id: resolvedUserId,
         show_id: showId,
         status,
         ticket_ref: null,
@@ -233,13 +249,19 @@ async function upsertUserShowStatusViaSupabase(
 export async function setShowStatus(
   showId: string,
   status: ShowStatus,
-  accessToken: string
+  accessToken: string | null,
+  userId: string
 ): Promise<UserShow> {
+  const token = await resolveAccessToken(accessToken);
+  if (!token) {
+    throw new Error('Unauthorized');
+  }
+
   try {
     const data = await apiFetch<SetShowStatusResponse>(`/api/shows/${showId}/status`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ status, ticket_ref: null }),
@@ -252,7 +274,7 @@ export async function setShowStatus(
       error instanceof ApiError &&
       (error.status === 400 || error.status === 422)
     ) {
-      return upsertUserShowStatusViaSupabase(showId, status);
+      return upsertUserShowStatusViaSupabase(showId, status, userId);
     }
     throw error;
   }

@@ -48,6 +48,7 @@
       "exploreShows": "Explorar shows"
     },
     "subtitle": "Tu compañero de conciertos",
+    "offlineNotice": "Sin conexión",
     "guestTitle": "Inicia sesión para ver tus shows",
     "guestSubtitle": "Marca conciertos como «Voy» o «Me interesa» y sigue artistas para recomendaciones.",
     "goToProfile": "Ir a Perfil",
