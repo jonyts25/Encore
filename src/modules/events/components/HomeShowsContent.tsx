@@ -86,7 +86,7 @@ export function HomeShowsContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
-  const { isGuest, session, user, isLoading: sessionLoading } = useSession();
+  const { isGuest, isOfflineSession, session, user, isLoading: sessionLoading } = useSession();
 
   const { sections, isLoading, error, refetch, isOffline, isFetching } = useHomeShowSections({
     userId: user?.id ?? null,
@@ -166,7 +166,8 @@ export function HomeShowsContent() {
         </Text>
         <Text style={[typography.largeTitle, { color: tokens.text }]}>{t('home.hero.pageTitle')}</Text>
 
-        {isOffline && hasData ? (
+        {isOfflineSession ? <StatusPill label={t('home.offlineNotice')} /> : null}
+        {isOffline && hasData && !isOfflineSession ? (
           <StatusPill label={t('offline.banner')} />
         ) : null}
 

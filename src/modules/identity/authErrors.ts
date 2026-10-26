@@ -35,9 +35,6 @@ export function isSessionInvalidError(error: unknown): boolean {
     code === 'refresh_token_not_found' ||
     code === 'invalid_refresh_token' ||
     message.includes('invalid refresh token') ||
-    message.includes('refresh token not found') ||
-    message.includes('session not found') ||
-    message.includes('jwt expired') ||
-    message.includes('invalid jwt')
+    message.includes('refresh token not found')
   );
 }

@@ -48,6 +48,7 @@
       "exploreShows": "Explore shows"
     },
     "subtitle": "Your concert companion",
+    "offlineNotice": "No connection",
     "guestTitle": "Sign in to see your shows",
     "guestSubtitle": "Mark concerts as Going or Interested and follow artists for recommendations.",
     "goToProfile": "Go to Profile",
