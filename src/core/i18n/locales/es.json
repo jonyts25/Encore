@@ -293,7 +293,7 @@
     "lowStorageTitle": "Poco espacio libre",
     "lowStorageMessage": "Queda menos de 1 GB libre. La grabación puede fallar si se llena el almacenamiento.",
     "exitWhileRecordingTitle": "Grabación en curso",
-    "exitWhileRecordingMessage": "¿Detener la grabación y guardar el video antes de salir?",
+    "exitWhileRecordingMessage": "¿Detener y guardar el video?",
     "stopAndSave": "Detener y guardar",
     "keepRecording": "Seguir grabando",
     "errors": {
@@ -302,7 +302,8 @@
       "microphone": "No se pudo usar el micrófono. Revisa los permisos.",
       "emptyFile": "El archivo de video está vacío o no se generó.",
       "sessionInterrupted": "La grabación se interrumpió (app en segundo plano o sesión cerrada).",
-      "generic": "No se pudo completar la grabación."
+      "generic": "No se pudo completar la grabación.",
+      "saveFailed": "No pudimos guardar el video en el carrete. Inténtalo de nuevo."
     },
     "openLayoutMenu": "Configurar layout",
     "layoutMenuTitle": "Layout LIVE",

@@ -1,4 +1,4 @@
-const SAVE_WAIT_TIMEOUT_MS = 15_000;
+const SAVE_WAIT_TIMEOUT_MS = 180_000;
 
 let resolvePendingSave: (() => void) | null = null;
 let saveWaitTimeoutId: ReturnType<typeof setTimeout> | null = null;
