@@ -1,6 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
+import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
 import { fetchUpcomingShows } from '../api';
@@ -16,15 +19,30 @@ type UseUpcomingShowsOptions = {
 export function useUpcomingShows(options: UseUpcomingShowsOptions = {}) {
   const { followedOnly = false, userId = null, accessToken = null, enabled = true } = options;
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const cacheKey = `upcoming:${followedOnly ? 'followed' : 'all'}:${userId ?? 'guest'}`;
 
-  const query = useQuery({
+  useEffect(() => {
+    void readOfflineQuery<Show[]>(cacheKey).then((cached) => {
+      if (cached) {
+        queryClient.setQueryData(queryKeys.upcoming(followedOnly, userId), cached);
+      }
+    });
+  }, [cacheKey, followedOnly, queryClient, userId]);
+
+  const query = useQuery<Show[]>({
     queryKey: queryKeys.upcoming(followedOnly, userId),
-    queryFn: () =>
-      fetchUpcomingShows({
-        followed: followedOnly,
-        accessToken: followedOnly ? accessToken ?? undefined : undefined,
-      }),
+    queryFn: createStaleWhileRevalidateQueryFn({
+      fetchFresh: () =>
+        fetchUpcomingShows({
+          followed: followedOnly,
+          accessToken: followedOnly ? accessToken ?? undefined : undefined,
+        }),
+      readCache: () => readOfflineQuery<Show[]>(cacheKey),
+      writeCache: (shows) => writeOfflineQuery(cacheKey, shows),
+    }),
     enabled,
+    placeholderData: (previous) => previous,
   });
 
   const shows: Show[] = query.data ?? [];

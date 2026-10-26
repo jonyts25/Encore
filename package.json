@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/modules/identity/sessionStatus.test.ts src/modules/lyrics/scrollLogic.test.ts src/modules/events/visibility.test.ts src/modules/live/nativeCameraFallback.test.ts modules/encore-camera/src/nativeCameraFlag.test.ts",
+    "test": "node --import tsx --test src/modules/identity/sessionStatus.test.ts src/modules/events/showPackLogic.test.ts src/core/query/staleWhileRevalidate.test.ts src/modules/lyrics/scrollLogic.test.ts src/modules/events/visibility.test.ts src/modules/live/nativeCameraFallback.test.ts modules/encore-camera/src/nativeCameraFlag.test.ts",
     "check:colors": "node scripts/check-colors.mjs",
     "lint": "tsc --noEmit"
   },

@@ -1,6 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
+import { getCachedLyrics } from '@/core/db/lyricsCache';
+import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
 import { fetchLyrics } from '../api';
@@ -9,14 +13,45 @@ import type { LyricsResult } from '../types';
 
 export function useLyrics(artist: string, title: string) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const trimmedArtist = artist.trim();
   const trimmedTitle = title.trim();
   const enabled = Boolean(trimmedArtist && trimmedTitle);
+  const cacheKey = `lyrics:${trimmedArtist.toLowerCase()}::${trimmedTitle.toLowerCase()}`;
 
-  const query = useQuery({
+  useEffect(() => {
+    if (!enabled) return;
+    void (async () => {
+      const fromLyricsDb = await getCachedLyrics(trimmedArtist, trimmedTitle);
+      if (fromLyricsDb) {
+        queryClient.setQueryData(queryKeys.lyrics(trimmedArtist, trimmedTitle), fromLyricsDb);
+        return;
+      }
+      const cached = await readOfflineQuery<LyricsResult | null>(cacheKey);
+      if (cached) {
+        queryClient.setQueryData(queryKeys.lyrics(trimmedArtist, trimmedTitle), cached);
+      }
+    })();
+  }, [cacheKey, enabled, queryClient, trimmedArtist, trimmedTitle]);
+
+  const query = useQuery<LyricsResult | null>({
     queryKey: queryKeys.lyrics(trimmedArtist, trimmedTitle),
-    queryFn: () => fetchLyrics(trimmedArtist, trimmedTitle),
+    queryFn: createStaleWhileRevalidateQueryFn({
+      fetchFresh: () => fetchLyrics(trimmedArtist, trimmedTitle),
+      readCache: async () => {
+        const fromLyricsDb = await getCachedLyrics(trimmedArtist, trimmedTitle);
+        if (fromLyricsDb) return fromLyricsDb;
+        return readOfflineQuery<LyricsResult | null>(cacheKey);
+      },
+      writeCache: (lyrics) => {
+        if (lyrics) {
+          return writeOfflineQuery(cacheKey, lyrics);
+        }
+        return Promise.resolve();
+      },
+    }),
     enabled,
+    placeholderData: (previous) => previous,
   });
 
   const lyrics: LyricsResult | null = query.data ?? null;

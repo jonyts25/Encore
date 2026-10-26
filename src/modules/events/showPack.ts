@@ -12,14 +12,13 @@ import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
 import { fetchShowById } from './api';
+import { isShowPackExpired } from './showPackLogic';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
 
 const LYRICS_BATCH_SIZE = 2;
 const LYRICS_BATCH_PAUSE_MS = 500;
-const GOING_PREFETCH_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 const STUCK_DOWNLOADING_MS = 10 * 60 * 1000;
-const READY_STALE_MS = 24 * 60 * 60 * 1000;
 
 function isPrefetchQueryMissingOrFailed(
   queryClient: QueryClient,
@@ -46,11 +45,8 @@ function songTargets(
   return [...titles].map((title) => ({ artist: artistName, title }));
 }
 
-export function isShowWithinGoingPrefetchWindow(showDate: string, now = new Date()): boolean {
-  const showTime = new Date(showDate).getTime();
-  const lowerBound = new Date(activeCutoffIso(now)).getTime();
-  const upperBound = now.getTime() + GOING_PREFETCH_WINDOW_MS;
-  return showTime >= lowerBound && showTime <= upperBound;
+export function isShowEligibleForShowPack(showDate: string, now = new Date()): boolean {
+  return new Date(showDate).getTime() >= new Date(activeCutoffIso(now)).getTime();
 }
 
 async function shouldPrefetchShowPack(
@@ -62,6 +58,8 @@ async function shouldPrefetchShowPack(
   const record = await getShowPackRecord(showId);
   if (!record) return true;
 
+  if (isShowPackExpired(record)) return true;
+
   if (record.status === 'partial') return true;
 
   if (record.status === 'downloading') {
@@ -69,8 +67,8 @@ async function shouldPrefetchShowPack(
   }
 
   if (record.status === 'ready') {
-    if (!record.downloadedAt) return true;
-    return Date.now() - record.downloadedAt >= READY_STALE_MS;
+    if (record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0) return true;
+    return false;
   }
 
   return true;
@@ -85,6 +83,7 @@ export async function prefetchShowPack(
   const shouldRun = await shouldPrefetchShowPack(showId, options);
   if (!shouldRun) return;
 
+  const expiresAt = lyricsExpiresAfterShow(show.show_date);
   const now = Date.now();
 
   await setShowPackRecord({
@@ -95,6 +94,10 @@ export async function prefetchShowPack(
     lyricsFailed: 0,
     downloadedAt: null,
     statusUpdatedAt: now,
+    expiresAt,
+    show,
+    prediction: null,
+    lyricsMissingTitles: [],
   });
 
   await queryClient.prefetchQuery({
@@ -107,10 +110,13 @@ export async function prefetchShowPack(
     queryFn: () => fetchShowPrediction(showId),
   });
 
-  const showQueryFailed = isPrefetchQueryMissingOrFailed(
-    queryClient,
-    queryKeys.show(showId)
+  const showFromNetwork =
+    queryClient.getQueryData<Show | null>(queryKeys.show(showId)) ?? show;
+  const prediction = queryClient.getQueryData<SetlistPrediction | null>(
+    queryKeys.prediction(showId)
   );
+
+  const showQueryFailed = isPrefetchQueryMissingOrFailed(queryClient, queryKeys.show(showId));
   const predictionQueryFailed = isPrefetchQueryMissingOrFailed(
     queryClient,
     queryKeys.prediction(showId)
@@ -121,7 +127,7 @@ export async function prefetchShowPack(
     queryFn: () => fetchArtistSongs(show.artist_id),
   });
 
-  if (showQueryFailed || predictionQueryFailed) {
+  if (showQueryFailed || predictionQueryFailed || !showFromNetwork) {
     const failedAt = Date.now();
     await setShowPackRecord({
       showId,
@@ -131,19 +137,20 @@ export async function prefetchShowPack(
       lyricsFailed: 1,
       downloadedAt: failedAt,
       statusUpdatedAt: failedAt,
+      expiresAt,
+      show: showFromNetwork ?? show,
+      prediction: prediction ?? null,
+      lyricsMissingTitles: [],
     });
     return;
   }
 
-  const prediction = queryClient.getQueryData<SetlistPrediction | null>(
-    queryKeys.prediction(showId)
-  );
-  const artistName = show.artist.name;
+  const artistName = showFromNetwork.artist.name;
   const targets = prediction ? songTargets(prediction, artistName) : [];
-  const expiresAt = lyricsExpiresAfterShow(show.show_date);
 
   let lyricsCached = 0;
   let lyricsFailed = 0;
+  const lyricsMissingTitles: string[] = [];
 
   for (let index = 0; index < targets.length; index += LYRICS_BATCH_SIZE) {
     const batch = targets.slice(index, index + LYRICS_BATCH_SIZE);
@@ -153,9 +160,15 @@ export async function prefetchShowPack(
           const result = await fetchLyrics(artist, title, { expiresAt });
           if (result) {
             lyricsCached += 1;
+          } else {
+            lyricsMissingTitles.push(title);
           }
         } catch (error) {
-          if (isLyricsNetworkFailure(error) || !(error instanceof ApiError && error.status === 404)) {
+          if (isLyricsNetworkFailure(error)) {
+            lyricsFailed += 1;
+          } else if (error instanceof ApiError && error.status === 404) {
+            lyricsMissingTitles.push(title);
+          } else {
             lyricsFailed += 1;
           }
         }
@@ -170,6 +183,10 @@ export async function prefetchShowPack(
       lyricsFailed,
       downloadedAt: null,
       statusUpdatedAt: Date.now(),
+      expiresAt,
+      show: showFromNetwork,
+      prediction: prediction ?? null,
+      lyricsMissingTitles,
     });
 
     if (index + LYRICS_BATCH_SIZE < targets.length) {
@@ -178,14 +195,19 @@ export async function prefetchShowPack(
   }
 
   const finishedAt = Date.now();
+  const hasNetworkFailures = lyricsFailed > 0;
   await setShowPackRecord({
     showId,
-    status: lyricsFailed === 0 ? 'ready' : 'partial',
+    status: hasNetworkFailures ? 'partial' : 'ready',
     lyricsCached,
     lyricsTotal: targets.length,
     lyricsFailed,
     downloadedAt: finishedAt,
     statusUpdatedAt: finishedAt,
+    expiresAt,
+    show: showFromNetwork,
+    prediction: prediction ?? null,
+    lyricsMissingTitles,
   });
 }
 
@@ -193,7 +215,7 @@ export async function prefetchGoingShowPacks(
   shows: Show[],
   queryClient: QueryClient
 ): Promise<void> {
-  const eligible = shows.filter((show) => isShowWithinGoingPrefetchWindow(show.show_date));
+  const eligible = shows.filter((show) => isShowEligibleForShowPack(show.show_date));
 
   for (const show of eligible) {
     const shouldRun = await shouldPrefetchShowPack(show.id);

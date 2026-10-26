@@ -1,7 +1,9 @@
 import { onlineManager, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 import { useSession } from '@/modules/identity';
 
@@ -15,11 +17,28 @@ export function useShowStatus(showId: string) {
   const queryClient = useQueryClient();
   const userId = user?.id ?? null;
   const [offlineMessage, setOfflineMessage] = useState<string | null>(null);
+  const cacheKey = userId ? `showStatus:${showId}:${userId}` : null;
 
-  const statusQuery = useQuery({
+  useEffect(() => {
+    if (!cacheKey || !userId) return;
+    void readOfflineQuery<ShowStatus | null>(cacheKey).then((cached) => {
+      if (cached !== null) {
+        queryClient.setQueryData(queryKeys.showStatus(showId, userId), cached);
+      }
+    });
+  }, [cacheKey, queryClient, showId, userId]);
+
+  const statusQuery = useQuery<ShowStatus | null>({
     queryKey: userId ? queryKeys.showStatus(showId, userId) : ['showStatus', 'disabled'],
-    queryFn: () => getUserShowStatus(showId),
+    queryFn: createStaleWhileRevalidateQueryFn({
+      fetchFresh: () => getUserShowStatus(showId),
+      readCache: () =>
+        cacheKey ? readOfflineQuery<ShowStatus | null>(cacheKey) : Promise.resolve(null),
+      writeCache: (status) =>
+        cacheKey ? writeOfflineQuery(cacheKey, status) : Promise.resolve(),
+    }),
     enabled: !isGuest && Boolean(userId && showId),
+    placeholderData: (previous) => previous,
   });
 
   const invalidateRelated = useCallback(async () => {

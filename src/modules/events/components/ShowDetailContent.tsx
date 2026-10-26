@@ -76,10 +76,13 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const isOffline = useIsOffline();
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
   const { prediction } = useShowPrediction(showId);
-  const { record: packRecord, label: packLabel, isPartial, retry } = useShowPackStatus(
-    show,
-    Boolean(show)
-  );
+  const {
+    record: packRecord,
+    label: packLabel,
+    missingTitlesLine,
+    canRetry,
+    retry,
+  } = useShowPackStatus(show, Boolean(show));
 
   const showConfidence = prediction
     ? CONFIDENCE_STRUCTURES.includes(prediction.structure)
@@ -103,29 +106,28 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
   const packCardTitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return null;
-    if (packRecord.status === 'downloading') return t('offline.showPackDownloading');
-    if (packRecord.status === 'partial') return t('offline.showPackPartial');
-    return t('offline.showPackCardTitle');
-  }, [packRecord, t]);
+    if (packRecord.status === 'ready') return t('events.showPackReadyForShow');
+    return packLabel ?? t('offline.showPackDownloading');
+  }, [packLabel, packRecord, t]);
 
   const packSubtitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return packLabel;
-    const updated =
-      packRecord.statusUpdatedAt > 0
-        ? t('events.packUpdated', {
-            relative: formatRelativeUpdated(packRecord.statusUpdatedAt, t),
-          })
-        : null;
-    if (packRecord.status === 'ready' && packRecord.lyricsTotal > 0) {
-      const lyricsLine = t('events.packLyricsProgress', {
-        cached: packRecord.lyricsCached,
-        total: packRecord.lyricsTotal,
-      });
-      return updated ? `${lyricsLine} · ${updated}` : lyricsLine;
+    const lines: string[] = [];
+    if (packLabel && packRecord.status !== 'ready') {
+      lines.push(packLabel);
     }
-    if (packLabel && updated) return `${packLabel} · ${updated}`;
-    return packLabel ?? updated;
-  }, [packLabel, packRecord, i18n.language, t]);
+    if (missingTitlesLine) {
+      lines.push(missingTitlesLine);
+    }
+    if (packRecord.statusUpdatedAt > 0) {
+      lines.push(
+        t('events.packUpdated', {
+          relative: formatRelativeUpdated(packRecord.statusUpdatedAt, t),
+        })
+      );
+    }
+    return lines.length > 0 ? lines.join('\n') : null;
+  }, [missingTitlesLine, packLabel, packRecord, t]);
 
   const handleShare = () => {
     if (!show) return;
@@ -243,25 +245,28 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           <ShowStatusButtons appearance="showDetail" showDate={show.show_date} showId={show.id} />
 
           {packRecord && packRecord.status !== 'idle' ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={!isPartial}
-              onPress={isPartial ? retry : undefined}
-              style={({ pressed }) => [
-                styles.packCard,
-                { backgroundColor: tokens.surface },
-                pressed && isPartial && styles.pressed,
-              ]}>
+            <View style={[styles.packCard, { backgroundColor: tokens.surface }]}>
               <View style={[styles.packIcon, { backgroundColor: tokens.successMuted }]}>
-                <Ionicons color={tokens.success} name="checkmark" size={18} />
+                <Ionicons
+                  color={tokens.success}
+                  name={packRecord.status === 'ready' ? 'checkmark' : 'cloud-download-outline'}
+                  size={18}
+                />
               </View>
               <View style={styles.packText}>
                 <Text style={[typography.bodySemibold, { color: tokens.text }]}>{packCardTitle}</Text>
                 {packSubtitle ? (
                   <Text style={[typography.footnote, { color: tokens.textSecondary }]}>{packSubtitle}</Text>
                 ) : null}
+                {canRetry ? (
+                  <PillButton
+                    title={t('events.showPackRetry')}
+                    variant="secondary"
+                    onPress={retry}
+                  />
+                ) : null}
               </View>
-            </Pressable>
+            </View>
           ) : null}
 
           <View style={styles.setlistHeader}>

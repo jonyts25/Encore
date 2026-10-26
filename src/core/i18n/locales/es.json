@@ -144,6 +144,10 @@
     "todayStatusUnconfirmed": "Hoy · hora por confirmar",
     "packUpdated": "actualizado {{relative}}",
     "packLyricsProgress": "{{cached}} de {{total}} letras",
+    "showPackReadyForShow": "Listo para el show",
+    "showPackDownloadingProgress": "Descargando {{cached}} de {{total}} letras",
+    "showPackMissingLyrics": "Sin letra: {{titles}}",
+    "showPackRetry": "Reintentar descarga",
     "status": {
       "interesado": "Interesado",
       "voy": "Voy",

@@ -5,6 +5,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import 'expo-sqlite/localStorage/install';
 
 import { purgeExpiredLyrics } from '@/core/db/lyricsCache';
+import { purgeExpiredShowPacks } from '@/core/db/showPackCache';
 import { useSession } from '@/modules/identity';
 
 import { QUERY_PERSIST_MAX_AGE_MS, queryClient } from './client';
@@ -30,6 +31,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
 
   useEffect(() => {
     void purgeExpiredLyrics();
+    void purgeExpiredShowPacks();
   }, []);
 
   return (
