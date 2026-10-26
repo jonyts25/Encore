@@ -1,5 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
+import type { PracticePackSong } from '@/modules/events/practicePackTypes';
+import { legacyPracticeSongsFromTitles } from '@/modules/events/showPackLogic';
 import type { Show } from '@/modules/events/types';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
@@ -19,7 +21,7 @@ export type ShowPackRecord = {
   show: Show | null;
   prediction: SetlistPrediction | null;
   lyricsMissingTitles: string[];
-  practiceTitles: string[];
+  practiceSongs: PracticePackSong[];
 };
 
 type ShowPackRow = {
@@ -35,6 +37,7 @@ type ShowPackRow = {
   prediction_json: string | null;
   lyrics_missing_json: string | null;
   practice_titles_json: string | null;
+  practice_songs_json: string | null;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -62,6 +65,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         'ALTER TABLE show_pack ADD COLUMN prediction_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN lyrics_missing_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN practice_titles_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN practice_songs_json TEXT;',
       ]) {
         try {
           await db.execAsync(ddl);
@@ -88,6 +92,29 @@ function parseMissingTitles(raw: string | null): string[] {
   } catch {
     return [];
   }
+}
+
+function parsePracticeSongs(
+  songsRaw: string | null,
+  titlesRaw: string | null
+): PracticePackSong[] {
+  if (songsRaw) {
+    try {
+      const parsed = JSON.parse(songsRaw) as PracticePackSong[];
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (entry) =>
+            entry &&
+            typeof entry.title === 'string' &&
+            typeof entry.songId === 'string' &&
+            entry.title.trim().length > 0
+        );
+      }
+    } catch {
+      // fall through to legacy titles
+    }
+  }
+  return legacyPracticeSongsFromTitles(parseMissingTitles(titlesRaw));
 }
 
 function rowToRecord(row: ShowPackRow): ShowPackRecord {
@@ -122,7 +149,7 @@ function rowToRecord(row: ShowPackRow): ShowPackRecord {
     show,
     prediction,
     lyricsMissingTitles: parseMissingTitles(row.lyrics_missing_json),
-    practiceTitles: parseMissingTitles(row.practice_titles_json),
+    practiceSongs: parsePracticeSongs(row.practice_songs_json, row.practice_titles_json),
   };
 }
 
@@ -136,7 +163,7 @@ export async function getShowPackRecord(showId: string): Promise<ShowPackRecord 
   const row = await db.getFirstAsync<ShowPackRow>(
     `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
             status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-            practice_titles_json
+            practice_titles_json, practice_songs_json
      FROM show_pack WHERE show_id = ?`,
     showId
   );
@@ -158,8 +185,8 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     `INSERT OR REPLACE INTO show_pack (
       show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
       status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-      practice_titles_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      practice_titles_json, practice_songs_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     record.showId,
     record.status,
     record.lyricsCached,
@@ -171,7 +198,8 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     record.show ? JSON.stringify(record.show) : null,
     record.prediction ? JSON.stringify(record.prediction) : null,
     JSON.stringify(record.lyricsMissingTitles),
-    JSON.stringify(record.practiceTitles)
+    JSON.stringify(record.practiceSongs.map((song) => song.title)),
+    JSON.stringify(record.practiceSongs)
   );
 }
 

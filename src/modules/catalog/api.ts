@@ -1,7 +1,14 @@
 import { apiFetch } from '@/core/api/client';
 import { supabase } from '@/core/api/supabase';
 
+import {
+  mapAddUserSongRpcError,
+  parseAddUserSongResponse,
+  type ParsedAddUserSongResult,
+} from './addUserSongLogic';
 import type { Artist, ArtistLink, ArtistSearchResponse, UserArtist } from './types';
+
+export type { ParsedAddUserSongResult };
 
 const ARTIST_COLUMNS = 'id, mbid, name, image_url, genres, created_at';
 
@@ -9,6 +16,31 @@ export type ArtistSongTitle = {
   id: string;
   title: string;
 };
+
+export async function addUserSong(artistId: string, title: string): Promise<ParsedAddUserSongResult> {
+  const trimmedTitle = title.trim();
+  if (!artistId || !trimmedTitle) {
+    return { ok: false, reason: 'invalid_input' };
+  }
+
+  const { data, error } = await supabase.rpc('add_user_song', {
+    p_artist_id: artistId,
+    p_title: trimmedTitle,
+  });
+
+  if (error) {
+    return mapAddUserSongRpcError(error.message, error.code);
+  }
+
+  return parseAddUserSongResponse(
+    (data ?? { result: 'unknown' }) as {
+      result?: string;
+      song?: { id: string; artist_id: string; title: string; source: string };
+      created_today?: number;
+      limit?: number;
+    }
+  );
+}
 
 export async function fetchArtistSongs(artistId: string): Promise<ArtistSongTitle[]> {
   const { data, error } = await supabase

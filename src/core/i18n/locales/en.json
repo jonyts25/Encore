@@ -256,7 +256,15 @@
     "searchEmpty": "No songs match in this artist's catalog.",
     "yourSongs": "Your practice songs",
     "suggestions": "From the catalog",
-    "tapToAdd": "Tap to add"
+    "tapToAdd": "Tap to add",
+    "errors": {
+      "notAuthenticated": "Sign in to add songs from lyrics search.",
+      "dailyLimit": "Daily limit reached ({{limit}} new songs per day).",
+      "invalid": "Enter a valid song title.",
+      "lyricsMissing": "Could not download lyrics for this song.",
+      "lyricsNetwork": "Could not download lyrics. Check your connection and try again.",
+      "unknown": "Could not add this song. Try again."
+    }
   },
   "lyrics": {
     "screenTitle": "Lyrics",

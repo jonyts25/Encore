@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -22,25 +22,39 @@ import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing } from '@/core/ui/theme/spacing';
 import { typography } from '@/core/ui/theme/typography';
 import { fetchArtistSongs } from '@/modules/catalog/api';
+import type { PracticePackSong } from '@/modules/events/practicePackTypes';
+import { practiceSongErrorMessageKey } from '@/modules/events/practiceSongErrors';
 import { addPracticeSongToShowPack } from '@/modules/events/showPack';
 import type { Show } from '@/modules/events/types';
 import { filterSongsByQuery, normalizeSongSearchQuery } from '@/modules/live/liveSongSearchLogic';
+
 import { useLyricsSearchMatches } from '../hooks/useLyricsSearchMatches';
 
 type PracticeLyricsEmptyContentProps = {
   show: Show;
 };
 
+type SearchListItem = {
+  key: string;
+  title: string;
+  subtitle: string;
+  source: 'catalog' | 'remote';
+  songId?: string;
+  lyricsArtist?: string;
+};
+
 export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
+  const isOffline = useIsOffline();
   const [searchMode, setSearchMode] = useState(false);
   const [searchRaw, setSearchRaw] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
 
-  const isOffline = useIsOffline();
   const searchQuery = normalizeSongSearchQuery(searchRaw);
   const artistName = show.artist.name;
 
@@ -49,21 +63,21 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
     queryFn: () => fetchArtistSongs(show.artist_id),
   });
 
-  const practiceTitlesQuery = useQuery({
-    queryKey: [...queryKeys.show(show.id), 'practiceTitles'] as const,
+  const practiceSongsQuery = useQuery({
+    queryKey: [...queryKeys.show(show.id), 'practiceSongs'] as const,
     queryFn: async () => {
       const record = await getShowPackRecord(show.id);
-      return record?.practiceTitles ?? [];
+      return record?.practiceSongs ?? [];
     },
   });
 
   const catalogSongs = artistSongsQuery.data ?? [];
-  const practiceTitles = practiceTitlesQuery.data ?? [];
+  const practiceSongs = practiceSongsQuery.data ?? [];
 
   const suggestionSongs = useMemo(() => {
-    const practiced = new Set(practiceTitles);
+    const practiced = new Set(practiceSongs.map((song) => song.title));
     return catalogSongs.filter((song) => !practiced.has(song.title)).slice(0, 12);
-  }, [catalogSongs, practiceTitles]);
+  }, [catalogSongs, practiceSongs]);
 
   const catalogSearchResults = useMemo(() => {
     if (!searchMode) return [];
@@ -77,9 +91,6 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
     isOffline,
   });
 
-  type SearchListItem =
-    | { key: string; title: string; subtitle: string; source: 'catalog' | 'remote' };
-
   const searchResults = useMemo((): SearchListItem[] => {
     if (!searchMode) return [];
     if (catalogSearchResults.length > 0) {
@@ -88,6 +99,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
         title: song.title,
         subtitle: artistName,
         source: 'catalog' as const,
+        songId: song.id,
       }));
     }
     return remoteMatches.map((match) => ({
@@ -95,6 +107,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
       title: match.title,
       subtitle: match.artist,
       source: 'remote' as const,
+      lyricsArtist: match.artist,
     }));
   }, [artistName, catalogSearchResults, remoteMatches, searchMode]);
 
@@ -108,21 +121,56 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
     [artistName, router, show.id]
   );
 
-  const handlePickTitle = useCallback(
-    async (title: string) => {
-      const trimmed = title.trim();
+  const handlePick = useCallback(
+    async (item: SearchListItem) => {
+      const trimmed = item.title.trim();
       if (!trimmed || isAdding) return;
+      if (item.source === 'remote' && isOffline) {
+        setAddError(t('practice.errors.lyricsNetwork'));
+        return;
+      }
+
       hapticSelection();
       setIsAdding(true);
+      setAddError(null);
       try {
-        await addPracticeSongToShowPack(show, trimmed);
-        await practiceTitlesQuery.refetch();
-        openLyricsForTitle(trimmed);
+        const result = await addPracticeSongToShowPack(show, {
+          title: trimmed,
+          songId: item.songId,
+          lyricsArtist: item.lyricsArtist,
+          requireCatalogSong: item.source === 'remote',
+        });
+        if (!result.ok) {
+          setAddError(
+            t(practiceSongErrorMessageKey(result.code), {
+              limit: result.limit ?? 30,
+            })
+          );
+          return;
+        }
+        await queryClient.invalidateQueries({ queryKey: queryKeys.artistSongs(show.artist_id) });
+        await practiceSongsQuery.refetch();
+        openLyricsForTitle(result.title);
+      } catch {
+        setAddError(t('practice.errors.unknown'));
       } finally {
         setIsAdding(false);
       }
     },
-    [isAdding, openLyricsForTitle, practiceTitlesQuery, show]
+    [isAdding, isOffline, openLyricsForTitle, practiceSongsQuery, queryClient, show, t]
+  );
+
+  const handlePickCatalogTitle = useCallback(
+    (title: string, songId: string) => {
+      void handlePick({
+        key: `quick-${songId}`,
+        title,
+        subtitle: artistName,
+        source: 'catalog',
+        songId,
+      });
+    },
+    [artistName, handlePick]
   );
 
   return (
@@ -135,9 +183,18 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
         <PillButton
           style={styles.searchButton}
           title={t('practice.searchSong')}
-          onPress={() => setSearchMode(true)}
+          onPress={() => {
+            setSearchMode(true);
+            setAddError(null);
+          }}
         />
       </View>
+
+      {addError ? (
+        <Text style={[typography.footnote, { color: tokens.recording, marginTop: spacing.sm }]}>
+          {addError}
+        </Text>
+      ) : null}
 
       {searchMode ? (
         <View style={styles.searchBlock}>
@@ -150,7 +207,10 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
               { color: tokens.text, borderColor: tokens.separator, backgroundColor: tokens.surface },
             ]}
             value={searchRaw}
-            onChangeText={setSearchRaw}
+            onChangeText={(value) => {
+              setSearchRaw(value);
+              setAddError(null);
+            }}
           />
           {artistSongsQuery.isLoading || isRemoteSearching ? (
             <ActivityIndicator color={tokens.accent} style={styles.loader} />
@@ -163,7 +223,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
               <ListRow
                 subtitle={item.subtitle}
                 title={item.title}
-                onPress={() => void handlePickTitle(item.title)}
+                onPress={() => void handlePick(item)}
               />
             )}
             ListEmptyComponent={
@@ -177,14 +237,14 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
         </View>
       ) : null}
 
-      {practiceTitles.length > 0 ? (
+      {practiceSongs.length > 0 ? (
         <View style={styles.section}>
           <Text style={[typography.bodySemibold, { color: tokens.text }]}>
             {t('practice.yourSongs')}
           </Text>
-          {practiceTitles.map((title) => (
-            <Pressable key={title} onPress={() => openLyricsForTitle(title)}>
-              <ListRow subtitle={artistName} title={title} />
+          {practiceSongs.map((song: PracticePackSong) => (
+            <Pressable key={song.songId || song.title} onPress={() => openLyricsForTitle(song.title)}>
+              <ListRow subtitle={artistName} title={song.title} />
             </Pressable>
           ))}
         </View>
@@ -196,7 +256,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
             {t('practice.suggestions')}
           </Text>
           {suggestionSongs.map((song) => (
-            <Pressable key={song.id} onPress={() => void handlePickTitle(song.title)}>
+            <Pressable key={song.id} onPress={() => handlePickCatalogTitle(song.title, song.id)}>
               <ListRow subtitle={t('practice.tapToAdd')} title={song.title} />
             </Pressable>
           ))}

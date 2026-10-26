@@ -256,7 +256,15 @@
     "searchEmpty": "No hay canciones que coincidan en el catálogo de este artista.",
     "yourSongs": "Tus canciones de práctica",
     "suggestions": "Del catálogo",
-    "tapToAdd": "Toca para agregar"
+    "tapToAdd": "Toca para agregar",
+    "errors": {
+      "notAuthenticated": "Inicia sesión para agregar canciones desde la búsqueda de letras.",
+      "dailyLimit": "Límite diario alcanzado ({{limit}} canciones nuevas por día).",
+      "invalid": "Escribe un título de canción válido.",
+      "lyricsMissing": "No se pudo descargar la letra de esta canción.",
+      "lyricsNetwork": "No se pudo descargar la letra. Revisa tu conexión e inténtalo de nuevo.",
+      "unknown": "No se pudo agregar esta canción. Inténtalo de nuevo."
+    }
   },
   "lyrics": {
     "screenTitle": "Letra",

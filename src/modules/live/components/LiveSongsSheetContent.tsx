@@ -24,7 +24,9 @@ import { darkTokens } from '@/core/ui/theme/tokens';
 import { spacing } from '@/core/ui/theme/spacing';
 import { typography } from '@/core/ui/theme/typography';
 import { fetchArtistSongs } from '@/modules/catalog/api';
-import { cacheLyricsForShowPackTitle } from '@/modules/events/showPack';
+import { practiceSongErrorMessageKey } from '@/modules/events/practiceSongErrors';
+import { addPracticeSongToShowPack, cacheLyricsForShowPackTitle } from '@/modules/events/showPack';
+import type { PracticePackSong } from '@/modules/events/practicePackTypes';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong } from '@/modules/setlist/types';
@@ -47,6 +49,9 @@ type SongRow = {
   index: number;
   detail: string;
   active: boolean;
+  songId?: string;
+  fromRemote?: boolean;
+  lyricsArtist?: string;
 };
 
 const LIST_HEADER_BACKGROUND = 'rgba(28,28,30,0.98)';
@@ -144,8 +149,9 @@ export function LiveSongsSheetContent() {
   const [searchRaw, setSearchRaw] = useState('');
   const [segment, setSegment] = useState<SongSegment>('predicted');
   const [cachedTitles, setCachedTitles] = useState<Set<string>>(new Set());
-  const [practiceTitles, setPracticeTitles] = useState<string[]>([]);
+  const [practiceSongs, setPracticeSongs] = useState<PracticePackSong[]>([]);
   const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
+  const [addSongError, setAddSongError] = useState<string | null>(null);
 
   const { prediction } = useShowPrediction(showId, { enabled: Boolean(showId) });
   const { show } = useShow(showId);
@@ -159,11 +165,11 @@ export function LiveSongsSheetContent() {
 
   useEffect(() => {
     if (!showId) {
-      setPracticeTitles([]);
+      setPracticeSongs([]);
       return;
     }
     void getShowPackRecord(showId).then((record) => {
-      setPracticeTitles(record?.practiceTitles ?? []);
+      setPracticeSongs(record?.practiceSongs ?? []);
     });
   }, [showId]);
 
@@ -202,18 +208,19 @@ export function LiveSongsSheetContent() {
 
   const practiceRows = useMemo((): SongRow[] => {
     const predictedTitleSet = new Set(predictedSongs.map((song) => song.title));
-    return practiceTitles
-      .filter((title) => !predictedTitleSet.has(title))
-      .filter((title) => filterSongsByQuery([{ title }], searchQuery).length > 0)
-      .map((title, index) => ({
-        key: `practice-${title}`,
+    return practiceSongs
+      .filter((song) => !predictedTitleSet.has(song.title))
+      .filter((song) => filterSongsByQuery([{ title: song.title }], searchQuery).length > 0)
+      .map((song, index) => ({
+        key: `practice-${song.songId || song.title}`,
         kind: 'song' as const,
-        title,
+        title: song.title,
+        songId: song.songId,
         index: index + 1,
         detail: t('live.songsPracticePick'),
-        active: title === activeTitle,
+        active: song.title === activeTitle,
       }));
-  }, [activeTitle, predictedSongs, practiceTitles, searchQuery, t]);
+  }, [activeTitle, predictedSongs, practiceSongs, searchQuery, t]);
 
   const rows = useMemo((): SongRow[] => {
     if (effectiveSegment === 'predicted') {
@@ -298,6 +305,9 @@ export function LiveSongsSheetContent() {
         key: `remote-${match.id}`,
         kind: 'song' as const,
         title: match.title,
+        songId: undefined,
+        fromRemote: true,
+        lyricsArtist: match.artist,
         index: index + 1,
         detail: match.artist,
         active: match.title === activeTitle,
@@ -326,7 +336,7 @@ export function LiveSongsSheetContent() {
     for (const song of predictedSongs) titles.add(song.title);
     for (const song of otherSongs) titles.add(song.title);
     for (const song of repertoireSongs) titles.add(song.title);
-    for (const title of practiceTitles) titles.add(title);
+    for (const song of practiceSongs) titles.add(song.title);
 
     void (async () => {
       const cached = new Set<string>();
@@ -339,15 +349,52 @@ export function LiveSongsSheetContent() {
       );
       setCachedTitles(cached);
     })();
-  }, [artistName, otherSongs, practiceTitles, predictedSongs, repertoireSongs]);
+  }, [artistName, otherSongs, practiceSongs, predictedSongs, repertoireSongs]);
 
-  const selectTitle = useCallback(
-    async (title: string) => {
+  const selectSongRow = useCallback(
+    async (row: SongRow) => {
+      if (row.kind !== 'song') return;
       hapticSelection();
-      const trimmed = title.trim();
-      if (!trimmed) return;
+      setAddSongError(null);
+      const trimmed = row.title.trim();
+      if (!trimmed || !show) return;
 
-      if (show && !isOffline && !(await hasCachedLyrics(artistName, trimmed))) {
+      if (row.fromRemote) {
+        if (isOffline) {
+          setAddSongError(t('practice.errors.lyricsNetwork'));
+          return;
+        }
+        setIsFetchingLyrics(true);
+        try {
+          const result = await addPracticeSongToShowPack(show, {
+            title: trimmed,
+            lyricsArtist: row.lyricsArtist,
+            requireCatalogSong: true,
+          });
+          if (!result.ok) {
+            setAddSongError(
+              t(practiceSongErrorMessageKey(result.code), {
+                limit: result.limit ?? 30,
+              })
+            );
+            return;
+          }
+          await queryClient.invalidateQueries({ queryKey: queryKeys.artistSongs(show.artist_id) });
+          const record = await getShowPackRecord(show.id);
+          setPracticeSongs(record?.practiceSongs ?? []);
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.lyrics(artistName, result.title),
+          });
+          setCachedTitles((current) => new Set([...current, result.title]));
+          setActiveTitle(result.title);
+          router.back();
+        } finally {
+          setIsFetchingLyrics(false);
+        }
+        return;
+      }
+
+      if (!isOffline && !(await hasCachedLyrics(artistName, trimmed))) {
         setIsFetchingLyrics(true);
         try {
           await cacheLyricsForShowPackTitle(show, trimmed);
@@ -363,7 +410,7 @@ export function LiveSongsSheetContent() {
       setActiveTitle(trimmed);
       router.back();
     },
-    [artistName, isOffline, queryClient, router, setActiveTitle, show]
+    [artistName, isOffline, queryClient, router, setActiveTitle, show, t]
   );
 
   const handleDone = useCallback(() => {
@@ -379,6 +426,7 @@ export function LiveSongsSheetContent() {
         onSearchQueryChange={(normalized, raw) => {
           setSearchQuery(normalized);
           setSearchRaw(raw);
+          setAddSongError(null);
         }}
         onSegmentChange={setSegment}
       />
@@ -399,6 +447,11 @@ export function LiveSongsSheetContent() {
 
   return (
     <>
+      {addSongError ? (
+        <View style={styles.errorBanner}>
+          <Text style={[typography.footnote, { color: tokens.recording }]}>{addSongError}</Text>
+        </View>
+      ) : null}
       {isFetchingLyrics ? (
         <View style={styles.fetchingOverlay}>
           <ActivityIndicator color={tokens.accentText} />
@@ -436,7 +489,7 @@ export function LiveSongsSheetContent() {
                   />
                 ) : null
               }
-              onPress={() => void selectTitle(item.title)}
+              onPress={() => void selectSongRow(item)}
             />
           )
         }
@@ -448,6 +501,10 @@ export function LiveSongsSheetContent() {
 }
 
 const styles = StyleSheet.create({
+  errorBanner: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
   customRow: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,

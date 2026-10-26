@@ -6,15 +6,44 @@ import { lyricsExpiresAfterShow } from '@/core/db/lyricsCache';
 import { getShowPackRecord, setShowPackRecord } from '@/core/db/showPackCache';
 import { queryKeys } from '@/core/query';
 
-import { fetchArtistSongs } from '@/modules/catalog/api';
+import { addUserSong, fetchArtistSongs } from '@/modules/catalog/api';
 import { fetchLyrics, isLyricsNetworkFailure } from '@/modules/lyrics/api';
 import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
 import { fetchShowById } from './api';
-import { collectShowPackSongTitles, isShowPackExpired, mergePracticeTitles } from './showPackLogic';
+import type { PracticePackSong } from './practicePackTypes';
+import {
+  collectShowPackSongTitles,
+  isShowPackExpired,
+  mergePracticeSong,
+} from './showPackLogic';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
+
+export type PracticeSongPick = {
+  title: string;
+  songId?: string | null;
+  lyricsArtist?: string;
+  requireCatalogSong?: boolean;
+};
+
+export type AddPracticeSongErrorCode =
+  | 'not_authenticated'
+  | 'daily_limit'
+  | 'invalid_input'
+  | 'lyrics_missing'
+  | 'lyrics_network'
+  | 'unknown';
+
+export type AddPracticeSongResult =
+  | { ok: true; songId: string; title: string; lyricsStatus: 'cached' }
+  | {
+      ok: false;
+      code: AddPracticeSongErrorCode;
+      createdToday?: number;
+      limit?: number;
+    };
 
 const LYRICS_BATCH_SIZE = 2;
 const LYRICS_BATCH_PAUSE_MS = 500;
@@ -34,9 +63,9 @@ function isPrefetchQueryMissingOrFailed(
 function songTargets(
   prediction: SetlistPrediction | null,
   artistName: string,
-  practiceTitles: readonly string[]
+  practiceSongs: readonly PracticePackSong[]
 ): { artist: string; title: string }[] {
-  return collectShowPackSongTitles(prediction, practiceTitles).map((title) => ({
+  return collectShowPackSongTitles(prediction, practiceSongs).map((title) => ({
     artist: artistName,
     title,
   }));
@@ -83,7 +112,7 @@ export async function prefetchShowPack(
   const expiresAt = lyricsExpiresAfterShow(show.show_date);
   const now = Date.now();
 
-  const existingPractice = (await getShowPackRecord(showId))?.practiceTitles ?? [];
+  const existingPractice = (await getShowPackRecord(showId))?.practiceSongs ?? [];
 
   await setShowPackRecord({
     showId,
@@ -97,7 +126,7 @@ export async function prefetchShowPack(
     show,
     prediction: null,
     lyricsMissingTitles: [],
-    practiceTitles: existingPractice,
+    practiceSongs: existingPractice,
   });
 
   await queryClient.prefetchQuery({
@@ -141,7 +170,7 @@ export async function prefetchShowPack(
       show: showFromNetwork ?? show,
       prediction: prediction ?? null,
       lyricsMissingTitles: [],
-      practiceTitles: existingPractice,
+      practiceSongs: existingPractice,
     });
     return;
   }
@@ -188,7 +217,7 @@ export async function prefetchShowPack(
       show: showFromNetwork,
       prediction: prediction ?? null,
       lyricsMissingTitles,
-      practiceTitles: existingPractice,
+      practiceSongs: existingPractice,
     });
 
     if (index + LYRICS_BATCH_SIZE < targets.length) {
@@ -210,54 +239,98 @@ export async function prefetchShowPack(
     show: showFromNetwork,
     prediction: prediction ?? null,
     lyricsMissingTitles,
-    practiceTitles: existingPractice,
+    practiceSongs: existingPractice,
   });
 }
 
 export async function addPracticeSongToShowPack(
   show: Show,
-  title: string
-): Promise<'cached' | 'missing' | 'failed'> {
-  const trimmedTitle = title.trim();
-  if (!trimmedTitle) return 'missing';
+  pick: PracticeSongPick
+): Promise<AddPracticeSongResult> {
+  const trimmedTitle = pick.title.trim();
+  if (!trimmedTitle) return { ok: false, code: 'invalid_input' };
 
-  const record = await getShowPackRecord(show.id);
-  const beforeTitles = collectShowPackSongTitles(record?.prediction ?? null, record?.practiceTitles ?? []);
-  const result = await cacheLyricsForShowPackTitle(show, trimmedTitle);
-  const expiresAt = lyricsExpiresAfterShow(show.show_date);
-  const now = Date.now();
-  const practiceTitles = mergePracticeTitles(record?.practiceTitles ?? [], trimmedTitle);
+  let songId = pick.songId?.trim() ?? '';
+  let canonicalTitle = trimmedTitle;
 
-  if (record) {
-    let lyricsCached = record.lyricsCached;
-    if (result === 'cached' && !beforeTitles.includes(trimmedTitle)) {
-      lyricsCached += 1;
+  if (pick.requireCatalogSong || !songId) {
+    const catalogResult = await addUserSong(show.artist_id, trimmedTitle);
+    if (!catalogResult.ok) {
+      if (catalogResult.reason === 'daily_limit') {
+        return {
+          ok: false,
+          code: 'daily_limit',
+          createdToday: catalogResult.createdToday,
+          limit: catalogResult.limit,
+        };
+      }
+      if (catalogResult.reason === 'not_authenticated') {
+        return { ok: false, code: 'not_authenticated' };
+      }
+      if (catalogResult.reason === 'invalid_input') {
+        return { ok: false, code: 'invalid_input' };
+      }
+      return { ok: false, code: 'unknown' };
     }
-    await setShowPackRecord({
-      ...record,
-      practiceTitles,
-      lyricsTotal: Math.max(record.lyricsTotal, collectShowPackSongTitles(record.prediction, practiceTitles).length),
-      lyricsCached,
-      statusUpdatedAt: now,
-    });
-    return result;
+    songId = catalogResult.song.id;
+    canonicalTitle = catalogResult.song.title;
   }
 
-  await setShowPackRecord({
-    showId: show.id,
-    status: result === 'failed' ? 'partial' : 'ready',
-    lyricsCached: result === 'cached' ? 1 : 0,
-    lyricsTotal: 1,
-    lyricsFailed: result === 'failed' ? 1 : 0,
-    downloadedAt: now,
-    statusUpdatedAt: now,
-    expiresAt,
-    show,
-    prediction: null,
-    lyricsMissingTitles: result === 'missing' ? [trimmedTitle] : [],
-    practiceTitles,
+  if (!songId) return { ok: false, code: 'unknown' };
+
+  const lyricsStatus = await cacheLyricsForShowPackTitle(show, canonicalTitle);
+
+  const record = await getShowPackRecord(show.id);
+  const beforeTitles = collectShowPackSongTitles(record?.prediction ?? null, record?.practiceSongs ?? []);
+  const practiceSongs = mergePracticeSong(record?.practiceSongs ?? [], {
+    songId,
+    title: canonicalTitle,
   });
-  return result;
+  const expiresAt = lyricsExpiresAfterShow(show.show_date);
+  const now = Date.now();
+
+  const persistPack = async () => {
+    if (record) {
+      let lyricsCached = record.lyricsCached;
+      if (lyricsStatus === 'cached' && !beforeTitles.includes(canonicalTitle)) {
+        lyricsCached += 1;
+      }
+      await setShowPackRecord({
+        ...record,
+        practiceSongs,
+        lyricsTotal: Math.max(
+          record.lyricsTotal,
+          collectShowPackSongTitles(record.prediction, practiceSongs).length
+        ),
+        lyricsCached,
+        lyricsFailed: lyricsStatus === 'failed' ? record.lyricsFailed + 1 : record.lyricsFailed,
+        statusUpdatedAt: now,
+      });
+      return;
+    }
+
+    await setShowPackRecord({
+      showId: show.id,
+      status: lyricsStatus === 'failed' ? 'partial' : 'ready',
+      lyricsCached: lyricsStatus === 'cached' ? 1 : 0,
+      lyricsTotal: 1,
+      lyricsFailed: lyricsStatus === 'failed' ? 1 : 0,
+      downloadedAt: now,
+      statusUpdatedAt: now,
+      expiresAt,
+      show,
+      prediction: null,
+      lyricsMissingTitles: lyricsStatus === 'missing' ? [canonicalTitle] : [],
+      practiceSongs,
+    });
+  };
+
+  await persistPack();
+
+  if (lyricsStatus === 'missing') return { ok: false, code: 'lyrics_missing' };
+  if (lyricsStatus === 'failed') return { ok: false, code: 'lyrics_network' };
+
+  return { ok: true, songId, title: canonicalTitle, lyricsStatus: 'cached' };
 }
 
 export async function cacheLyricsForShowPackTitle(
