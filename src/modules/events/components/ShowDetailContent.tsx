@@ -29,6 +29,7 @@ import {
 import type { SetlistPredictionStructure } from '@/modules/setlist/types';
 
 import { formatShowDate } from '../api';
+import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShow } from '../hooks/useShow';
 import { getShowPhase } from '../visibility';
@@ -153,21 +154,27 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   };
 
   const openPracticeLyrics = () => {
-    if (!show || !primarySongTitle) return;
+    if (!show) return;
+    if (primarySongTitle) {
+      router.push({
+        pathname: '/lyrics',
+        params: { artist: show.artist.name, title: primarySongTitle, showId: show.id },
+      });
+      return;
+    }
     router.push({
       pathname: '/lyrics',
-      params: { artist: show.artist.name, title: primarySongTitle, showId: show.id },
+      params: { artist: show.artist.name, showId: show.id },
     });
   };
 
   const handleFab = () => {
-    if (!show) return;
-    if (primarySongTitle) {
-      openPracticeLyrics();
-      return;
-    }
-    router.push(`/show/${show.id}`);
+    openPracticeLyrics();
   };
+
+  const venueDateDisplay = show
+    ? formatShowVenueDateDisplay(show, i18n.language, t)
+    : null;
 
   if (isLoading) {
     return (
@@ -229,9 +236,21 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           <View style={[styles.infoCard, { backgroundColor: tokens.surface }]}>
             <View style={[styles.infoRow, { borderBottomColor: tokens.separator }]}>
               <Ionicons color={tokens.accent} name="calendar-outline" size={20} />
-              <Text style={[typography.body, { color: tokens.text, flex: 1 }]}>
-                {formatShowDate(show.show_date, i18n.language)}
-              </Text>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={[typography.body, { color: tokens.text }]}>
+                  {venueDateDisplay?.calendarLine ?? formatShowDate(show.show_date, i18n.language)}
+                </Text>
+                {venueDateDisplay?.venueTimeLine ? (
+                  <Text style={[typography.body, { color: tokens.text }]}>
+                    {venueDateDisplay.venueTimeLine}
+                  </Text>
+                ) : null}
+                {venueDateDisplay?.deviceTimeHint ? (
+                  <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+                    {venueDateDisplay.deviceTimeHint}
+                  </Text>
+                ) : null}
+              </View>
             </View>
             <View style={[styles.infoRow, styles.infoRowLast]}>
               <Ionicons color={tokens.accent} name="location-outline" size={20} />
@@ -294,14 +313,12 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
               variant="recording"
               onPress={openLive}
             />
-            {primarySongTitle ? (
-              <PillButton
-                style={styles.fabHalf}
-                title={t('events.practiceLyrics')}
-                variant="glass"
-                onPress={openPracticeLyrics}
-              />
-            ) : null}
+            <PillButton
+              style={styles.fabHalf}
+              title={t('events.practiceLyrics')}
+              variant="glass"
+              onPress={openPracticeLyrics}
+            />
           </View>
         ) : (
           <PillButton style={styles.fabButton} title={t('events.practiceLyrics')} onPress={handleFab} />

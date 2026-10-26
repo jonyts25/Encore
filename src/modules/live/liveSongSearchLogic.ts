@@ -13,11 +13,13 @@ export function matchesSongSearch(title: string, normalizedQuery: string): boole
 
 export function collectPackSongTitles(
   predicted: readonly { title: string }[],
-  others: readonly { title: string }[]
+  others: readonly { title: string }[],
+  practiceTitles: readonly string[] = []
 ): string[] {
   const titles = new Set<string>();
   for (const song of predicted) titles.add(song.title);
   for (const song of others) titles.add(song.title);
+  for (const title of practiceTitles) titles.add(title);
   return [...titles];
 }
 

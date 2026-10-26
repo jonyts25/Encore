@@ -3,11 +3,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
-import { PillButton } from '@/core/ui';
+import { GlassIconButton, PillButton } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
+import { useShow } from '@/modules/events/hooks/useShow';
 
 import { LyricsScrollPanel } from '../components/LyricsScrollPanel';
+import { PracticeLyricsEmptyContent } from '../components/PracticeLyricsEmptyContent';
 import { useLyrics } from '../hooks/useLyrics';
 
 type LyricsScreenContentProps = {
@@ -21,7 +23,34 @@ export function LyricsScreenContent({ artist, title, showId }: LyricsScreenConte
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
-  const { lyrics, isLoading, error, isBusy, notFound, refetch } = useLyrics(artist, title);
+  const trimmedTitle = title.trim();
+  const showQuery = useShow(showId ?? '');
+  const show = showId && !trimmedTitle ? showQuery.show : null;
+  const isShowLoading = showId && !trimmedTitle ? showQuery.isLoading : false;
+  const { lyrics, isLoading, error, isBusy, notFound, refetch } = useLyrics(artist, trimmedTitle);
+
+  if (!trimmedTitle && showId) {
+    return (
+      <ThemedView
+        style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }]}
+      >
+        <View style={styles.topBar}>
+          <GlassIconButton
+            accessibilityLabel={t('live.back')}
+            icon="chevron-back"
+            onPress={() => router.back()}
+          />
+        </View>
+        {isShowLoading || !show ? (
+          <ThemedView style={styles.centered}>
+            <ThemedText>{t('common.loading')}</ThemedText>
+          </ThemedView>
+        ) : (
+          <PracticeLyricsEmptyContent show={show} />
+        )}
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 12 }]}>
@@ -95,6 +124,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20,
+  },
+  topBar: {
+    marginBottom: 8,
   },
   emptySubtitle: {
     opacity: 0.75,

@@ -19,6 +19,7 @@ export type ShowPackRecord = {
   show: Show | null;
   prediction: SetlistPrediction | null;
   lyricsMissingTitles: string[];
+  practiceTitles: string[];
 };
 
 type ShowPackRow = {
@@ -33,6 +34,7 @@ type ShowPackRow = {
   show_json: string | null;
   prediction_json: string | null;
   lyrics_missing_json: string | null;
+  practice_titles_json: string | null;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -59,6 +61,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         'ALTER TABLE show_pack ADD COLUMN show_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN prediction_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN lyrics_missing_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN practice_titles_json TEXT;',
       ]) {
         try {
           await db.execAsync(ddl);
@@ -119,6 +122,7 @@ function rowToRecord(row: ShowPackRow): ShowPackRecord {
     show,
     prediction,
     lyricsMissingTitles: parseMissingTitles(row.lyrics_missing_json),
+    practiceTitles: parseMissingTitles(row.practice_titles_json),
   };
 }
 
@@ -131,7 +135,8 @@ export async function getShowPackRecord(showId: string): Promise<ShowPackRecord 
   const db = await getDb();
   const row = await db.getFirstAsync<ShowPackRow>(
     `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
-            status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json
+            status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
+            practice_titles_json
      FROM show_pack WHERE show_id = ?`,
     showId
   );
@@ -152,8 +157,9 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO show_pack (
       show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
-      status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
+      practice_titles_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     record.showId,
     record.status,
     record.lyricsCached,
@@ -164,7 +170,8 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     record.expiresAt,
     record.show ? JSON.stringify(record.show) : null,
     record.prediction ? JSON.stringify(record.prediction) : null,
-    JSON.stringify(record.lyricsMissingTitles)
+    JSON.stringify(record.lyricsMissingTitles),
+    JSON.stringify(record.practiceTitles)
   );
 }
 

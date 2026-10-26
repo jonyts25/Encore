@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { hasCachedLyrics } from '@/core/db/lyricsCache';
+import { getShowPackRecord } from '@/core/db/showPackCache';
 import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { useIsOffline } from '@/core/network/useIsOffline';
@@ -142,6 +143,7 @@ export function LiveSongsSheetContent() {
   const [searchRaw, setSearchRaw] = useState('');
   const [segment, setSegment] = useState<SongSegment>('predicted');
   const [cachedTitles, setCachedTitles] = useState<Set<string>>(new Set());
+  const [practiceTitles, setPracticeTitles] = useState<string[]>([]);
   const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
 
   const { prediction } = useShowPrediction(showId, { enabled: Boolean(showId) });
@@ -153,6 +155,16 @@ export function LiveSongsSheetContent() {
       setActiveTitle(initialTitle);
     }
   }, [initialTitle, setActiveTitle]);
+
+  useEffect(() => {
+    if (!showId) {
+      setPracticeTitles([]);
+      return;
+    }
+    void getShowPackRecord(showId).then((record) => {
+      setPracticeTitles(record?.practiceTitles ?? []);
+    });
+  }, [showId]);
 
   useEffect(() => {
     if (segment === 'all' && isOffline) {
@@ -175,6 +187,21 @@ export function LiveSongsSheetContent() {
 
   const effectiveSegment = pickSearchScope({ segment, isOffline });
 
+  const practiceRows = useMemo((): SongRow[] => {
+    const predictedTitleSet = new Set(predictedSongs.map((song) => song.title));
+    return practiceTitles
+      .filter((title) => !predictedTitleSet.has(title))
+      .filter((title) => filterSongsByQuery([{ title }], searchQuery).length > 0)
+      .map((title, index) => ({
+        key: `practice-${title}`,
+        kind: 'song' as const,
+        title,
+        index: index + 1,
+        detail: t('live.songsPracticePick'),
+        active: title === activeTitle,
+      }));
+  }, [activeTitle, predictedSongs, practiceTitles, searchQuery, t]);
+
   const rows = useMemo((): SongRow[] => {
     if (effectiveSegment === 'predicted') {
       const predictedRows = filterSongsByQuery(predictedSongs, searchQuery).map((song, index) => ({
@@ -192,12 +219,14 @@ export function LiveSongsSheetContent() {
       }));
 
       const filteredOthers = filterSongsByQuery(otherSongs, searchQuery);
+      const withPractice = [...practiceRows, ...predictedRows];
+
       if (filteredOthers.length === 0) {
-        return predictedRows;
+        return withPractice;
       }
 
       return [
-        ...predictedRows,
+        ...withPractice,
         {
           key: 'others-header',
           kind: 'header' as const,
@@ -238,6 +267,7 @@ export function LiveSongsSheetContent() {
     activeTitle,
     effectiveSegment,
     otherSongs,
+    practiceRows,
     predictedSongs,
     repertoireSongs,
     searchQuery,
@@ -249,6 +279,7 @@ export function LiveSongsSheetContent() {
     for (const song of predictedSongs) titles.add(song.title);
     for (const song of otherSongs) titles.add(song.title);
     for (const song of repertoireSongs) titles.add(song.title);
+    for (const title of practiceTitles) titles.add(title);
 
     void (async () => {
       const cached = new Set<string>();
@@ -261,7 +292,7 @@ export function LiveSongsSheetContent() {
       );
       setCachedTitles(cached);
     })();
-  }, [artistName, otherSongs, predictedSongs, repertoireSongs]);
+  }, [artistName, otherSongs, practiceTitles, predictedSongs, repertoireSongs]);
 
   const selectTitle = useCallback(
     async (title: string) => {

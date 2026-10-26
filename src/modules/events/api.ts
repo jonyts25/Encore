@@ -51,7 +51,8 @@ const SHOW_SELECT = `
     country,
     lat,
     lng,
-    capacity
+    capacity,
+    timezone
   )
 `;
 

@@ -179,6 +179,9 @@
     "attendancePrompt": "¿Fuiste?",
     "todayStatusSubtitle": "Hoy · empieza a las {{time}}",
     "todayStatusUnconfirmed": "Hoy · hora por confirmar",
+    "timeUnconfirmed": "Hora por confirmar",
+    "showVenueTime": "{{time}} · hora de {{city}}",
+    "showDeviceTimeHint": "{{time}} en tu hora actual",
     "packUpdated": "actualizado {{relative}}",
     "packLyricsProgress": "{{cached}} de {{total}} letras",
     "showPackReadyForShow": "Listo para el show",
@@ -244,6 +247,16 @@
       "limited_tour_data": "Referencia limitada de la gira",
       "no_tour_data_fallback": "Repertorio general del artista"
     }
+  },
+  "practice": {
+    "emptyTitle": "Aún no sabemos qué van a tocar",
+    "emptySubtitle": "No hay setlists de esta gira todavía. Elige las canciones que quieres practicar.",
+    "searchSong": "Buscar canción",
+    "searchPlaceholder": "Buscar por título…",
+    "searchEmpty": "No hay canciones que coincidan en el catálogo de este artista.",
+    "yourSongs": "Tus canciones de práctica",
+    "suggestions": "Del catálogo",
+    "tapToAdd": "Toca para agregar"
   },
   "lyrics": {
     "screenTitle": "Letra",
@@ -330,6 +343,7 @@
     "songsSegmentAll": "Todas",
     "songsNowPlaying": "Sonando ahora",
     "songsConfidence": "{{percent}}% de los shows",
+    "songsPracticePick": "Tu elección de práctica",
     "lowStorageTitle": "Poco espacio libre",
     "lowStorageMessage": "Queda menos de 1 GB libre. La grabación puede fallar si se llena el almacenamiento.",
     "exitWhileRecordingTitle": "Grabación en curso",

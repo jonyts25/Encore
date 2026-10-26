@@ -12,7 +12,7 @@ import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
 import { fetchShowById } from './api';
-import { isShowPackExpired } from './showPackLogic';
+import { collectShowPackSongTitles, isShowPackExpired, mergePracticeTitles } from './showPackLogic';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
 
@@ -32,17 +32,14 @@ function isPrefetchQueryMissingOrFailed(
 }
 
 function songTargets(
-  prediction: SetlistPrediction,
-  artistName: string
+  prediction: SetlistPrediction | null,
+  artistName: string,
+  practiceTitles: readonly string[]
 ): { artist: string; title: string }[] {
-  const titles = new Set<string>();
-  for (const song of prediction.songs) {
-    titles.add(song.title);
-  }
-  for (const other of prediction.others ?? []) {
-    titles.add(other.title);
-  }
-  return [...titles].map((title) => ({ artist: artistName, title }));
+  return collectShowPackSongTitles(prediction, practiceTitles).map((title) => ({
+    artist: artistName,
+    title,
+  }));
 }
 
 export function isShowEligibleForShowPack(showDate: string, now = new Date()): boolean {
@@ -86,6 +83,8 @@ export async function prefetchShowPack(
   const expiresAt = lyricsExpiresAfterShow(show.show_date);
   const now = Date.now();
 
+  const existingPractice = (await getShowPackRecord(showId))?.practiceTitles ?? [];
+
   await setShowPackRecord({
     showId,
     status: 'downloading',
@@ -98,6 +97,7 @@ export async function prefetchShowPack(
     show,
     prediction: null,
     lyricsMissingTitles: [],
+    practiceTitles: existingPractice,
   });
 
   await queryClient.prefetchQuery({
@@ -141,12 +141,13 @@ export async function prefetchShowPack(
       show: showFromNetwork ?? show,
       prediction: prediction ?? null,
       lyricsMissingTitles: [],
+      practiceTitles: existingPractice,
     });
     return;
   }
 
   const artistName = showFromNetwork.artist.name;
-  const targets = prediction ? songTargets(prediction, artistName) : [];
+  const targets = songTargets(prediction ?? null, artistName, existingPractice);
 
   let lyricsCached = 0;
   let lyricsFailed = 0;
@@ -187,6 +188,7 @@ export async function prefetchShowPack(
       show: showFromNetwork,
       prediction: prediction ?? null,
       lyricsMissingTitles,
+      practiceTitles: existingPractice,
     });
 
     if (index + LYRICS_BATCH_SIZE < targets.length) {
@@ -208,7 +210,54 @@ export async function prefetchShowPack(
     show: showFromNetwork,
     prediction: prediction ?? null,
     lyricsMissingTitles,
+    practiceTitles: existingPractice,
   });
+}
+
+export async function addPracticeSongToShowPack(
+  show: Show,
+  title: string
+): Promise<'cached' | 'missing' | 'failed'> {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) return 'missing';
+
+  const record = await getShowPackRecord(show.id);
+  const beforeTitles = collectShowPackSongTitles(record?.prediction ?? null, record?.practiceTitles ?? []);
+  const result = await cacheLyricsForShowPackTitle(show, trimmedTitle);
+  const expiresAt = lyricsExpiresAfterShow(show.show_date);
+  const now = Date.now();
+  const practiceTitles = mergePracticeTitles(record?.practiceTitles ?? [], trimmedTitle);
+
+  if (record) {
+    let lyricsCached = record.lyricsCached;
+    if (result === 'cached' && !beforeTitles.includes(trimmedTitle)) {
+      lyricsCached += 1;
+    }
+    await setShowPackRecord({
+      ...record,
+      practiceTitles,
+      lyricsTotal: Math.max(record.lyricsTotal, collectShowPackSongTitles(record.prediction, practiceTitles).length),
+      lyricsCached,
+      statusUpdatedAt: now,
+    });
+    return result;
+  }
+
+  await setShowPackRecord({
+    showId: show.id,
+    status: result === 'failed' ? 'partial' : 'ready',
+    lyricsCached: result === 'cached' ? 1 : 0,
+    lyricsTotal: 1,
+    lyricsFailed: result === 'failed' ? 1 : 0,
+    downloadedAt: now,
+    statusUpdatedAt: now,
+    expiresAt,
+    show,
+    prediction: null,
+    lyricsMissingTitles: result === 'missing' ? [trimmedTitle] : [],
+    practiceTitles,
+  });
+  return result;
 }
 
 export async function cacheLyricsForShowPackTitle(

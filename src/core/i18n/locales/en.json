@@ -179,6 +179,9 @@
     "attendancePrompt": "Did you go?",
     "todayStatusSubtitle": "Today · starts at {{time}}",
     "todayStatusUnconfirmed": "Today · time to be confirmed",
+    "timeUnconfirmed": "Time to be confirmed",
+    "showVenueTime": "{{time}} · {{city}} local time",
+    "showDeviceTimeHint": "{{time}} in your current time zone",
     "packUpdated": "updated {{relative}}",
     "packLyricsProgress": "{{cached}} of {{total}} lyrics",
     "showPackReadyForShow": "Ready for the show",
@@ -244,6 +247,16 @@
       "limited_tour_data": "Limited tour reference",
       "no_tour_data_fallback": "General artist repertoire"
     }
+  },
+  "practice": {
+    "emptyTitle": "We don't know the setlist yet",
+    "emptySubtitle": "There are no setlists for this tour yet. Pick the songs you want to practice.",
+    "searchSong": "Search song",
+    "searchPlaceholder": "Search by title…",
+    "searchEmpty": "No songs match in this artist's catalog.",
+    "yourSongs": "Your practice songs",
+    "suggestions": "From the catalog",
+    "tapToAdd": "Tap to add"
   },
   "lyrics": {
     "screenTitle": "Lyrics",
@@ -330,6 +343,7 @@
     "songsSegmentAll": "All",
     "songsNowPlaying": "Playing now",
     "songsConfidence": "{{percent}}% of shows",
+    "songsPracticePick": "Your practice pick",
     "lowStorageTitle": "Low free storage",
     "lowStorageMessage": "Less than 1 GB free. Recording may fail if storage fills up.",
     "exitWhileRecordingTitle": "Recording in progress",

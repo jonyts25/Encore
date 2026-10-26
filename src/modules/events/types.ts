@@ -16,6 +16,7 @@ export type VenueSummary = {
   lng: number | null;
   capacity: number | null;
   photo_url?: string | null;
+  timezone?: string | null;
 };
 
 export type ShowSource = 'setlistfm' | 'user' | 'ticketmaster';
