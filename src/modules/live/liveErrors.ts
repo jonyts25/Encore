@@ -8,6 +8,7 @@ type LiveErrorKey =
   | 'microphone'
   | 'emptyFile'
   | 'sessionInterrupted'
+  | 'saveFailed'
   | 'generic';
 
 function classifyLiveError(message: string): LiveErrorKey {

@@ -14,7 +14,7 @@ import {
 } from 'encore-camera';
 import { Paths } from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -119,15 +119,23 @@ function formatRecordingClock(totalSeconds: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+function didSaveRecording(outcome: 'idle' | 'success' | 'failed'): boolean {
+  return outcome === 'success';
+}
+
 export function LiveCameraContent({ artist, title, showId }: LiveCameraContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const previewRef = useRef<LiveCameraPreviewRef>(null);
+  const navigation = useNavigation();
   const isMountedRef = useRef(true);
   const isRecordingRef = useRef(false);
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingSongTitleRef = useRef(title);
+  const allowNavigationRef = useRef(false);
+  const recordingSaveOutcomeRef = useRef<'idle' | 'success' | 'failed'>('idle');
+  const stopRecordingAndSaveRef = useRef<() => Promise<boolean>>(async () => true);
   const wantsNativePreview = shouldUseEncoreNativeCamera();
   const [nativeCameraFailed, setNativeCameraFailed] = useState(false);
   const useNativePreview = wantsNativePreview && !nativeCameraFailed;
@@ -270,11 +278,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     return () => {
       isMountedRef.current = false;
       if (isRecordingRef.current) {
-        try {
-          previewRef.current?.stopRecording();
-        } catch {
-          // Camera may already be torn down during navigation.
-        }
+        void stopRecordingAndSaveRef.current();
       }
       deactivateRecordingKeepAwake();
       if (Platform.OS === 'ios' && multiCamActive) {
@@ -287,19 +291,19 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     const handleAppStateChange = (nextState: AppStateStatus) => {
       setAppIsActive(nextState === 'active');
 
-      if (nextState !== 'background' || !isRecordingRef.current) return;
+      if (!isRecordingRef.current) return;
+      if (nextState !== 'background' && nextState !== 'inactive') return;
 
-      try {
-        previewRef.current?.stopRecording();
-      } catch {
-        // Best-effort stop when the app backgrounds during recording.
-      }
-      deactivateRecordingKeepAwake();
+      void stopRecordingAndSaveRef.current().then((saved) => {
+        if (!saved && isMountedRef.current) {
+          setErrorMessage(t('live.errors.saveFailed'));
+        }
+      });
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [useNativePreview]);
+  }, [t]);
 
   useEffect(() => {
     if (facing === 'front') {
@@ -464,13 +468,20 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       try {
         await saveRecordingToCameraRoll(uri, target);
         await finalizeRecordingSession(true);
+        recordingSaveOutcomeRef.current = 'success';
         if (isMountedRef.current) {
           setStatusMessage(t('live.savedToCameraRoll'));
         }
       } catch (error) {
         await finalizeRecordingSession(false);
+        recordingSaveOutcomeRef.current = 'failed';
         if (isMountedRef.current) {
-          setErrorMessage(formatLiveError(error, t));
+          const photosDenied =
+            error instanceof Error &&
+            error.message.toUpperCase().includes('PHOTOS_PERMISSION');
+          setErrorMessage(
+            photosDenied ? formatLiveError(error, t) : t('live.errors.saveFailed')
+          );
         }
         throw error;
       } finally {
@@ -491,13 +502,20 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       try {
         await saveMultiCamRecordings(backUri, frontUri);
         await finalizeRecordingSession(true);
+        recordingSaveOutcomeRef.current = 'success';
         if (isMountedRef.current) {
           setStatusMessage(t('live.savedMultiCamToCameraRoll'));
         }
       } catch (error) {
         await finalizeRecordingSession(false);
+        recordingSaveOutcomeRef.current = 'failed';
         if (isMountedRef.current) {
-          setErrorMessage(formatLiveError(error, t));
+          const photosDenied =
+            error instanceof Error &&
+            error.message.toUpperCase().includes('PHOTOS_PERMISSION');
+          setErrorMessage(
+            photosDenied ? formatLiveError(error, t) : t('live.errors.saveFailed')
+          );
         }
         throw error;
       } finally {
@@ -609,9 +627,10 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
       if (!video?.uri) {
         await finalizeRecordingSession(false);
+        recordingSaveOutcomeRef.current = 'failed';
         notifyRecordingSaveFinished();
         if (isMountedRef.current) {
-          setErrorMessage(formatLiveError(new Error('EMPTY_RECORDING_FILE'), t));
+          setErrorMessage(t('live.errors.saveFailed'));
         }
         return;
       }
@@ -621,6 +640,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       isRecordingRef.current = false;
       releaseRecordingKeepAwake();
       await finalizeRecordingSession(false);
+      recordingSaveOutcomeRef.current = 'failed';
       notifyRecordingSaveFinished();
       if (isMountedRef.current) {
         setIsRecording(false);
@@ -659,6 +679,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     isRecordingRef.current = false;
     releaseRecordingKeepAwake();
     void finalizeRecordingSession(false);
+    recordingSaveOutcomeRef.current = 'failed';
     notifyRecordingSaveFinished();
     if (isMountedRef.current) {
       setIsRecording(false);
@@ -679,10 +700,15 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     setFacing((current) => (current === 'back' ? 'front' : 'back'));
   };
 
-  const stopRecordingAndWaitForSave = useCallback(async () => {
+  const stopRecordingAndSave = useCallback(async (): Promise<boolean> => {
+    if (!isRecordingRef.current) {
+      return true;
+    }
+
+    recordingSaveOutcomeRef.current = 'idle';
     const saveWait = waitForRecordingSave();
 
-    if (Platform.OS === 'ios' && multiCamActive && isRecordingRef.current) {
+    if (Platform.OS === 'ios' && multiCamActive) {
       try {
         const result = await stopMultiCamRecording();
         isRecordingRef.current = false;
@@ -691,25 +717,34 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         }
         releaseRecordingKeepAwake();
         await persistMultiCamToCameraRoll(result.backVideoURL, result.frontVideoURL);
+        await saveWait;
+        return didSaveRecording(recordingSaveOutcomeRef.current);
       } catch {
         notifyRecordingSaveFinished();
+        return false;
       }
-      await saveWait;
-      return;
     }
 
-    if (isRecordingRef.current && previewRef.current) {
-      try {
-        previewRef.current.stopRecording();
-      } catch {
-        notifyRecordingSaveFinished();
-      }
-      await saveWait;
+    if (!previewRef.current) {
+      notifyRecordingSaveFinished();
+      return false;
     }
+
+    try {
+      previewRef.current.stopRecording();
+    } catch {
+      notifyRecordingSaveFinished();
+      return false;
+    }
+
+    await saveWait;
+    return didSaveRecording(recordingSaveOutcomeRef.current);
   }, [multiCamActive, persistMultiCamToCameraRoll, releaseRecordingKeepAwake]);
 
-  const handleBackPress = useCallback(() => {
-    if (isRecording || isRecordingRef.current) {
+  stopRecordingAndSaveRef.current = stopRecordingAndSave;
+
+  const confirmExitWhileRecording = useCallback(
+    (onSavedExit?: () => void) => {
       Alert.alert(t('live.exitWhileRecordingTitle'), t('live.exitWhileRecordingMessage'), [
         { text: t('live.keepRecording'), style: 'cancel' },
         {
@@ -717,16 +752,48 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           style: 'destructive',
           onPress: () => {
             void (async () => {
-              await stopRecordingAndWaitForSave();
-              router.back();
+              const saved = await stopRecordingAndSave();
+              if (!saved) {
+                if (isMountedRef.current) {
+                  setErrorMessage(t('live.errors.saveFailed'));
+                }
+                return;
+              }
+              allowNavigationRef.current = true;
+              onSavedExit?.();
             })();
           },
         },
       ]);
+    },
+    [stopRecordingAndSave, t]
+  );
+
+  const handleBackPress = useCallback(() => {
+    if (isRecording || isRecordingRef.current) {
+      confirmExitWhileRecording(() => router.back());
       return;
     }
     router.back();
-  }, [isRecording, router, stopRecordingAndWaitForSave, t]);
+  }, [confirmExitWhileRecording, isRecording, router]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
+      if (allowNavigationRef.current) {
+        return;
+      }
+      if (!isRecordingRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      confirmExitWhileRecording(() => {
+        navigation.dispatch(event.data.action);
+      });
+    });
+
+    return unsubscribe;
+  }, [confirmExitWhileRecording, navigation]);
 
   const activeSongIndex = useMemo(() => {
     const index = pickerSongs.findIndex((song) => song.title === activeTitle);

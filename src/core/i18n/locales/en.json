@@ -293,7 +293,7 @@
     "lowStorageTitle": "Low free storage",
     "lowStorageMessage": "Less than 1 GB free. Recording may fail if storage fills up.",
     "exitWhileRecordingTitle": "Recording in progress",
-    "exitWhileRecordingMessage": "Stop recording and save the video before leaving?",
+    "exitWhileRecordingMessage": "Stop recording and save the video?",
     "stopAndSave": "Stop and save",
     "keepRecording": "Keep recording",
     "errors": {
@@ -302,7 +302,8 @@
       "microphone": "Could not use the microphone. Check permissions.",
       "emptyFile": "The video file is empty or was not created.",
       "sessionInterrupted": "Recording was interrupted (app backgrounded or session ended).",
-      "generic": "Could not complete the recording."
+      "generic": "Could not complete the recording.",
+      "saveFailed": "We couldn't save the video to your camera roll. Please try again."
     },
     "openLayoutMenu": "Configure layout",
     "layoutMenuTitle": "LIVE layout",
