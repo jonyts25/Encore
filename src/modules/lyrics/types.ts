@@ -18,6 +18,13 @@ export type LyricsResult = {
   scrollMode: LyricsScrollMode;
 };
 
+export type LyricsMatchSummary = {
+  id: string;
+  title: string;
+  artist: string;
+  album: string | null;
+};
+
 export type LyricsSearchResponse = {
   lyrics: {
     id: string;
@@ -30,4 +37,11 @@ export type LyricsSearchResponse = {
     synced_lines: SyncedLine[];
   };
   attribution: string;
+  matches?: {
+    id: string;
+    title: string;
+    artist: string;
+    album: string | null;
+    hasPlainLyrics?: boolean;
+  }[];
 };

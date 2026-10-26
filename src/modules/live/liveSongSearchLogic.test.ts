@@ -9,6 +9,7 @@ import {
   mergeUniqueTitles,
   pickSearchScope,
   repertoireTitlesFromCatalog,
+  shouldFetchRemoteLyricsSearch,
 } from './liveSongSearchLogic';
 
 describe('liveSongSearchLogic', () => {
@@ -42,6 +43,13 @@ describe('liveSongSearchLogic', () => {
     assert.equal(isRepertoireSegmentAvailable(false), true);
     assert.equal(pickSearchScope({ segment: 'all', isOffline: true }), 'predicted');
     assert.equal(pickSearchScope({ segment: 'all', isOffline: false }), 'all');
+  });
+
+  it('fetches remote lyrics search only when catalog has no matches', () => {
+    assert.equal(shouldFetchRemoteLyricsSearch(false, 'hello', 0), true);
+    assert.equal(shouldFetchRemoteLyricsSearch(false, 'hello', 2), false);
+    assert.equal(shouldFetchRemoteLyricsSearch(true, 'hello', 0), false);
+    assert.equal(shouldFetchRemoteLyricsSearch(false, '', 0), false);
   });
 
   it('merges catalog titles for online search', () => {

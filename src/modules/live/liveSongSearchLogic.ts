@@ -59,3 +59,13 @@ export function pickSearchScope(params: {
   }
   return params.segment;
 }
+
+export function shouldFetchRemoteLyricsSearch(
+  isOffline: boolean,
+  normalizedQuery: string,
+  catalogMatchCount: number
+): boolean {
+  if (isOffline) return false;
+  if (!normalizedQuery) return false;
+  return catalogMatchCount === 0;
+}

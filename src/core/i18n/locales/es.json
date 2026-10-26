@@ -344,6 +344,7 @@
     "songsNowPlaying": "Sonando ahora",
     "songsConfidence": "{{percent}}% de los shows",
     "songsPracticePick": "Tu elección de práctica",
+    "songsLyricsSearchHeader": "Búsqueda de letras",
     "lowStorageTitle": "Poco espacio libre",
     "lowStorageMessage": "Queda menos de 1 GB libre. La grabación puede fallar si se llena el almacenamiento.",
     "exitWhileRecordingTitle": "Grabación en curso",

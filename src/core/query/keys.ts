@@ -8,6 +8,8 @@ export const queryKeys = {
   prediction: (showId: string) => ['prediction', showId] as const,
   lyrics: (artist: string, title: string) =>
     ['lyrics', artist.trim().toLowerCase(), title.trim().toLowerCase()] as const,
+  lyricsSearchMatches: (artist: string, titleQuery: string) =>
+    ['lyricsSearchMatches', artist.trim().toLowerCase(), titleQuery.trim().toLowerCase()] as const,
   show: (showId: string) => ['show', showId] as const,
   artistSongs: (artistId: string) => ['artistSongs', artistId] as const,
 };

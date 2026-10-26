@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getShowPackRecord } from '@/core/db/showPackCache';
 import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
+import { useIsOffline } from '@/core/network/useIsOffline';
 import { queryKeys } from '@/core/query';
 import { ListRow, PillButton } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
@@ -24,6 +25,7 @@ import { fetchArtistSongs } from '@/modules/catalog/api';
 import { addPracticeSongToShowPack } from '@/modules/events/showPack';
 import type { Show } from '@/modules/events/types';
 import { filterSongsByQuery, normalizeSongSearchQuery } from '@/modules/live/liveSongSearchLogic';
+import { useLyricsSearchMatches } from '../hooks/useLyricsSearchMatches';
 
 type PracticeLyricsEmptyContentProps = {
   show: Show;
@@ -38,6 +40,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
   const [searchRaw, setSearchRaw] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
+  const isOffline = useIsOffline();
   const searchQuery = normalizeSongSearchQuery(searchRaw);
   const artistName = show.artist.name;
 
@@ -62,10 +65,38 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
     return catalogSongs.filter((song) => !practiced.has(song.title)).slice(0, 12);
   }, [catalogSongs, practiceTitles]);
 
-  const searchResults = useMemo(() => {
+  const catalogSearchResults = useMemo(() => {
     if (!searchMode) return [];
     return filterSongsByQuery(catalogSongs, searchQuery).slice(0, 30);
   }, [catalogSongs, searchMode, searchQuery]);
+
+  const { matches: remoteMatches, isSearching: isRemoteSearching } = useLyricsSearchMatches({
+    artistName,
+    searchRaw,
+    catalogMatchCount: catalogSearchResults.length,
+    isOffline,
+  });
+
+  type SearchListItem =
+    | { key: string; title: string; subtitle: string; source: 'catalog' | 'remote' };
+
+  const searchResults = useMemo((): SearchListItem[] => {
+    if (!searchMode) return [];
+    if (catalogSearchResults.length > 0) {
+      return catalogSearchResults.map((song) => ({
+        key: `cat-${song.id}`,
+        title: song.title,
+        subtitle: artistName,
+        source: 'catalog' as const,
+      }));
+    }
+    return remoteMatches.map((match) => ({
+      key: `remote-${match.id}`,
+      title: match.title,
+      subtitle: match.artist,
+      source: 'remote' as const,
+    }));
+  }, [artistName, catalogSearchResults, remoteMatches, searchMode]);
 
   const openLyricsForTitle = useCallback(
     (title: string) => {
@@ -121,22 +152,22 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
             value={searchRaw}
             onChangeText={setSearchRaw}
           />
-          {artistSongsQuery.isLoading ? (
+          {artistSongsQuery.isLoading || isRemoteSearching ? (
             <ActivityIndicator color={tokens.accent} style={styles.loader} />
           ) : null}
           <FlatList
             data={searchResults}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item) => item.key}
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <ListRow
-                subtitle={artistName}
+                subtitle={item.subtitle}
                 title={item.title}
                 onPress={() => void handlePickTitle(item.title)}
               />
             )}
             ListEmptyComponent={
-              searchQuery && !artistSongsQuery.isLoading ? (
+              searchQuery && !artistSongsQuery.isLoading && !isRemoteSearching ? (
                 <Text style={[typography.footnote, { color: tokens.textSecondary, padding: spacing.md }]}>
                   {t('practice.searchEmpty')}
                 </Text>

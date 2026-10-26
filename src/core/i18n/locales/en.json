@@ -344,6 +344,7 @@
     "songsNowPlaying": "Playing now",
     "songsConfidence": "{{percent}}% of shows",
     "songsPracticePick": "Your practice pick",
+    "songsLyricsSearchHeader": "From lyrics search",
     "lowStorageTitle": "Low free storage",
     "lowStorageMessage": "Less than 1 GB free. Recording may fail if storage fills up.",
     "exitWhileRecordingTitle": "Recording in progress",

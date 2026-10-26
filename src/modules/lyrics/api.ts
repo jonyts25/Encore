@@ -9,7 +9,7 @@ import {
   normalizePlainLyrics,
   normalizeSyncedLines,
 } from './scrollLogic';
-import type { LyricsResult, LyricsSearchResponse } from './types';
+import type { LyricsMatchSummary, LyricsResult, LyricsSearchResponse } from './types';
 
 function normalizeLyricsResult(
   data: LyricsSearchResponse['lyrics'],
@@ -82,6 +82,35 @@ export async function fetchLyrics(
     const fallback = await getCachedLyrics(artist, title);
     if (fallback) {
       return normalizeCachedResult(fallback);
+    }
+    throw toLyricsFetchError(error);
+  }
+}
+
+export async function searchLyricsMatches(
+  artist: string,
+  titleQuery: string
+): Promise<LyricsMatchSummary[]> {
+  const trimmedArtist = artist.trim();
+  const trimmedTitle = titleQuery.trim();
+  if (!trimmedArtist || !trimmedTitle) return [];
+
+  const params = new URLSearchParams({ artist: trimmedArtist, title: trimmedTitle });
+
+  try {
+    const data = await apiFetch<LyricsSearchResponse>(`/api/lyrics/search?${params.toString()}`);
+    const matches = data.matches ?? [];
+    return matches
+      .filter((match) => match.hasPlainLyrics !== false)
+      .map((match) => ({
+        id: match.id,
+        title: match.title,
+        artist: match.artist,
+        album: match.album ?? null,
+      }));
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 503)) {
+      return [];
     }
     throw toLyricsFetchError(error);
   }

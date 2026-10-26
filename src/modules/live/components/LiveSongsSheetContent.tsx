@@ -28,6 +28,7 @@ import { cacheLyricsForShowPackTitle } from '@/modules/events/showPack';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong } from '@/modules/setlist/types';
+import { useLyricsSearchMatches } from '@/modules/lyrics/hooks/useLyricsSearchMatches';
 
 import { useLiveSession } from '../context/LiveSessionContext';
 import {
@@ -185,6 +186,18 @@ export function LiveSongsSheetContent() {
   const otherSongs = prediction?.others ?? [];
   const repertoireSongs = artistSongsQuery.data ?? [];
 
+  const catalogMatchCount = useMemo(
+    () => filterSongsByQuery(repertoireSongs, searchQuery).length,
+    [repertoireSongs, searchQuery]
+  );
+
+  const { matches: remoteMatches, isSearching: isRemoteSearching } = useLyricsSearchMatches({
+    artistName,
+    searchRaw,
+    catalogMatchCount,
+    isOffline,
+  });
+
   const effectiveSegment = pickSearchScope({ segment, isOffline });
 
   const practiceRows = useMemo((): SongRow[] => {
@@ -274,6 +287,40 @@ export function LiveSongsSheetContent() {
     t,
   ]);
 
+  const remoteRows = useMemo((): SongRow[] => {
+    if (!searchQuery || catalogMatchCount > 0) return [];
+    const existingTitles = new Set(
+      rows.filter((row) => row.kind === 'song').map((row) => row.title.trim().toLowerCase())
+    );
+    return remoteMatches
+      .filter((match) => !existingTitles.has(match.title.trim().toLowerCase()))
+      .map((match, index) => ({
+        key: `remote-${match.id}`,
+        kind: 'song' as const,
+        title: match.title,
+        index: index + 1,
+        detail: match.artist,
+        active: match.title === activeTitle,
+      }));
+  }, [activeTitle, catalogMatchCount, remoteMatches, rows, searchQuery]);
+
+  const displayRows = useMemo(() => {
+    if (remoteRows.length === 0) return rows;
+    if (rows.length === 0) return remoteRows;
+    return [
+      ...rows,
+      {
+        key: 'remote-header',
+        kind: 'header' as const,
+        title: t('live.songsLyricsSearchHeader'),
+        index: 0,
+        detail: '',
+        active: false,
+      },
+      ...remoteRows,
+    ];
+  }, [remoteRows, rows, t]);
+
   useEffect(() => {
     const titles = new Set<string>();
     for (const song of predictedSongs) titles.add(song.title);
@@ -340,19 +387,13 @@ export function LiveSongsSheetContent() {
   );
 
   const listFooter =
-    rows.length === 0 && searchQuery ? (
-      isOffline ? (
+    searchQuery && displayRows.length === 0 ? (
+      isRemoteSearching ? (
+        <ActivityIndicator color={tokens.accentText} style={styles.emptySearch} />
+      ) : (
         <Text style={[typography.secondary, styles.emptySearch, { color: tokens.textSecondary }]}>
           {t('live.songPickerNoMatches')}
         </Text>
-      ) : (
-        <Pressable
-          onPress={() => void selectTitle(searchRaw.trim())}
-          style={styles.customRow}>
-          <Text style={[typography.bodySemibold, { color: tokens.accentText }]}>
-            {t('live.songPickerUseCustom', { title: searchRaw.trim() })}
-          </Text>
-        </Pressable>
       )
     ) : null;
 
@@ -367,7 +408,7 @@ export function LiveSongsSheetContent() {
       <FlatList
         contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
         contentInsetAdjustmentBehavior="never"
-        data={rows}
+        data={displayRows}
         keyboardShouldPersistTaps="handled"
         keyExtractor={(item) => item.key}
         ListFooterComponent={listFooter}
