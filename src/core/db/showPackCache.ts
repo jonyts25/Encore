@@ -1,5 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 
+import type { Show } from '@/modules/events/types';
+import type { SetlistPrediction } from '@/modules/setlist/types';
+
 const DB_NAME = 'encore.db';
 
 export type ShowPackStatus = 'idle' | 'downloading' | 'ready' | 'partial';
@@ -12,6 +15,24 @@ export type ShowPackRecord = {
   lyricsFailed: number;
   downloadedAt: number | null;
   statusUpdatedAt: number;
+  expiresAt: number | null;
+  show: Show | null;
+  prediction: SetlistPrediction | null;
+  lyricsMissingTitles: string[];
+};
+
+type ShowPackRow = {
+  show_id: string;
+  status: string;
+  lyrics_cached: number;
+  lyrics_total: number;
+  lyrics_failed: number;
+  downloaded_at: number | null;
+  status_updated_at: number;
+  expires_at: number | null;
+  show_json: string | null;
+  prediction_json: string | null;
+  lyrics_missing_json: string | null;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -31,15 +52,19 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
           status_updated_at INTEGER NOT NULL DEFAULT 0
         );
       `);
-      try {
-        await db.execAsync('ALTER TABLE show_pack ADD COLUMN lyrics_failed INTEGER NOT NULL DEFAULT 0;');
-      } catch {
-        // Column already exists.
-      }
-      try {
-        await db.execAsync('ALTER TABLE show_pack ADD COLUMN status_updated_at INTEGER NOT NULL DEFAULT 0;');
-      } catch {
-        // Column already exists.
+      for (const ddl of [
+        'ALTER TABLE show_pack ADD COLUMN lyrics_failed INTEGER NOT NULL DEFAULT 0;',
+        'ALTER TABLE show_pack ADD COLUMN status_updated_at INTEGER NOT NULL DEFAULT 0;',
+        'ALTER TABLE show_pack ADD COLUMN expires_at INTEGER;',
+        'ALTER TABLE show_pack ADD COLUMN show_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN prediction_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_missing_json TEXT;',
+      ]) {
+        try {
+          await db.execAsync(ddl);
+        } catch {
+          // Column already exists.
+        }
       }
       await db.execAsync(`
         UPDATE show_pack
@@ -52,23 +77,35 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
   return dbPromise;
 }
 
-export async function getShowPackRecord(showId: string): Promise<ShowPackRecord | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<{
-    show_id: string;
-    status: string;
-    lyrics_cached: number;
-    lyrics_total: number;
-    lyrics_failed: number;
-    downloaded_at: number | null;
-    status_updated_at: number;
-  }>(
-    `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at, status_updated_at
-     FROM show_pack WHERE show_id = ?`,
-    showId
-  );
+function parseMissingTitles(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
-  if (!row) return null;
+function rowToRecord(row: ShowPackRow): ShowPackRecord {
+  let show: Show | null = null;
+  let prediction: SetlistPrediction | null = null;
+
+  if (row.show_json) {
+    try {
+      show = JSON.parse(row.show_json) as Show;
+    } catch {
+      show = null;
+    }
+  }
+
+  if (row.prediction_json) {
+    try {
+      prediction = JSON.parse(row.prediction_json) as SetlistPrediction;
+    } catch {
+      prediction = null;
+    }
+  }
 
   return {
     showId: row.show_id,
@@ -78,21 +115,67 @@ export async function getShowPackRecord(showId: string): Promise<ShowPackRecord 
     lyricsFailed: row.lyrics_failed,
     downloadedAt: row.downloaded_at,
     statusUpdatedAt: row.status_updated_at,
+    expiresAt: row.expires_at,
+    show,
+    prediction,
+    lyricsMissingTitles: parseMissingTitles(row.lyrics_missing_json),
   };
+}
+
+export async function purgeExpiredShowPacks(now = Date.now()): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM show_pack WHERE expires_at IS NOT NULL AND expires_at < ?', [now]);
+}
+
+export async function getShowPackRecord(showId: string): Promise<ShowPackRecord | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<ShowPackRow>(
+    `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
+            status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json
+     FROM show_pack WHERE show_id = ?`,
+    showId
+  );
+
+  if (!row) return null;
+
+  const record = rowToRecord(row);
+  if (record.expiresAt != null && record.expiresAt < Date.now()) {
+    await db.runAsync('DELETE FROM show_pack WHERE show_id = ?', showId);
+    return null;
+  }
+
+  return record;
 }
 
 export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
   const db = await getDb();
   await db.runAsync(
     `INSERT OR REPLACE INTO show_pack (
-      show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at, status_updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
+      status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     record.showId,
     record.status,
     record.lyricsCached,
     record.lyricsTotal,
     record.lyricsFailed,
     record.downloadedAt,
-    record.statusUpdatedAt
+    record.statusUpdatedAt,
+    record.expiresAt,
+    record.show ? JSON.stringify(record.show) : null,
+    record.prediction ? JSON.stringify(record.prediction) : null,
+    JSON.stringify(record.lyricsMissingTitles)
   );
+}
+
+export async function getCachedShowFromPack(showId: string): Promise<Show | null> {
+  const record = await getShowPackRecord(showId);
+  return record?.show ?? null;
+}
+
+export async function getCachedPredictionFromPack(
+  showId: string
+): Promise<SetlistPrediction | null> {
+  const record = await getShowPackRecord(showId);
+  return record?.prediction ?? null;
 }

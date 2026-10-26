@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useIsOffline } from '@/core/network/useIsOffline';
+import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
 import { fetchHomeShowSections } from '../api';
@@ -36,11 +38,27 @@ export function useHomeShowSections(options: UseHomeShowSectionsOptions = {}) {
   const { userId = null, accessToken = null, enabled = true } = options;
   const isOffline = useIsOffline();
   const queryClient = useQueryClient();
+  const cacheKey = userId ? `home:${userId}` : null;
 
-  const query = useQuery({
+  useEffect(() => {
+    if (!cacheKey) return;
+    void readOfflineQuery<HomeShowSections>(cacheKey).then((cached) => {
+      if (cached && userId) {
+        queryClient.setQueryData(queryKeys.home(userId), cached);
+      }
+    });
+  }, [cacheKey, queryClient, userId]);
+
+  const query = useQuery<HomeShowSections>({
     queryKey: userId ? queryKeys.home(userId) : ['home', 'disabled'],
-    queryFn: () => fetchHomeShowSections(userId!, accessToken),
+    queryFn: createStaleWhileRevalidateQueryFn({
+      fetchFresh: () => fetchHomeShowSections(userId!, accessToken),
+      readCache: () => (cacheKey ? readOfflineQuery<HomeShowSections>(cacheKey) : Promise.resolve(null)),
+      writeCache: (sections) =>
+        cacheKey ? writeOfflineQuery(cacheKey, sections) : Promise.resolve(),
+    }),
     enabled: enabled && Boolean(userId),
+    placeholderData: (previous) => previous,
   });
 
   useEffect(() => {

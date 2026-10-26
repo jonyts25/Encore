@@ -3,7 +3,9 @@ import * as SQLite from 'expo-sqlite';
 import type { LyricsResult } from '@/modules/lyrics/types';
 
 const DB_NAME = 'encore.db';
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+import { SHOW_CACHE_TTL_MS } from '@/core/time/showCacheTtl';
+
+const SEVEN_DAYS_MS = SHOW_CACHE_TTL_MS;
 
 export type CachedLyricsRecord = LyricsResult;
 

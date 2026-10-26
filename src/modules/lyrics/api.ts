@@ -79,6 +79,10 @@ export async function fetchLyrics(
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
+    const fallback = await getCachedLyrics(artist, title);
+    if (fallback) {
+      return normalizeCachedResult(fallback);
+    }
     throw toLyricsFetchError(error);
   }
 }

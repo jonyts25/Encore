@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { useTranslation } from '@/core/i18n';
 import { getShowPackRecord, type ShowPackRecord } from '@/core/db/showPackCache';
@@ -43,22 +43,43 @@ export function useShowPackStatus(show: Show | null, enabled: boolean) {
     });
   }, [queryClient, refresh, show]);
 
+  const missingTitlesLine = useMemo(() => {
+    if (!record?.lyricsMissingTitles.length) return null;
+    const preview = record.lyricsMissingTitles.slice(0, 4).join(', ');
+    const suffix =
+      record.lyricsMissingTitles.length > 4
+        ? ` +${record.lyricsMissingTitles.length - 4}`
+        : '';
+    return t('events.showPackMissingLyrics', { titles: `${preview}${suffix}` });
+  }, [record?.lyricsMissingTitles, t]);
+
   let label: string | null = null;
   let isPartial = false;
+  let canRetry = false;
 
   if (record?.status === 'downloading') {
-    label = t('offline.showPackDownloading');
+    label =
+      record.lyricsTotal > 0
+        ? t('events.showPackDownloadingProgress', {
+            cached: record.lyricsCached,
+            total: record.lyricsTotal,
+          })
+        : t('offline.showPackDownloading');
+    canRetry = true;
   } else if (record?.status === 'partial') {
     isPartial = true;
-    label = t('offline.showPackPartial');
-  } else if (record?.status === 'ready' && record.lyricsTotal > 0) {
-    label = t('offline.showPackReady', {
-      cached: record.lyricsCached,
-      total: record.lyricsTotal,
-    });
+    canRetry = true;
+    label =
+      record.lyricsTotal > 0
+        ? t('events.showPackDownloadingProgress', {
+            cached: record.lyricsCached,
+            total: record.lyricsTotal,
+          })
+        : t('offline.showPackPartial');
   } else if (record?.status === 'ready') {
-    label = t('offline.showPackReadyEmpty');
+    label = t('events.showPackReadyForShow');
+    canRetry = Boolean(record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0);
   }
 
-  return { record, label, isPartial, retry, refresh };
+  return { record, label, missingTitlesLine, isPartial, canRetry, retry, refresh };
 }

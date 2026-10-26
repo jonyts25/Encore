@@ -31,6 +31,7 @@ type SongSegment = 'predicted' | 'others' | 'all';
 
 type SongRow = {
   key: string;
+  kind: 'song' | 'header';
   title: string;
   index: number;
   detail: string;
@@ -150,10 +151,11 @@ export function LiveSongsSheetContent() {
 
   const rows = useMemo((): SongRow[] => {
     if (segment === 'predicted') {
-      return predictedSongs
+      const predictedRows = predictedSongs
         .filter((song) => matchesSearch(song.title, searchQuery))
         .map((song, index) => ({
           key: `pred-${song.song_id}`,
+          kind: 'song' as const,
           title: song.title,
           index: index + 1,
           detail:
@@ -164,12 +166,38 @@ export function LiveSongsSheetContent() {
                 }),
           active: song.title === activeTitle,
         }));
+
+      const filteredOthers = otherSongs.filter((song) => matchesSearch(song.title, searchQuery));
+      if (filteredOthers.length === 0) {
+        return predictedRows;
+      }
+
+      return [
+        ...predictedRows,
+        {
+          key: 'others-header',
+          kind: 'header' as const,
+          title: t('live.songsSegmentOthers'),
+          index: 0,
+          detail: '',
+          active: false,
+        },
+        ...filteredOthers.map((song, index) => ({
+          key: `other-inline-${song.song_id}`,
+          kind: 'song' as const,
+          title: song.title,
+          index: index + 1,
+          detail: t('live.songPickerOthers'),
+          active: song.title === activeTitle,
+        })),
+      ];
     }
     if (segment === 'others') {
       return otherSongs
         .filter((song) => matchesSearch(song.title, searchQuery))
         .map((song, index) => ({
           key: `other-${song.song_id}`,
+          kind: 'song' as const,
           title: song.title,
           index: index + 1,
           detail: t('live.songPickerOthers'),
@@ -180,6 +208,7 @@ export function LiveSongsSheetContent() {
       .filter((song) => matchesSearch(song.title, searchQuery))
       .map((song, index) => ({
         key: `rep-${song.id}`,
+        kind: 'song' as const,
         title: song.title,
         index: index + 1,
         detail: t('live.songPickerRepertoire'),
@@ -262,27 +291,33 @@ export function LiveSongsSheetContent() {
       keyExtractor={(item) => item.key}
       ListFooterComponent={listFooter}
       ListHeaderComponent={listHeader}
-      renderItem={({ item }) => (
-        <ListRow
-          leading={<Text style={styles.rowIndex}>{item.index}</Text>}
-          selected={false}
-          style={item.active ? styles.rowActive : undefined}
-          subtitle={item.detail}
-          subtitleColor={item.active ? tokens.accentText : undefined}
-          title={item.title}
-          trailing={
-            cachedTitles.has(item.title) ? (
-              <Ionicons
-                accessibilityLabel={t('live.songHasCachedLyrics')}
-                color={item.active ? tokens.text : tokens.textSecondary}
-                name="document-text-outline"
-                size={18}
-              />
-            ) : null
-          }
-          onPress={() => selectTitle(item.title)}
-        />
-      )}
+      renderItem={({ item }) =>
+        item.kind === 'header' ? (
+          <Text style={[typography.footnoteSemibold, styles.sectionHeader, { color: tokens.textSecondary }]}>
+            {item.title}
+          </Text>
+        ) : (
+          <ListRow
+            leading={<Text style={styles.rowIndex}>{item.index}</Text>}
+            selected={false}
+            style={item.active ? styles.rowActive : undefined}
+            subtitle={item.detail}
+            subtitleColor={item.active ? tokens.accentText : undefined}
+            title={item.title}
+            trailing={
+              cachedTitles.has(item.title) ? (
+                <Ionicons
+                  accessibilityLabel={t('live.songHasCachedLyrics')}
+                  color={item.active ? tokens.text : tokens.textSecondary}
+                  name="document-text-outline"
+                  size={18}
+                />
+              ) : null
+            }
+            onPress={() => selectTitle(item.title)}
+          />
+        )
+      }
       stickyHeaderIndices={[0]}
       style={styles.listRoot}
     />
@@ -318,6 +353,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontVariant: ['tabular-nums'],
     width: 22,
+  },
+  sectionHeader: {
+    marginBottom: spacing.xs,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.lg,
   },
   search: {
     backgroundColor: 'rgba(118,118,128,0.28)',
