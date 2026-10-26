@@ -1,6 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
   PanResponder,
   Pressable,
   ScrollView,
@@ -8,6 +7,8 @@ import {
   Text,
   View,
   type AccessibilityActionEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
@@ -21,16 +22,24 @@ import {
 } from '@/modules/lyrics';
 import type { SyncedLine } from '@/modules/lyrics';
 
+import {
+  isTapWithoutScroll,
+  LIVE_LYRICS_FALLBACK_LINE_HEIGHT,
+  LIVE_LYRICS_LINE_GAP,
+  scrollOffsetForActiveLine,
+} from '../liveLyricsScrollLogic';
+
 type LiveConcertLyricsStripProps = {
   plainLyrics?: string;
   syncedLines?: SyncedLine[] | null;
   durationSeconds?: number | null;
   isLoading: boolean;
   isUnavailable: boolean;
+  /** Max height for the scrollable lyrics area (all LIVE layouts). */
+  scrollMaxHeight?: number;
 };
 
 const SWIPE_THRESHOLD = 40;
-const EXPAND_THRESHOLD = 28;
 
 export function LiveConcertLyricsStrip({
   plainLyrics,
@@ -38,10 +47,16 @@ export function LiveConcertLyricsStrip({
   durationSeconds,
   isLoading,
   isUnavailable,
+  scrollMaxHeight = 240,
 }: LiveConcertLyricsStripProps) {
   const { t } = useTranslation();
   const [resyncOpen, setResyncOpen] = useState(false);
-  const [expanded, setExpanded] = useState(false);
+  const [userBrowsing, setUserBrowsing] = useState(false);
+
+  const scrollRef = useRef<ScrollView>(null);
+  const lineHeightsRef = useRef<number[]>([]);
+  const didScrollRef = useRef(false);
+  const touchStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
   const safeSyncedLines = normalizeSyncedLines(syncedLines);
@@ -65,10 +80,58 @@ export function LiveConcertLyricsStrip({
 
   const stepLineRef = useRef(stepLine);
   stepLineRef.current = stepLine;
+  const activeLineIndexRef = useRef(activeLineIndex);
+  activeLineIndexRef.current = activeLineIndex;
 
-  const openExpanded = () => {
+  const scrollToActiveLine = useCallback(
+    (animated: boolean) => {
+      scrollRef.current?.scrollTo({
+        y: scrollOffsetForActiveLine(
+          activeLineIndexRef.current,
+          lineHeightsRef.current,
+          LIVE_LYRICS_FALLBACK_LINE_HEIGHT,
+          false
+        ),
+        animated,
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    lineHeightsRef.current = [];
+  }, [displayLines.length, safePlainLyrics, safeSyncedLines]);
+
+  useEffect(() => {
+    if (userBrowsing || displayLines.length === 0) return;
+    scrollToActiveLine(true);
+  }, [activeLineIndex, displayLines.length, scrollToActiveLine, userBrowsing]);
+
+  const handleLineLayout = useCallback(
+    (index: number, height: number) => {
+      if (lineHeightsRef.current[index] === height) return;
+      lineHeightsRef.current[index] = height;
+      if (!userBrowsing && index <= activeLineIndexRef.current) {
+        scrollToActiveLine(false);
+      }
+    },
+    [scrollToActiveLine, userBrowsing]
+  );
+
+  const handleScrollBeginDrag = () => {
+    didScrollRef.current = true;
     pause();
-    setExpanded(true);
+    setUserBrowsing(true);
+  };
+
+  const handleMomentumScrollEnd = (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    didScrollRef.current = false;
+  };
+
+  const backToCurrentLine = () => {
+    setUserBrowsing(false);
+    scrollToActiveLine(true);
+    start();
   };
 
   const panResponder = useMemo(
@@ -77,16 +140,9 @@ export function LiveConcertLyricsStrip({
         onMoveShouldSetPanResponder: (_, gestureState) => {
           const absX = Math.abs(gestureState.dx);
           const absY = Math.abs(gestureState.dy);
-          if (absY > EXPAND_THRESHOLD && absY > absX * 1.1) return true;
           return absX > 12 && absX > absY * 1.2;
         },
         onPanResponderRelease: (_, gestureState) => {
-          const absX = Math.abs(gestureState.dx);
-          const absY = Math.abs(gestureState.dy);
-          if (absY > EXPAND_THRESHOLD && absY > absX) {
-            openExpanded();
-            return;
-          }
           if (gestureState.dx <= -SWIPE_THRESHOLD) {
             stepLineRef.current(1);
             return;
@@ -96,7 +152,7 @@ export function LiveConcertLyricsStrip({
           }
         },
       }),
-    [pause]
+    []
   );
 
   const accessibilityLabel = useMemo(() => {
@@ -135,19 +191,14 @@ export function LiveConcertLyricsStrip({
   if (isUnavailable || displayLines.length === 0) {
     return (
       <View style={styles.root}>
-        <Text style={styles.message}>{t('live.lyricsUnavailable')}</Text>
+        <Text style={styles.message}>{t('live.noLyricsForSong')}</Text>
       </View>
     );
   }
 
-  const previousLine = activeLineIndex > 0 ? displayLines[activeLineIndex - 1] : '';
-  const currentLine = displayLines[activeLineIndex] ?? '';
-  const nextLine =
-    activeLineIndex < displayLines.length - 1 ? displayLines[activeLineIndex + 1] : '';
-
   return (
     <>
-      <Pressable
+      <View
         accessibilityActions={[
           { name: 'increment', label: t('lyrics.nextLine') },
           { name: 'decrement', label: t('lyrics.previousLine') },
@@ -158,62 +209,81 @@ export function LiveConcertLyricsStrip({
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="adjustable"
         onAccessibilityAction={handleAccessibilityAction}
-        onLongPress={() => setResyncOpen(true)}
-        onPress={playPause}
+        onStartShouldSetResponder={() => true}
+        onResponderGrant={(event) => {
+          didScrollRef.current = false;
+          touchStartRef.current = {
+            x: event.nativeEvent.pageX,
+            y: event.nativeEvent.pageY,
+            t: Date.now(),
+          };
+        }}
+        onResponderRelease={(event) => {
+          const start = touchStartRef.current;
+          touchStartRef.current = null;
+          if (!start) return;
+          if (
+            isTapWithoutScroll({
+              startX: start.x,
+              startY: start.y,
+              endX: event.nativeEvent.pageX,
+              endY: event.nativeEvent.pageY,
+              startTimeMs: start.t,
+              endTimeMs: Date.now(),
+              didScroll: didScrollRef.current,
+            })
+          ) {
+            playPause();
+          }
+        }}
         style={styles.root}
         {...panResponder.panHandlers}>
-        {!isPlaying ? <Text style={styles.pausedBadge}>{t('lyrics.paused')}</Text> : null}
-        <Text style={styles.previousLine} numberOfLines={2}>
-          {previousLine}
-        </Text>
-        <Text style={styles.currentLine} numberOfLines={3}>
-          {currentLine}
-        </Text>
-        <Text style={styles.nextLine} numberOfLines={2}>
-          {nextLine}
-        </Text>
-      </Pressable>
+        {!isPlaying && !userBrowsing ? (
+          <Text style={styles.pausedBadge}>{t('lyrics.paused')}</Text>
+        ) : null}
 
-      <Modal animationType="fade" transparent visible={expanded} onRequestClose={() => setExpanded(false)}>
-        <View style={styles.expandedBackdrop}>
-          <View style={styles.expandedSheet}>
-            <ScrollView contentContainerStyle={styles.expandedList}>
-              {displayLines.map((line, index) => {
-                const active = index === activeLineIndex;
-                return (
-                  <Pressable
-                    key={`${index}-${line.slice(0, 12)}`}
-                    onPress={() => {
-                      seekToLine(index);
-                      start();
-                    }}
-                    style={[styles.expandedLineRow, active && styles.expandedLineRowActive]}>
-                    <Text style={[styles.expandedLineText, active && styles.expandedLineTextActive]}>
-                      {line}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+        <Pressable delayLongPress={450} onLongPress={() => setResyncOpen(true)}>
+          <ScrollView
+            ref={scrollRef}
+            nestedScrollEnabled
+            onMomentumScrollEnd={handleMomentumScrollEnd}
+            onScrollBeginDrag={handleScrollBeginDrag}
+            showsVerticalScrollIndicator={false}
+            style={{ maxHeight: scrollMaxHeight }}
+            contentContainerStyle={styles.scrollContent}>
+            {displayLines.map((line, index) => {
+              const isActive = index === activeLineIndex;
+              return (
+                <View
+                  key={`${index}-${line.slice(0, 16)}`}
+                  onLayout={(event) => {
+                    handleLineLayout(index, event.nativeEvent.layout.height);
+                  }}
+                  style={[styles.lineRow, isActive && styles.lineRowActive]}>
+                  <Text style={[styles.lineText, isActive && styles.lineTextActive]}>{line}</Text>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </Pressable>
 
-            <Pressable
-              onPress={() => {
-                setExpanded(false);
-                start();
-              }}
-              style={styles.backToCurrentButton}>
-              <Text style={styles.backToCurrentText}>{t('live.backToCurrentLine')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+        {userBrowsing ? (
+          <Pressable onPress={backToCurrentLine} style={styles.backToCurrentButton}>
+            <Text style={styles.backToCurrentText}>{t('live.backToCurrentLine')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       <LyricsResyncModal
         activeLineIndex={activeLineIndex}
         lines={displayLines}
         visible={resyncOpen}
         onClose={() => setResyncOpen(false)}
-        onSelectLine={seekToLine}
+        onSelectLine={(index) => {
+          seekToLine(index);
+          setUserBrowsing(false);
+          start();
+        }}
       />
     </>
   );
@@ -222,69 +292,45 @@ export function LiveConcertLyricsStrip({
 const styles = StyleSheet.create({
   backToCurrentButton: {
     alignItems: 'center',
-    backgroundColor: '#111',
-    borderRadius: 12,
-    marginTop: 12,
-    paddingVertical: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 999,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   backToCurrentText: {
     color: '#fff',
+    fontSize: 13,
     fontWeight: '700',
   },
-  currentLine: {
-    ...typography.liveCurrentLine,
-    color: '#fff',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.75)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 12,
-  },
-  expandedBackdrop: {
-    backgroundColor: 'rgba(0,0,0,0.72)',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  expandedLineRow: {
+  lineRow: {
     borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
-  expandedLineRowActive: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
+  lineRowActive: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
   },
-  expandedLineText: {
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 18,
+  lineText: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 17,
     lineHeight: 26,
     textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.65)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 8,
   },
-  expandedLineTextActive: {
+  lineTextActive: {
+    ...typography.liveCurrentLine,
     color: '#fff',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '800',
-  },
-  expandedList: {
-    gap: 4,
-    paddingVertical: 8,
-  },
-  expandedSheet: {
-    backgroundColor: 'rgba(20,20,20,0.95)',
-    borderRadius: 16,
-    maxHeight: '78%',
-    padding: 16,
   },
   message: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
     fontWeight: '600',
-    textAlign: 'center',
-  },
-  nextLine: {
-    color: 'rgba(255,255,255,0.42)',
-    fontSize: 16,
-    fontWeight: '500',
-    lineHeight: 22,
     textAlign: 'center',
   },
   pausedBadge: {
@@ -299,16 +345,13 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     textTransform: 'uppercase',
   },
-  previousLine: {
-    color: 'rgba(255,255,255,0.28)',
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 21,
-    textAlign: 'center',
-  },
   root: {
-    gap: 10,
+    gap: 6,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
+  },
+  scrollContent: {
+    gap: LIVE_LYRICS_LINE_GAP,
+    paddingVertical: 4,
   },
 });

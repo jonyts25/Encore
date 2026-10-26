@@ -344,7 +344,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
           }
         }
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+        setErrorMessage(formatLiveError(error, t));
       }
       return;
     }
@@ -398,7 +398,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         await setCameraMode('single');
         setMultiCamActive(false);
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : t('live.multiCamFailed'));
+        setErrorMessage(formatLiveError(error, t));
       }
       return;
     }
@@ -421,7 +421,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   const applyKeepAwakeDiagnostic = (result: { ok: true } | { ok: false; error: string }) => {
     if (!showKeepAwakeDiagnostic || !isMountedRef.current) return;
-    setKeepAwakeDiagnostic(result.ok ? 'Pantalla activa ✓' : result.error);
+    setKeepAwakeDiagnostic(result.ok ? t('live.keepAwakeActive') : result.error);
   };
 
   const releaseRecordingKeepAwake = () => {
@@ -692,7 +692,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
       try {
         await previewRef.current?.switchNativeCamera();
       } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : t('live.recordFailed'));
+        setErrorMessage(formatLiveError(error, t));
       }
       return;
     }

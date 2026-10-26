@@ -211,6 +211,39 @@ export async function prefetchShowPack(
   });
 }
 
+export async function cacheLyricsForShowPackTitle(
+  show: Show,
+  title: string
+): Promise<'cached' | 'missing' | 'failed'> {
+  const trimmedTitle = title.trim();
+  if (!trimmedTitle) return 'missing';
+
+  const expiresAt = lyricsExpiresAfterShow(show.show_date);
+  const artistName = show.artist.name;
+
+  try {
+    const result = await fetchLyrics(artistName, trimmedTitle, { expiresAt });
+    if (result) return 'cached';
+
+    const record = await getShowPackRecord(show.id);
+    if (record) {
+      const missing = record.lyricsMissingTitles.includes(trimmedTitle)
+        ? record.lyricsMissingTitles
+        : [...record.lyricsMissingTitles, trimmedTitle];
+      await setShowPackRecord({
+        ...record,
+        lyricsMissingTitles: missing,
+        statusUpdatedAt: Date.now(),
+      });
+    }
+    return 'missing';
+  } catch (error) {
+    if (isLyricsNetworkFailure(error)) return 'failed';
+    if (error instanceof ApiError && error.status === 404) return 'missing';
+    return 'failed';
+  }
+}
+
 export async function prefetchGoingShowPacks(
   shows: Show[],
   queryClient: QueryClient

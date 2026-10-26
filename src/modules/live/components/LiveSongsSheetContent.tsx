@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   StyleSheet,
@@ -15,17 +16,25 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { hasCachedLyrics } from '@/core/db/lyricsCache';
 import { hapticSelection } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
+import { useIsOffline } from '@/core/network/useIsOffline';
 import { queryKeys } from '@/core/query';
 import { ListRow, PillButton, SegmentedControl } from '@/core/ui';
 import { darkTokens } from '@/core/ui/theme/tokens';
 import { spacing } from '@/core/ui/theme/spacing';
 import { typography } from '@/core/ui/theme/typography';
 import { fetchArtistSongs } from '@/modules/catalog/api';
+import { cacheLyricsForShowPackTitle } from '@/modules/events/showPack';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong } from '@/modules/setlist/types';
 
 import { useLiveSession } from '../context/LiveSessionContext';
+import {
+  filterSongsByQuery,
+  isRepertoireSegmentAvailable,
+  normalizeSongSearchQuery,
+  pickSearchScope,
+} from '../liveSongSearchLogic';
 
 type SongSegment = 'predicted' | 'others' | 'all';
 
@@ -41,15 +50,6 @@ type SongRow = {
 const LIST_HEADER_BACKGROUND = 'rgba(28,28,30,0.98)';
 const tokens = darkTokens;
 
-function normalizeSearch(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function matchesSearch(title: string, query: string): boolean {
-  if (!query) return true;
-  return title.toLowerCase().includes(query);
-}
-
 function sortPredicted(songs: PredictedSong[]) {
   return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 }
@@ -59,6 +59,7 @@ type LiveSongsSheetListHeaderProps = {
   onSegmentChange: (segment: SongSegment) => void;
   onSearchQueryChange: (normalized: string, raw: string) => void;
   onDone: () => void;
+  isOffline: boolean;
 };
 
 const LiveSongsSheetListHeader = memo(function LiveSongsSheetListHeader({
@@ -66,6 +67,7 @@ const LiveSongsSheetListHeader = memo(function LiveSongsSheetListHeader({
   onSegmentChange,
   onSearchQueryChange,
   onDone,
+  isOffline,
 }: LiveSongsSheetListHeaderProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -73,10 +75,21 @@ const LiveSongsSheetListHeader = memo(function LiveSongsSheetListHeader({
   const handleSearchChange = useCallback(
     (value: string) => {
       setSearch(value);
-      onSearchQueryChange(normalizeSearch(value), value);
+      onSearchQueryChange(normalizeSongSearchQuery(value), value);
     },
     [onSearchQueryChange]
   );
+
+  const segmentOptions = useMemo((): { value: SongSegment; label: string }[] => {
+    const options: { value: SongSegment; label: string }[] = [
+      { value: 'predicted', label: t('live.songsSegmentPredicted') },
+      { value: 'others', label: t('live.songsSegmentOthers') },
+    ];
+    if (isRepertoireSegmentAvailable(!isOffline)) {
+      options.push({ value: 'all', label: t('live.songsSegmentAll') });
+    }
+    return options;
+  }, [isOffline, t]);
 
   return (
     <View style={styles.listHeader}>
@@ -93,12 +106,14 @@ const LiveSongsSheetListHeader = memo(function LiveSongsSheetListHeader({
         onChangeText={handleSearchChange}
       />
 
+      {isOffline ? (
+        <Text style={[typography.footnote, { color: tokens.textSecondary, marginBottom: spacing.sm }]}>
+          {t('live.songPickerOfflineHint')}
+        </Text>
+      ) : null}
+
       <SegmentedControl
-        options={[
-          { value: 'predicted' as const, label: t('live.songsSegmentPredicted') },
-          { value: 'others' as const, label: t('live.songsSegmentOthers') },
-          { value: 'all' as const, label: t('live.songsSegmentAll') },
-        ]}
+        options={segmentOptions}
         value={segment}
         onChange={onSegmentChange}
       />
@@ -110,6 +125,8 @@ export function LiveSongsSheetContent() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const isOffline = useIsOffline();
+  const queryClient = useQueryClient();
   const { activeTitle, setActiveTitle } = useLiveSession();
   const params = useLocalSearchParams<{
     artist?: string;
@@ -125,6 +142,7 @@ export function LiveSongsSheetContent() {
   const [searchRaw, setSearchRaw] = useState('');
   const [segment, setSegment] = useState<SongSegment>('predicted');
   const [cachedTitles, setCachedTitles] = useState<Set<string>>(new Set());
+  const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
 
   const { prediction } = useShowPrediction(showId, { enabled: Boolean(showId) });
   const { show } = useShow(showId);
@@ -136,10 +154,16 @@ export function LiveSongsSheetContent() {
     }
   }, [initialTitle, setActiveTitle]);
 
+  useEffect(() => {
+    if (segment === 'all' && isOffline) {
+      setSegment('predicted');
+    }
+  }, [isOffline, segment]);
+
   const artistSongsQuery = useQuery({
     queryKey: queryKeys.artistSongs(artistId),
     queryFn: () => fetchArtistSongs(artistId),
-    enabled: Boolean(artistId),
+    enabled: Boolean(artistId) && !isOffline,
   });
 
   const predictedSongs = useMemo(
@@ -149,25 +173,25 @@ export function LiveSongsSheetContent() {
   const otherSongs = prediction?.others ?? [];
   const repertoireSongs = artistSongsQuery.data ?? [];
 
-  const rows = useMemo((): SongRow[] => {
-    if (segment === 'predicted') {
-      const predictedRows = predictedSongs
-        .filter((song) => matchesSearch(song.title, searchQuery))
-        .map((song, index) => ({
-          key: `pred-${song.song_id}`,
-          kind: 'song' as const,
-          title: song.title,
-          index: index + 1,
-          detail:
-            song.title === activeTitle
-              ? t('live.songsNowPlaying')
-              : t('live.songsConfidence', {
-                  percent: Math.round((song.confidence ?? 0) * 100),
-                }),
-          active: song.title === activeTitle,
-        }));
+  const effectiveSegment = pickSearchScope({ segment, isOffline });
 
-      const filteredOthers = otherSongs.filter((song) => matchesSearch(song.title, searchQuery));
+  const rows = useMemo((): SongRow[] => {
+    if (effectiveSegment === 'predicted') {
+      const predictedRows = filterSongsByQuery(predictedSongs, searchQuery).map((song, index) => ({
+        key: `pred-${song.song_id}`,
+        kind: 'song' as const,
+        title: song.title,
+        index: index + 1,
+        detail:
+          song.title === activeTitle
+            ? t('live.songsNowPlaying')
+            : t('live.songsConfidence', {
+                percent: Math.round((song.confidence ?? 0) * 100),
+              }),
+        active: song.title === activeTitle,
+      }));
+
+      const filteredOthers = filterSongsByQuery(otherSongs, searchQuery);
       if (filteredOthers.length === 0) {
         return predictedRows;
       }
@@ -192,35 +216,31 @@ export function LiveSongsSheetContent() {
         })),
       ];
     }
-    if (segment === 'others') {
-      return otherSongs
-        .filter((song) => matchesSearch(song.title, searchQuery))
-        .map((song, index) => ({
-          key: `other-${song.song_id}`,
-          kind: 'song' as const,
-          title: song.title,
-          index: index + 1,
-          detail: t('live.songPickerOthers'),
-          active: song.title === activeTitle,
-        }));
-    }
-    return repertoireSongs
-      .filter((song) => matchesSearch(song.title, searchQuery))
-      .map((song, index) => ({
-        key: `rep-${song.id}`,
+    if (effectiveSegment === 'others') {
+      return filterSongsByQuery(otherSongs, searchQuery).map((song, index) => ({
+        key: `other-${song.song_id}`,
         kind: 'song' as const,
         title: song.title,
         index: index + 1,
-        detail: t('live.songPickerRepertoire'),
+        detail: t('live.songPickerOthers'),
         active: song.title === activeTitle,
       }));
+    }
+    return filterSongsByQuery(repertoireSongs, searchQuery).map((song, index) => ({
+      key: `rep-${song.id}`,
+      kind: 'song' as const,
+      title: song.title,
+      index: index + 1,
+      detail: t('live.songPickerRepertoire'),
+      active: song.title === activeTitle,
+    }));
   }, [
     activeTitle,
+    effectiveSegment,
     otherSongs,
     predictedSongs,
     repertoireSongs,
     searchQuery,
-    segment,
     t,
   ]);
 
@@ -244,12 +264,28 @@ export function LiveSongsSheetContent() {
   }, [artistName, otherSongs, predictedSongs, repertoireSongs]);
 
   const selectTitle = useCallback(
-    (title: string) => {
+    async (title: string) => {
       hapticSelection();
-      setActiveTitle(title);
+      const trimmed = title.trim();
+      if (!trimmed) return;
+
+      if (show && !isOffline && !(await hasCachedLyrics(artistName, trimmed))) {
+        setIsFetchingLyrics(true);
+        try {
+          await cacheLyricsForShowPackTitle(show, trimmed);
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.lyrics(artistName, trimmed),
+          });
+          setCachedTitles((current) => new Set([...current, trimmed]));
+        } finally {
+          setIsFetchingLyrics(false);
+        }
+      }
+
+      setActiveTitle(trimmed);
       router.back();
     },
-    [router, setActiveTitle]
+    [artistName, isOffline, queryClient, router, setActiveTitle, show]
   );
 
   const handleDone = useCallback(() => {
@@ -259,6 +295,7 @@ export function LiveSongsSheetContent() {
   const listHeader = useMemo(
     () => (
       <LiveSongsSheetListHeader
+        isOffline={isOffline}
         segment={segment}
         onDone={handleDone}
         onSearchQueryChange={(normalized, raw) => {
@@ -268,59 +305,73 @@ export function LiveSongsSheetContent() {
         onSegmentChange={setSegment}
       />
     ),
-    [handleDone, segment]
+    [handleDone, isOffline, segment]
   );
 
   const listFooter =
     rows.length === 0 && searchQuery ? (
-      <Pressable
-        onPress={() => selectTitle(searchRaw.trim())}
-        style={styles.customRow}>
-        <Text style={[typography.bodySemibold, { color: tokens.accentText }]}>
-          {t('live.songPickerUseCustom', { title: searchRaw.trim() })}
+      isOffline ? (
+        <Text style={[typography.secondary, styles.emptySearch, { color: tokens.textSecondary }]}>
+          {t('live.songPickerNoMatches')}
         </Text>
-      </Pressable>
+      ) : (
+        <Pressable
+          onPress={() => void selectTitle(searchRaw.trim())}
+          style={styles.customRow}>
+          <Text style={[typography.bodySemibold, { color: tokens.accentText }]}>
+            {t('live.songPickerUseCustom', { title: searchRaw.trim() })}
+          </Text>
+        </Pressable>
+      )
     ) : null;
 
   return (
-    <FlatList
-      contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
-      contentInsetAdjustmentBehavior="never"
-      data={rows}
-      keyboardShouldPersistTaps="handled"
-      keyExtractor={(item) => item.key}
-      ListFooterComponent={listFooter}
-      ListHeaderComponent={listHeader}
-      renderItem={({ item }) =>
-        item.kind === 'header' ? (
-          <Text style={[typography.footnoteSemibold, styles.sectionHeader, { color: tokens.textSecondary }]}>
-            {item.title}
-          </Text>
-        ) : (
-          <ListRow
-            leading={<Text style={styles.rowIndex}>{item.index}</Text>}
-            selected={false}
-            style={item.active ? styles.rowActive : undefined}
-            subtitle={item.detail}
-            subtitleColor={item.active ? tokens.accentText : undefined}
-            title={item.title}
-            trailing={
-              cachedTitles.has(item.title) ? (
-                <Ionicons
-                  accessibilityLabel={t('live.songHasCachedLyrics')}
-                  color={item.active ? tokens.text : tokens.textSecondary}
-                  name="document-text-outline"
-                  size={18}
-                />
-              ) : null
-            }
-            onPress={() => selectTitle(item.title)}
-          />
-        )
-      }
-      stickyHeaderIndices={[0]}
-      style={styles.listRoot}
-    />
+    <>
+      {isFetchingLyrics ? (
+        <View style={styles.fetchingOverlay}>
+          <ActivityIndicator color={tokens.accentText} />
+          <Text style={{ color: tokens.textSecondary }}>{t('live.songPickerDownloadingLyrics')}</Text>
+        </View>
+      ) : null}
+      <FlatList
+        contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
+        contentInsetAdjustmentBehavior="never"
+        data={rows}
+        keyboardShouldPersistTaps="handled"
+        keyExtractor={(item) => item.key}
+        ListFooterComponent={listFooter}
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }) =>
+          item.kind === 'header' ? (
+            <Text style={[typography.footnoteSemibold, styles.sectionHeader, { color: tokens.textSecondary }]}>
+              {item.title}
+            </Text>
+          ) : (
+            <ListRow
+              leading={<Text style={styles.rowIndex}>{item.index}</Text>}
+              selected={false}
+              style={item.active ? styles.rowActive : undefined}
+              subtitle={item.detail}
+              subtitleColor={item.active ? tokens.accentText : undefined}
+              title={item.title}
+              trailing={
+                cachedTitles.has(item.title) ? (
+                  <Ionicons
+                    accessibilityLabel={t('live.songHasCachedLyrics')}
+                    color={item.active ? tokens.text : tokens.textSecondary}
+                    name="document-text-outline"
+                    size={18}
+                  />
+                ) : null
+              }
+              onPress={() => void selectTitle(item.title)}
+            />
+          )
+        }
+        stickyHeaderIndices={[0]}
+        style={styles.listRoot}
+      />
+    </>
   );
 }
 
@@ -328,6 +379,23 @@ const styles = StyleSheet.create({
   customRow: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.lg,
+  },
+  emptySearch: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+  },
+  fetchingOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    bottom: 0,
+    gap: 8,
+    justifyContent: 'center',
+    left: 0,
+    padding: 16,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    zIndex: 20,
   },
   headerRow: {
     alignItems: 'center',
