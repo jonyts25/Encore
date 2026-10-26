@@ -199,20 +199,63 @@ export async function fetchShowById(showId: string): Promise<Show | null> {
   }
 }
 
+async function upsertUserShowStatusViaSupabase(
+  showId: string,
+  status: ShowStatus
+): Promise<UserShow> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError) throw authError;
+  if (!user) throw new Error('Unauthorized');
+
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('user_shows')
+    .upsert(
+      {
+        user_id: user.id,
+        show_id: showId,
+        status,
+        ticket_ref: null,
+        updated_at: now,
+      },
+      { onConflict: 'user_id,show_id' }
+    )
+    .select('user_id, show_id, status, ticket_ref, created_at, updated_at')
+    .single();
+
+  if (error) throw error;
+  return data as UserShow;
+}
+
 export async function setShowStatus(
   showId: string,
   status: ShowStatus,
   accessToken: string
 ): Promise<UserShow> {
-  const data = await apiFetch<SetShowStatusResponse>(`/api/shows/${showId}/status`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ status, ticket_ref: null }),
-  });
-  return data.user_show;
+  try {
+    const data = await apiFetch<SetShowStatusResponse>(`/api/shows/${showId}/status`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status, ticket_ref: null }),
+    });
+    return data.user_show;
+  } catch (error) {
+    // Old Railway deploys may reject `no_fui` before the API is updated; RLS allows direct upsert.
+    if (
+      status === 'no_fui' &&
+      error instanceof ApiError &&
+      (error.status === 400 || error.status === 422)
+    ) {
+      return upsertUserShowStatusViaSupabase(showId, status);
+    }
+    throw error;
+  }
 }
 
 export async function removeShowStatus(showId: string, accessToken: string): Promise<void> {
