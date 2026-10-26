@@ -18,12 +18,17 @@ export type VenueSummary = {
   photo_url?: string | null;
 };
 
+export type ShowSource = 'setlistfm' | 'user' | 'ticketmaster';
+
 export type Show = {
   id: string;
   artist_id: string;
   tour_id: string | null;
   venue_id: string;
   show_date: string;
+  local_date?: string;
+  time_confirmed?: boolean;
+  source?: ShowSource;
   setlistfm_id: string | null;
   created_at: string;
   artist: ArtistSummary;

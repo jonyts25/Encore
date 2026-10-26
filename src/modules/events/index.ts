@@ -2,13 +2,18 @@ export {
   fetchArtistShowSections,
   fetchHomeShowSections,
   fetchShowById,
+  fetchShowByIdFromSupabase,
   fetchUpcomingShows,
   formatShowDate,
   formatShowVenueLine,
   getUserShowStatus,
+  listUpcomingShowsForArtistFromSupabase,
+  searchVenues,
   setShowStatus,
   removeShowStatus,
 } from './api';
+export { createUserShow } from './createUserShow';
+export { AddShowContent } from './components/AddShowContent';
 export { HomeShowsContent } from './components/HomeShowsContent';
 export { ShowDetailContent } from './components/ShowDetailContent';
 export { ShowListItem } from './components/ShowListItem';
