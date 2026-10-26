@@ -6,8 +6,6 @@ import {
   Text,
   View,
   type AccessibilityActionEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
 import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -47,7 +45,6 @@ type LiveLyricsLineRowProps = {
   isActive: boolean;
   flash: boolean;
   onContinueFromLine: (index: number) => void;
-  onSingleTap: () => void;
   onLayoutHeight: (index: number, height: number) => void;
 };
 
@@ -57,29 +54,20 @@ const LiveLyricsLineRow = memo(function LiveLyricsLineRow({
   isActive,
   flash,
   onContinueFromLine,
-  onSingleTap,
   onLayoutHeight,
 }: LiveLyricsLineRowProps) {
   const continueRef = useRef(onContinueFromLine);
-  const singleTapRef = useRef(onSingleTap);
   continueRef.current = onContinueFromLine;
-  singleTapRef.current = onSingleTap;
 
-  const gesture = useMemo(() => {
-    const doubleTap = Gesture.Tap()
-      .numberOfTaps(2)
-      .maxDelay(320)
-      .onEnd(() => {
-        runOnJS(continueRef.current)(index);
-      });
-    const singleTap = Gesture.Tap()
-      .numberOfTaps(1)
-      .maxDuration(320)
-      .onEnd(() => {
-        runOnJS(singleTapRef.current)();
-      });
-    return Gesture.Exclusive(doubleTap, singleTap);
-  }, [index]);
+  const gesture = useMemo(
+    () =>
+      Gesture.Tap()
+        .numberOfTaps(2)
+        .onEnd(() => {
+          runOnJS(continueRef.current)(index);
+        }),
+    [index]
+  );
 
   return (
     <GestureDetector gesture={gesture}>
@@ -113,7 +101,6 @@ export function LiveConcertLyricsStrip({
 
   const scrollRef = useRef<ScrollView>(null);
   const lineHeightsRef = useRef<number[]>([]);
-  const didScrollRef = useRef(false);
 
   const safePlainLyrics = normalizePlainLyrics(plainLyrics);
   const safeSyncedLines = normalizeSyncedLines(syncedLines);
@@ -122,8 +109,6 @@ export function LiveConcertLyricsStrip({
   const {
     displayLines,
     activeLineIndex,
-    isPlaying,
-    playPause,
     stepLine,
     seekToLine,
     pause,
@@ -178,22 +163,9 @@ export function LiveConcertLyricsStrip({
     [scrollToActiveLine, userBrowsing]
   );
 
-  const enterUserBrowsing = useCallback(() => {
-    didScrollRef.current = true;
+  const handleScrollBeginDrag = () => {
     pause();
     setUserBrowsing(true);
-  }, [pause]);
-
-  const handleScrollBeginDrag = () => {
-    enterUserBrowsing();
-  };
-
-  const handleScrollEndDrag = () => {
-    didScrollRef.current = false;
-  };
-
-  const handleMomentumScrollEnd = (_event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    didScrollRef.current = false;
   };
 
   const continueFromLine = useCallback(
@@ -244,9 +216,8 @@ export function LiveConcertLyricsStrip({
 
   const accessibilityLabel = useMemo(() => {
     const current = displayLines[activeLineIndex] ?? '';
-    const stateLabel = isPlaying ? t('lyrics.pause') : t('lyrics.resume');
-    return `${current}. ${stateLabel}. ${t('lyrics.gestureHint')}`;
-  }, [activeLineIndex, displayLines, isPlaying, t]);
+    return `${current}. ${t('live.lyricsAccessibilityHint')}`;
+  }, [activeLineIndex, displayLines, t]);
 
   const handleAccessibilityAction = (event: AccessibilityActionEvent) => {
     switch (event.nativeEvent.actionName) {
@@ -255,9 +226,6 @@ export function LiveConcertLyricsStrip({
         break;
       case 'decrement':
         stepLine(-1);
-        break;
-      case 'activate':
-        playPause();
         break;
       case 'longpress':
         setResyncOpen(true);
@@ -289,28 +257,21 @@ export function LiveConcertLyricsStrip({
         accessibilityActions={[
           { name: 'increment', label: t('lyrics.nextLine') },
           { name: 'decrement', label: t('lyrics.previousLine') },
-          { name: 'activate', label: isPlaying ? t('lyrics.pause') : t('lyrics.resume') },
           { name: 'longpress', label: t('lyrics.resync') },
         ]}
-        accessibilityHint={t('lyrics.gestureHint')}
+        accessibilityHint={t('live.lyricsAccessibilityHint')}
         accessibilityLabel={accessibilityLabel}
         accessibilityRole="adjustable"
         onAccessibilityAction={handleAccessibilityAction}
         pointerEvents="box-none"
         style={styles.root}
         {...horizontalSwipeHandlers}>
-        {!isPlaying && !userBrowsing ? (
-          <Text style={styles.pausedBadge}>{t('lyrics.paused')}</Text>
-        ) : null}
-
         <ScrollView
           ref={scrollRef}
           nestedScrollEnabled
           scrollEnabled
           scrollEventThrottle={16}
-          onMomentumScrollEnd={handleMomentumScrollEnd}
           onScrollBeginDrag={handleScrollBeginDrag}
-          onScrollEndDrag={handleScrollEndDrag}
           showsVerticalScrollIndicator={false}
           style={[styles.scrollViewport, { height: scrollMaxHeight }]}>
           <View style={styles.scrollContent}>
@@ -323,7 +284,6 @@ export function LiveConcertLyricsStrip({
                 line={line}
                 onContinueFromLine={continueFromLine}
                 onLayoutHeight={handleLineLayout}
-                onSingleTap={playPause}
               />
             ))}
           </View>
@@ -395,18 +355,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  pausedBadge: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    borderRadius: 999,
-    color: 'rgba(255,255,255,0.82)',
-    fontSize: 11,
-    fontWeight: '700',
-    overflow: 'hidden',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    textTransform: 'uppercase',
   },
   root: {
     gap: 6,
