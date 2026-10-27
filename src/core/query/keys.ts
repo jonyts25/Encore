@@ -12,4 +12,5 @@ export const queryKeys = {
     ['lyricsSearchMatches', artist.trim().toLowerCase(), titleQuery.trim().toLowerCase()] as const,
   show: (showId: string) => ['show', showId] as const,
   artistSongs: (artistId: string) => ['artistSongs', artistId] as const,
+  explorePopular: () => ['explore', 'popular-artists'] as const,
 };

@@ -98,6 +98,7 @@ function RootLayoutNav() {
         <Stack.Screen name="artist/[id]" options={{ title: '', headerLargeTitle: false }} />
         <Stack.Screen name="show/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="add-show" options={{ title: '' }} />
+        <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="lyrics" options={{ title: '' }} />
         <Stack.Screen
           name="live"

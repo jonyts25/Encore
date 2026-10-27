@@ -13,6 +13,7 @@ import {
   showPackExpiresAt,
   SEVEN_DAYS_MS,
 } from './showPackLogic';
+import { formatShowCardMetaLine } from './showVenueTime';
 import { formatShowVenueDateDisplay } from './showVenueTime';
 
 describe('normalizeSongTitle', () => {
@@ -88,6 +89,19 @@ describe('showPackLogic', () => {
       [{ songId: '3', title: 'Custom' }]
     );
     assert.deepEqual(titles.sort(), ['Custom', 'Deep cut', 'Hit']);
+  });
+
+  it('formats show card meta without GMT label', () => {
+    const line = formatShowCardMetaLine(
+      {
+        show_date: '2026-10-29T03:00:00.000Z',
+        venue: { name: 'Arena Guadalajara', city: 'Guadalajara', timezone: 'America/Mexico_City' },
+      } as never,
+      'es',
+      (key) => (key === 'events.timeUnconfirmed' ? 'Hora por confirmar' : key)
+    );
+    assert.match(line, /Arena Guadalajara/);
+    assert.doesNotMatch(line, /GMT/i);
   });
 
   it('formats venue time without GMT label', () => {
