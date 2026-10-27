@@ -42,7 +42,7 @@ export function ProfileScreenContent() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
-  const { user, session, isOfflineSession, isLoading: sessionLoading } = useSession();
+  const { user, session, isOfflineSession, lastKnownUser, isLoading: sessionLoading } = useSession();
   const { profile, isLoading: profileLoading, error } = useProfile();
 
   const { sections, isLoading: homeLoading } = useHomeShowSections({
@@ -68,7 +68,11 @@ export function ProfileScreenContent() {
     [sections.attended]
   );
 
-  const displayName = profile?.display_name ?? user?.email?.split('@')[0] ?? 'Fan';
+  const displayName =
+    profile?.display_name ??
+    lastKnownUser?.display_name ??
+    user?.email?.split('@')[0] ??
+    'Fan';
   const year = new Date().getFullYear();
 
   if (sessionLoading || profileLoading || homeLoading) {
