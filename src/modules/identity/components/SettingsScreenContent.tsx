@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { clearLocalUserData } from '@/core/db/clearLocalUserData';
 import { useTranslation, type SupportedLocale } from '@/core/i18n';
 import { Card, ListRow, PillButton, SegmentedControl } from '@/core/ui';
-import { useEncoreTheme, type ThemePreference } from '@/core/ui/theme';
+import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
 
 import { deleteMyAccount, upsertProfile } from '../api';
