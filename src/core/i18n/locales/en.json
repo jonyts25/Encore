@@ -96,6 +96,32 @@
     "spanish": "Español",
     "english": "English"
   },
+  "festivals": {
+    "admin": {
+      "groupTitle": "ADMIN",
+      "title": "Admin · Load festival",
+      "subtitle": "Paste festival JSON. Shows are normal catalog rows; user schedules still use user_shows with Going.",
+      "jsonPlaceholder": "Paste festival-template.json here…",
+      "validate": "Validate",
+      "save": "Save",
+      "summary": "{{days}} days · {{lineup}} sets · {{found}} artists in catalog · {{missing}} missing",
+      "missingList": "Missing: {{names}}",
+      "saveSuccessTitle": "Festival saved",
+      "saveSuccessBody": "Shows created: {{created}} · updated: {{updated}} · unmatched artists: {{missing}}",
+      "errors": {
+        "invalid_json": "Invalid JSON",
+        "invalid_shape": "Invalid format",
+        "missing_name": "Festival name is required",
+        "invalid_edition_year": "Invalid edition year",
+        "invalid_dates": "Invalid dates (use YYYY-MM-DD)",
+        "invalid_date_range": "End date must be after start date",
+        "missing_venue": "Venue is required",
+        "missing_lineup": "Lineup cannot be empty",
+        "save_failed": "Could not save festival",
+        "forbidden": "Only admins can load festivals"
+      }
+    }
+  },
   "profile": {
     "memberSince": "On Encore since {{date}}",
     "avatarComingSoon": "Coming soon",

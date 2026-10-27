@@ -26,6 +26,8 @@ import { PRIVACY_NOTICE_URL, SUPPORT_REPORT_PROBLEM_URL, SUPPORT_WHATSAPP_URL } 
 import { applyProfileLocale, updateLastKnownDisplayName } from '../SessionProvider';
 import { useProfile } from '../hooks/useProfile';
 import { useSession } from '../hooks/useSession';
+import { FestivalAdminLoadCard } from '@/modules/events/festivals/components/FestivalAdminLoadCard';
+
 import { AppearanceSettings } from './AppearanceSettings';
 
 const TAB_BAR_CLEARANCE = 72;
@@ -36,7 +38,7 @@ export function SettingsScreenContent() {
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
   const { user, signOut, isOfflineSession } = useSession();
-  const { profile, refetch } = useProfile();
+  const { profile, refetch, role } = useProfile();
 
   const [nameDraft, setNameDraft] = useState(profile?.display_name ?? '');
 
@@ -177,6 +179,15 @@ export function SettingsScreenContent() {
             <AppearanceSettings />
           </Card>
         </View>
+
+        {role === 'admin' && !isOfflineSession ? (
+          <View style={styles.group}>
+            <Text style={[styles.groupTitle, { color: tokens.textSecondary }]}>
+              {t('festivals.admin.groupTitle')}
+            </Text>
+            <FestivalAdminLoadCard />
+          </View>
+        ) : null}
 
         <View style={styles.group}>
           <Text style={[styles.groupTitle, { color: tokens.textSecondary }]}>{t('settings.helpGroup')}</Text>
