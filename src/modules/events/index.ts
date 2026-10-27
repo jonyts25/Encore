@@ -12,6 +12,11 @@ export {
   setShowStatus,
   removeShowStatus,
 } from './api';
+export {
+  formatShowCardMetaLine,
+  formatShowCardMetaParts,
+  formatShowVenueTimeOnly,
+} from './showVenueTime';
 export { createUserShow } from './createUserShow';
 export { AddShowContent } from './components/AddShowContent';
 export { HomeShowsContent } from './components/HomeShowsContent';

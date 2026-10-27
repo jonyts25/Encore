@@ -53,7 +53,20 @@
   "explore": {
     "tab": "Explorar",
     "title": "Explorar",
-    "searchPlaceholder": "Buscar shows o artistas…",
+    "searchPlaceholder": "Artistas, shows o recintos",
+    "searchArtists": "Artistas",
+    "searchShows": "Shows",
+    "searchVenues": "Recintos",
+    "thisWeek": "Esta semana en {{city}}",
+    "comingSoon": "Próximamente",
+    "viewCalendar": "Ver calendario",
+    "artistsSeen": "Artistas que has visto",
+    "popular": "Populares en Encore",
+    "venuesInCity": "Recintos en {{city}}",
+    "venueUpcoming": "{{count}} próximos",
+    "addShowTitle": "¿No encuentras tu show?",
+    "addShowSubtitle": "Agrégalo al catálogo y márcalo como «Voy».",
+    "addShowCta": "Agregar show",
     "upcomingShows": "Próximos shows",
     "artists": "Artistas",
     "showsEmptyTitle": "No hay shows próximos",
@@ -62,6 +75,19 @@
     "signInCta": "Iniciar sesión"
   },
   "settings": {
+    "title": "Ajustes",
+    "accountGroup": "CUENTA",
+    "preferencesGroup": "PREFERENCIAS",
+    "helpGroup": "AYUDA",
+    "reportProblem": "Reportar un problema",
+    "privacyNotice": "Aviso de privacidad",
+    "deleteAccount": "Eliminar mi cuenta",
+    "deleteAccountConfirmTitle": "¿Eliminar tu cuenta?",
+    "deleteAccountConfirmBody": "Esto borra tu cuenta y tus shows. No se puede deshacer.",
+    "deleteAccountTypePrompt": "Escribe ELIMINAR para confirmar.",
+    "deleteAccountFailed": "No se pudo eliminar la cuenta. Intenta de nuevo.",
+    "continue": "Continuar",
+    "versionLine": "Versión {{version}} · {{fingerprint}}",
     "appearance": "Apariencia",
     "appearanceSystem": "Sistema",
     "appearanceLight": "Claro",
@@ -69,6 +95,20 @@
     "language": "Idioma",
     "spanish": "Español",
     "english": "English"
+  },
+  "profile": {
+    "memberSince": "En Encore desde {{date}}",
+    "avatarComingSoon": "Próximamente",
+    "stats": {
+      "shows": "Shows",
+      "artists": "Artistas",
+      "cities": "Ciudades",
+      "upcoming": "Próximos"
+    },
+    "recapTitle": "Tu {{year}} en vivo",
+    "recapSubtitle": "Tu recap del año llega en diciembre",
+    "attendedTitle": "Shows a los que fuiste",
+    "attendedEmpty": "Aquí aparecerán los shows a los que vayas"
   },
   "home": {
     "tab": "Inicio",

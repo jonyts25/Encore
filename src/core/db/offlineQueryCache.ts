@@ -44,3 +44,8 @@ export async function writeOfflineQuery<T>(cacheKey: string, payload: T): Promis
     Date.now()
   );
 }
+
+export async function clearAllOfflineQueries(): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM offline_query_cache');
+}

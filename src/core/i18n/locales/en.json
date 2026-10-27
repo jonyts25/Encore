@@ -53,7 +53,20 @@
   "explore": {
     "tab": "Explore",
     "title": "Explore",
-    "searchPlaceholder": "Search shows or artists…",
+    "searchPlaceholder": "Artists, shows, or venues",
+    "searchArtists": "Artists",
+    "searchShows": "Shows",
+    "searchVenues": "Venues",
+    "thisWeek": "This week in {{city}}",
+    "comingSoon": "Coming soon",
+    "viewCalendar": "View calendar",
+    "artistsSeen": "Artists you've seen",
+    "popular": "Popular on Encore",
+    "venuesInCity": "Venues in {{city}}",
+    "venueUpcoming": "{{count}} upcoming",
+    "addShowTitle": "Can't find your show?",
+    "addShowSubtitle": "Add it to the catalog and mark yourself as Going.",
+    "addShowCta": "Add show",
     "upcomingShows": "Upcoming shows",
     "artists": "Artists",
     "showsEmptyTitle": "No upcoming shows",
@@ -62,6 +75,19 @@
     "signInCta": "Sign in"
   },
   "settings": {
+    "title": "Settings",
+    "accountGroup": "ACCOUNT",
+    "preferencesGroup": "PREFERENCES",
+    "helpGroup": "HELP",
+    "reportProblem": "Report a problem",
+    "privacyNotice": "Privacy notice",
+    "deleteAccount": "Delete my account",
+    "deleteAccountConfirmTitle": "Delete your account?",
+    "deleteAccountConfirmBody": "This deletes your account and your shows. It cannot be undone.",
+    "deleteAccountTypePrompt": "Type ELIMINAR to confirm.",
+    "deleteAccountFailed": "Could not delete the account. Try again.",
+    "continue": "Continue",
+    "versionLine": "Version {{version}} · {{fingerprint}}",
     "appearance": "Appearance",
     "appearanceSystem": "System",
     "appearanceLight": "Light",
@@ -69,6 +95,20 @@
     "language": "Language",
     "spanish": "Español",
     "english": "English"
+  },
+  "profile": {
+    "memberSince": "On Encore since {{date}}",
+    "avatarComingSoon": "Coming soon",
+    "stats": {
+      "shows": "Shows",
+      "artists": "Artists",
+      "cities": "Cities",
+      "upcoming": "Upcoming"
+    },
+    "recapTitle": "Your {{year}} live",
+    "recapSubtitle": "Your year recap arrives in December",
+    "attendedTitle": "Shows you went to",
+    "attendedEmpty": "Shows you go to will appear here"
   },
   "home": {
     "tab": "Home",

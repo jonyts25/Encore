@@ -118,6 +118,19 @@ async function resolveUserIdForData(userId: string): Promise<string> {
   throw new Error('Unauthorized');
 }
 
+type PopularArtistsResponse = {
+  artists: ArtistSummary[];
+};
+
+export async function fetchExplorePopularArtists(): Promise<ArtistSummary[]> {
+  try {
+    const data = await apiFetch<PopularArtistsResponse>('/api/explore/popular-artists');
+    return data.artists;
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): Promise<Show[]> {
   const params = new URLSearchParams();
   if (options?.followed) {
@@ -389,9 +402,9 @@ export function formatShowDate(showDate: string, locale: string): string {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
-    timeZoneName: 'short',
+    hour12: false,
   }).format(date);
 }
 

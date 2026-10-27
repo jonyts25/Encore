@@ -10,7 +10,7 @@ import { spacing, typography } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 import { useSession } from '@/modules/identity';
 
-import { formatShowDate } from '../api';
+import { formatShowCardMetaLine } from '../showVenueTime';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import { useHomeShowSections } from '../hooks/useHomeShowSections';
 import { useShowStatus } from '../hooks/useShowStatus';
@@ -63,7 +63,7 @@ function pickHeroShow(going: Show[]): Show | null {
 
 function UpcomingCarouselItem({ show }: { show: Show }) {
   const router = useRouter();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { tokens } = useEncoreTheme();
 
   return (
@@ -75,7 +75,7 @@ function UpcomingCarouselItem({ show }: { show: Show }) {
       />
       <Text style={[typography.bodySemibold, { color: tokens.text }]}>{show.artist.name}</Text>
       <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
-        {formatShowDate(show.show_date, i18n.language)} · {show.venue.name}
+        {formatShowCardMetaLine(show, i18n.language, t)}
       </Text>
     </Pressable>
   );
@@ -114,7 +114,7 @@ export function HomeShowsContent() {
         style={styles.scrollView}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
+          { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
         ]}>
         <ThemedView style={styles.container}>
           <ThemedText style={styles.title}>{t('home.title')}</ThemedText>
@@ -151,7 +151,7 @@ export function HomeShowsContent() {
       style={[styles.scrollView, { backgroundColor: tokens.background }]}
       contentContainerStyle={[
         styles.scrollContent,
-        { paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
+        { paddingTop: insets.top + spacing.sm, paddingBottom: insets.bottom + TAB_BAR_CLEARANCE },
       ]}
       refreshControl={
         <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />

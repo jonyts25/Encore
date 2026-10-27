@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from '@/core/i18n';
 import { PillButton, StatusPill } from '@/core/ui';
 import { spacing, typography } from '@/core/ui/theme';
-import { formatShowDate, formatShowVenueLine } from '@/modules/events/api';
+import { formatShowCardMetaLine, formatShowVenueTimeOnly } from '@/modules/events/showVenueTime';
 import type { Show } from '@/modules/events/types';
 import { getShowPhase, isShowActive } from '@/modules/events/visibility';
 
@@ -32,9 +32,13 @@ export function HomeHeroShowCard({ show, statusLabel, onOpenLive }: HomeHeroShow
   const isConcertDay = showIsActive && phase === 'today';
   const { label: packLabel } = useShowPackStatus(show, true);
 
+  const venueTime =
+    formatShowVenueTimeOnly(show, i18n.language) ??
+    (i18n.language.startsWith('en') ? 'Time TBC' : 'Hora por confirmar');
+
   const countdownLabel = isConcertDay
     ? t('home.hero.today', {
-        time: formatShowDate(show.show_date, i18n.language),
+        time: venueTime,
       })
     : t('home.hero.inDays', { count: daysUntilShow(show.show_date) });
 
@@ -58,7 +62,7 @@ export function HomeHeroShowCard({ show, statusLabel, onOpenLive }: HomeHeroShow
         ) : null}
         <Text style={styles.artist}>{show.artist.name}</Text>
         <Text style={styles.meta}>
-          {formatShowDate(show.show_date, i18n.language)} · {formatShowVenueLine(show.venue)}
+          {formatShowCardMetaLine(show, i18n.language, t)}
         </Text>
         <View style={styles.actions}>
           {isConcertDay && onOpenLive ? (
