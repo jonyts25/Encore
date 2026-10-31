@@ -22,12 +22,23 @@ export function useShowPrediction(showId: string, options: UseShowPredictionOpti
   useEffect(() => {
     if (!showId) return;
     void (async () => {
+      if (queryClient.getQueryData(queryKeys.prediction(showId)) !== undefined) {
+        return;
+      }
+
       const fromPack = await getCachedPredictionFromPack(showId);
+      if (queryClient.getQueryData(queryKeys.prediction(showId)) !== undefined) {
+        return;
+      }
       if (fromPack) {
         queryClient.setQueryData(queryKeys.prediction(showId), fromPack);
         return;
       }
+
       const cached = await readOfflineQuery<SetlistPrediction | null>(`prediction:${showId}`);
+      if (queryClient.getQueryData(queryKeys.prediction(showId)) !== undefined) {
+        return;
+      }
       if (cached) {
         queryClient.setQueryData(queryKeys.prediction(showId), cached);
       }

@@ -5,6 +5,72 @@ import type { SetlistPrediction } from '@/modules/setlist/types';
 
 import type { PracticePackSong } from './practicePackTypes';
 
+const MS_PER_HOUR = 60 * 60 * 1000;
+export const SHOW_PACK_STALE_AFTER_MS = 12 * MS_PER_HOUR;
+export const SHOW_PACK_ATTENTION_HORIZON_MS = 48 * MS_PER_HOUR;
+export const SHOW_PACK_STUCK_DOWNLOADING_MS = 10 * 60 * 1000;
+
+export type ShowPackPrefetchRecord = {
+  status: string;
+  downloadedAt: number | null;
+  statusUpdatedAt: number;
+  prediction: SetlistPrediction | null;
+  lyricsMissingTitles: string[];
+  lyricsFailed: number;
+  expiresAt: number | null;
+};
+
+export function isShowPackPredictionStale(prediction: SetlistPrediction | null): boolean {
+  if (!prediction) return true;
+  if (prediction.structure === 'insufficient_data') return true;
+  if (prediction.songs.length === 0) return true;
+  return false;
+}
+
+export function isShowWithinPackAttentionWindow(showDate: string, now = new Date()): boolean {
+  const showTime = new Date(showDate).getTime();
+  const nowTime = now.getTime();
+  if (showTime >= nowTime) {
+    return showTime - nowTime <= SHOW_PACK_ATTENTION_HORIZON_MS;
+  }
+  return nowTime - showTime <= SHOW_PACK_ATTENTION_HORIZON_MS;
+}
+
+export function shouldPrefetchShowPackRecord(
+  record: ShowPackPrefetchRecord | null,
+  showDate: string,
+  options?: { force?: boolean; now?: Date }
+): boolean {
+  const now = options?.now ?? new Date();
+  const nowMs = now.getTime();
+
+  if (options?.force) return true;
+  if (!record) return true;
+  if (isShowPackExpired(record, nowMs)) return true;
+  if (record.status === 'partial') return true;
+
+  if (record.status === 'downloading') {
+    return nowMs - record.statusUpdatedAt >= SHOW_PACK_STUCK_DOWNLOADING_MS;
+  }
+
+  if (record.status === 'ready') {
+    if (record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0) return true;
+    if (isShowPackPredictionStale(record.prediction)) return true;
+
+    if (
+      isShowWithinPackAttentionWindow(showDate, now) &&
+      record.downloadedAt != null &&
+      nowMs - record.downloadedAt > SHOW_PACK_STALE_AFTER_MS
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 export function showPackExpiresAt(showDate: string): number {
   return expiresAtAfterShowDate(showDate);
 }
