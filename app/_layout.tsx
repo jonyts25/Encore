@@ -12,7 +12,7 @@ import '@/core/i18n';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { QueryProvider } from '@/core/query';
 import { useShowPackBusyLyricsRetry } from '@/modules/events/hooks/useShowPackBusyLyricsRetry';
-import { SessionProvider, useSession } from '@/modules/identity';
+import { PrivacyAcceptanceGate, SessionProvider, useSession } from '@/modules/identity';
 import { EncoreThemeProvider, useEncoreTheme } from '@/core/ui/theme';
 import { AppErrorBoundary } from '@/core/ui/AppErrorBoundary';
 import { GoingReminderBootstrap } from '@/modules/notifications/GoingReminderBootstrap';
@@ -98,6 +98,7 @@ function RootLayoutNav() {
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
       <GoingReminderBootstrap />
+      <PrivacyAcceptanceGate />
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="artist/[id]" options={{ title: '', headerLargeTitle: false }} />

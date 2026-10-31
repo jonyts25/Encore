@@ -5,7 +5,7 @@ import { supabase } from '@/core/api/supabase';
 import { isAuthNetworkError, isSessionInvalidError } from './authErrors';
 import type { Profile, SignUpResult, SystemRole } from './types';
 
-const PROFILE_COLUMNS = 'user_id, display_name, locale, home_city, role';
+const PROFILE_COLUMNS = 'user_id, display_name, locale, home_city, role, privacy_accepted_at';
 
 export async function getCurrentSession() {
   const { data, error } = await supabase.auth.getSession();
@@ -82,7 +82,8 @@ export async function signUpWithPassword(
   email: string,
   password: string,
   displayName: string,
-  locale: string
+  locale: string,
+  privacyAcceptedAt: string
 ): Promise<SignUpResult> {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -110,11 +111,21 @@ export async function signUpWithPassword(
       display_name: displayName,
       locale,
       home_city: null,
+      privacy_accepted_at: privacyAcceptedAt,
     });
     return { needsEmailConfirmation: false };
   }
 
   return { needsEmailConfirmation: true };
+}
+
+export async function acceptPrivacyNotice(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ privacy_accepted_at: new Date().toISOString() })
+    .eq('user_id', userId);
+
+  if (error) throw error;
 }
 
 export async function signOut() {
@@ -140,7 +151,8 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
 
 export async function upsertProfile(
   userId: string,
-  patch: Pick<Profile, 'display_name' | 'locale' | 'home_city'>
+  patch: Pick<Profile, 'display_name' | 'locale' | 'home_city'> &
+    Partial<Pick<Profile, 'privacy_accepted_at'>>
 ) {
   const { error } = await supabase.from('profiles').upsert(
     {

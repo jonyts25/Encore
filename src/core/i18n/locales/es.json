@@ -389,6 +389,15 @@
     "authCallbackLoading": "Confirmando tu cuenta…",
     "authCallbackFailed": "No se pudo completar la confirmación. Intenta iniciar sesión manualmente."
   },
+  "privacy": {
+    "consentLabel": "Tengo 18 años o más y acepto el",
+    "consentLink": "Aviso de privacidad",
+    "mustAccept": "Marca la casilla para confirmar que tienes 18 años o más y aceptas el aviso de privacidad.",
+    "gateTitle": "Aviso de privacidad",
+    "gateBody": "Para seguir usando Encore, confirma que tienes 18 años o más y que aceptas nuestro aviso de privacidad. Puedes leerlo completo antes de aceptar.",
+    "acceptContinue": "Aceptar y continuar",
+    "acceptError": "No se pudo guardar tu aceptación. Intenta de nuevo."
+  },
   "setlist": {
     "probableTitle": "Setlist probable",
     "predictionTitle": "Setlist predicho",

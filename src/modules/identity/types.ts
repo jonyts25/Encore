@@ -6,6 +6,7 @@ export type Profile = {
   locale: string | null;
   home_city: string | null;
   role: SystemRole | null;
+  privacy_accepted_at: string | null;
 };
 
 export type EntitlementFeature =

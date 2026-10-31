@@ -50,7 +50,12 @@ type SessionContextValue = {
   lastKnownUser: LastKnownUser | null;
   role: SystemRole;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<SignUpResult>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+    privacyAcceptedAt: string
+  ) => Promise<SignUpResult>;
   signOut: () => Promise<void>;
 };
 
@@ -186,12 +191,14 @@ export function SessionProvider({ children }: SessionProviderProps) {
     setLastKnownUser(persistUserFromSession(nextSession));
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName: string) => {
+  const signUp = useCallback(
+    async (email: string, password: string, displayName: string, privacyAcceptedAt: string) => {
     const result = await signUpWithPassword(
       email,
       password,
       displayName,
-      currentAppLocale()
+      currentAppLocale(),
+      privacyAcceptedAt
     );
     const nextSession = await getCurrentSession();
     setSession(nextSession);
@@ -200,7 +207,8 @@ export function SessionProvider({ children }: SessionProviderProps) {
         persistUserFromSession(nextSession)
     );
     return result;
-  }, []);
+  },
+  []);
 
   const signOut = useCallback(async () => {
     await signOutApi();

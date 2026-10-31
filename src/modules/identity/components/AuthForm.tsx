@@ -5,16 +5,20 @@ import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useSession } from '../hooks/useSession';
+import { openPrivacyNoticeInBrowser } from '../privacyNotice';
+
+import { PrivacyConsentRow } from './PrivacyAcceptanceGate';
 
 type AuthMode = 'login' | 'register';
 
 export function AuthForm() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { signIn, signUp } = useSession();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -26,13 +30,22 @@ export function AuthForm() {
 
   const handleSubmit = async () => {
     resetFeedback();
+    if (mode === 'register' && !privacyAccepted) {
+      setError(t('privacy.mustAccept'));
+      return;
+    }
     setIsSubmitting(true);
     try {
       if (mode === 'login') {
         await signIn(email.trim(), password);
         setMessage(t('identity.loginSuccess'));
       } else {
-        const result = await signUp(email.trim(), password, displayName.trim());
+        const result = await signUp(
+          email.trim(),
+          password,
+          displayName.trim(),
+          new Date().toISOString()
+        );
         if (result.emailAlreadyRegistered) {
           setError(t('identity.emailAlreadyRegistered'));
         } else if (result.needsEmailConfirmation) {
@@ -47,6 +60,8 @@ export function AuthForm() {
       setIsSubmitting(false);
     }
   };
+
+  const registerBlocked = mode === 'register' && !privacyAccepted;
 
   return (
     <ThemedView style={styles.container}>
@@ -87,8 +102,20 @@ export function AuthForm() {
         onChangeText={setPassword}
       />
 
+      {mode === 'register' ? (
+        <PrivacyConsentRow
+          checked={privacyAccepted}
+          label={t('privacy.consentLabel')}
+          linkLabel={t('privacy.consentLink')}
+          onOpenPrivacy={() =>
+            void openPrivacyNoticeInBrowser(i18n.language.startsWith('en') ? 'en' : 'es')
+          }
+          onToggle={() => setPrivacyAccepted((value) => !value)}
+        />
+      ) : null}
+
       <Button
-        disabled={isSubmitting}
+        disabled={isSubmitting || registerBlocked}
         title={isSubmitting ? t('common.loading') : t('identity.submit')}
         onPress={() => {
           void handleSubmit();
@@ -104,6 +131,7 @@ export function AuthForm() {
           variant="secondary"
           onPress={() => {
             resetFeedback();
+            setPrivacyAccepted(false);
             setMode(mode === 'login' ? 'register' : 'login');
           }}
         />

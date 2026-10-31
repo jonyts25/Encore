@@ -22,7 +22,8 @@ import { useEncoreTheme, type ThemePreference } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
 
 import { deleteMyAccount, upsertProfile } from '../api';
-import { PRIVACY_NOTICE_URL, SUPPORT_REPORT_PROBLEM_URL, SUPPORT_WHATSAPP_URL } from '../supportLinks';
+import { openPrivacyNoticeInBrowser } from '../privacyNotice';
+import { SUPPORT_REPORT_PROBLEM_URL, SUPPORT_WHATSAPP_URL } from '../supportLinks';
 import { applyProfileLocale, updateLastKnownDisplayName } from '../SessionProvider';
 import { useProfile } from '../hooks/useProfile';
 import { useSession } from '../hooks/useSession';
@@ -97,8 +98,7 @@ export function SettingsScreenContent() {
   };
 
   const openPrivacy = () => {
-    if (!PRIVACY_NOTICE_URL) return;
-    void Linking.openURL(PRIVACY_NOTICE_URL);
+    void openPrivacyNoticeInBrowser();
   };
 
   const performDelete = async () => {
@@ -184,9 +184,7 @@ export function SettingsScreenContent() {
             {reportUrl ? (
               <ListRow title={t('settings.reportProblem')} onPress={openReport} />
             ) : null}
-            {PRIVACY_NOTICE_URL ? (
-              <ListRow title={t('settings.privacyNotice')} onPress={openPrivacy} />
-            ) : null}
+            <ListRow title={t('settings.privacyNotice')} onPress={openPrivacy} />
           </Card>
         </View>
 

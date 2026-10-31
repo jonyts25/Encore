@@ -389,6 +389,15 @@
     "authCallbackLoading": "Confirming your account…",
     "authCallbackFailed": "Could not complete confirmation. Try signing in manually."
   },
+  "privacy": {
+    "consentLabel": "I am 18 or older and accept the",
+    "consentLink": "Privacy notice",
+    "mustAccept": "Check the box to confirm you are 18 or older and accept the privacy notice.",
+    "gateTitle": "Privacy notice",
+    "gateBody": "To keep using Encore, confirm that you are 18 or older and accept our privacy notice. You can read the full notice before accepting.",
+    "acceptContinue": "Accept and continue",
+    "acceptError": "Could not save your acceptance. Please try again."
+  },
   "setlist": {
     "probableTitle": "Likely setlist",
     "predictionTitle": "Predicted setlist",

@@ -24,6 +24,7 @@ export function useProfile() {
         locale: 'es',
         home_city: null,
         role: 'user',
+        privacy_accepted_at: null,
       });
       setError(null);
       setIsLoading(false);
