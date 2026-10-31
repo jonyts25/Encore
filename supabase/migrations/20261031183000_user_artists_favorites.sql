@@ -17,6 +17,7 @@ create policy "user_artists_update_own" on public.user_artists
 create or replace function public.enforce_user_artists_favorite_limit()
 returns trigger
 language plpgsql
+set search_path = public
 as $$
 declare
   favorite_count integer;
