@@ -1,22 +1,15 @@
+import { lrclibRequestDirectWithFetch } from './lrclibRequest';
+import { LrclibRequestQueue } from './lrclibQueue';
 import { parseLrc } from './lrc';
 import type { Lyrics, LyricsMatch, LyricsProvider, SyncedLyrics } from './types';
 
 const BASE_URL = 'https://lrclib.net/api';
 const LRCLIB_ATTRIBUTION = 'Lyrics via LRCLIB (lrclib.net)';
-const USER_AGENT = 'Encore/0.1 (https://github.com/jonyts25/Encore)';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 2000;
-const RETRY_DELAYS_MS = [0, 2000, 5000];
 const MAX_CONCURRENT_LRCLIB_REQUESTS = 2;
 
-export class LyricsBusyError extends Error {
-  readonly code = 'lyrics_busy';
-
-  constructor() {
-    super('Lyrics service is busy');
-    this.name = 'LyricsBusyError';
-  }
-}
+export { LyricsBusyError } from './lrclibErrors';
 
 type LrclibRecord = {
   id: number;
@@ -42,70 +35,7 @@ type CacheEntry = {
 };
 
 const lyricsCache = new Map<string, CacheEntry>();
-
-type QueueTask<T> = {
-  run: () => Promise<T>;
-  resolve: (value: T) => void;
-  reject: (error: unknown) => void;
-};
-
-class LrclibRequestQueue {
-  private active = 0;
-  private readonly queue: QueueTask<unknown>[] = [];
-
-  constructor(private readonly maxConcurrent: number) {}
-
-  enqueue<T>(run: () => Promise<T>): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      this.queue.push({
-        run: run as () => Promise<unknown>,
-        resolve: resolve as (value: unknown) => void,
-        reject,
-      });
-      this.pump();
-    });
-  }
-
-  private pump(): void {
-    while (this.active < this.maxConcurrent && this.queue.length > 0) {
-      const task = this.queue.shift();
-      if (!task) return;
-      this.active += 1;
-      void task
-        .run()
-        .then(task.resolve)
-        .catch(task.reject)
-        .finally(() => {
-          this.active -= 1;
-          this.pump();
-        });
-    }
-  }
-}
-
 const lrclibQueue = new LrclibRequestQueue(MAX_CONCURRENT_LRCLIB_REQUESTS);
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function jitterMs(maxMs: number): number {
-  return Math.floor(Math.random() * maxMs);
-}
-
-function parseRetryAfterMs(response: Response): number | null {
-  const header = response.headers.get('retry-after');
-  if (!header) return null;
-  const seconds = Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) {
-    return seconds * 1000;
-  }
-  const dateMs = Date.parse(header);
-  if (Number.isFinite(dateMs)) {
-    return Math.max(0, dateMs - Date.now());
-  }
-  return null;
-}
 
 function cacheKey(artist: string, title: string): string {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
@@ -170,57 +100,10 @@ function mapSynced(record: LrclibRecord): SyncedLyrics | null {
   };
 }
 
-async function lrclibFetchOnce(path: string): Promise<Response> {
-  return fetch(`${BASE_URL}${path}`, {
-    headers: {
-      Accept: 'application/json',
-      'User-Agent': USER_AGENT,
-    },
-    cache: 'no-store',
-  });
-}
-
-async function lrclibRequestDirect<T>(path: string): Promise<T> {
-  let lastTransient: Error | null = null;
-
-  for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt += 1) {
-    const baseDelay = RETRY_DELAYS_MS[attempt] ?? 0;
-    if (baseDelay > 0) {
-      await sleep(baseDelay + jitterMs(400));
-    }
-
-    const response = await lrclibFetchOnce(path);
-
-    if (response.status === 503 || response.status === 429) {
-      lastTransient = new Error(`LRCLIB temporary failure (${response.status})`);
-      const retryAfterMs = parseRetryAfterMs(response);
-      if (retryAfterMs != null) {
-        await sleep(retryAfterMs + jitterMs(400));
-      }
-      continue;
-    }
-
-    if (response.status === 404) {
-      throw new Error('Lyrics not found');
-    }
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LRCLIB request failed (${response.status}): ${text}`);
-    }
-
-    return (await response.json()) as T;
-  }
-
-  if (lastTransient) {
-    throw new LyricsBusyError();
-  }
-
-  throw new LyricsBusyError();
-}
-
 async function lrclibRequest<T>(path: string): Promise<T> {
-  return lrclibQueue.enqueue(() => lrclibRequestDirect<T>(path));
+  return lrclibQueue.enqueue(() =>
+    lrclibRequestDirectWithFetch<T>(path, BASE_URL, fetch)
+  );
 }
 
 function pickBestRecord(records: LrclibRecord[]): LrclibRecord | null {
