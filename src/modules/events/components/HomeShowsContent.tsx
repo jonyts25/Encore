@@ -124,6 +124,7 @@ export function HomeShowsContent() {
 
   const heroShow = pickPrimaryGoingShow(sections.going);
   const hasData = hasAnyShows(sections);
+  const isInitialLoading = isLoading && !hasData;
   const carouselShows = sections.going.filter((show) => show.id !== heroShow?.id).slice(0, 8);
 
   const openLiveForShow = (show: Show) => {
@@ -164,15 +165,17 @@ export function HomeShowsContent() {
           <StatusPill label={t('offline.banner')} />
         ) : null}
 
-        {isLoading ? <Text style={{ color: tokens.textSecondary }}>{t('common.loading')}</Text> : null}
-        {!isLoading && error ? (
+        {isInitialLoading ? (
+          <Text style={{ color: tokens.textSecondary }}>{t('common.loading')}</Text>
+        ) : null}
+        {!isInitialLoading && error && !hasData ? (
           <Card>
             <Text style={{ color: tokens.textSecondary }}>{error}</Text>
             <PillButton title={t('explore.retry')} variant="secondary" onPress={() => void refetch()} />
           </Card>
         ) : null}
 
-        {!isLoading && !error && heroShow ? (
+        {!isInitialLoading && !error && heroShow ? (
           <HomeHeroShowCard
             show={heroShow}
             statusLabel={t('home.hero.nextShowKicker')}
@@ -180,13 +183,13 @@ export function HomeShowsContent() {
           />
         ) : null}
 
-        {!isLoading && !error && sections.goingAttendancePending.length > 0
+        {!isInitialLoading && !error && sections.goingAttendancePending.length > 0
           ? sections.goingAttendancePending.map((show) => (
               <AttendancePromptItem key={show.id} show={show} />
             ))
           : null}
 
-        {!isLoading && !error && carouselShows.length > 0 ? (
+        {!isInitialLoading && !error && carouselShows.length > 0 ? (
           <View style={styles.section}>
             <SectionHeader
               actionLabel={t('home.hero.seeAll')}
@@ -201,7 +204,7 @@ export function HomeShowsContent() {
           </View>
         ) : null}
 
-        {!isLoading && !error && !hasData ? (
+        {!isInitialLoading && !error && !hasData ? (
           <Card>
             <Text style={[typography.bodySemibold, { color: tokens.text }]}>
               {t('home.sections.goingEmpty')}

@@ -179,7 +179,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     ? formatShowVenueDateDisplay(show, i18n.language, t)
     : null;
 
-  if (isLoading) {
+  if (isLoading && !show) {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText>{t('common.loading')}</ThemedText>
@@ -187,7 +187,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     );
   }
 
-  if (error || !show) {
+  if ((error && !show) || !show) {
     return (
       <ThemedView style={styles.centered}>
         <ThemedText style={{ color: tokens.recording, textAlign: 'center' }}>

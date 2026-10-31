@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { buildArtistShowSections } from './artistShowSectionsLogic';
+import { formatVenueNearbySubtitle } from './venueSearchFormat';
 import {
   collectExploreCities,
   exploreHasCityContent,
@@ -123,6 +124,16 @@ describe('exploreLogic', () => {
       ['future']
     );
     assert.equal(showsThisWeekInCity(shows, 'Guadalajara', now).length, 0);
+  });
+});
+
+describe('formatVenueNearbySubtitle', () => {
+  it('formats city and rounded distance', () => {
+    const label = formatVenueNearbySubtitle(
+      { city: 'Zapopan', country: 'MX', distance_km: 8.2 },
+      (_key, params) => `${params?.city} · ${params?.distance} km`
+    );
+    assert.equal(label, 'Zapopan · 8 km');
   });
 });
 

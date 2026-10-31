@@ -27,6 +27,7 @@
     "venueTitle": "Recinto",
     "venueCityPlaceholder": "Ciudad",
     "venueSearchPlaceholder": "Buscar recinto por nombre…",
+    "venueDistance": "{{city}} · {{distance}} km",
     "venueNewTitle": "O agrega uno nuevo",
     "venueNamePlaceholder": "Nombre del recinto",
     "venueCandidatesTitle": "¿Es este recinto?",

@@ -245,7 +245,7 @@ export function MyMapScreenContent() {
     fitMap();
   }, [fitMap, year]);
 
-  if (isLoading) {
+  if (isLoading && attendedShows.length === 0) {
     return (
       <View style={[styles.centered, { backgroundColor: tokens.background }]}>
         <Text style={{ color: tokens.textSecondary }}>{t('common.loading')}</Text>
@@ -253,7 +253,7 @@ export function MyMapScreenContent() {
     );
   }
 
-  if (error) {
+  if (error && attendedShows.length === 0) {
     return (
       <View style={[styles.centered, { backgroundColor: tokens.background }]}>
         <Text style={{ color: tokens.recording }}>{error}</Text>

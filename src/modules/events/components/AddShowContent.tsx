@@ -25,17 +25,19 @@ import { useSession } from '@/modules/identity';
 
 import {
   fetchShowByIdFromSupabase,
-  formatShowVenueLine,
   listUpcomingShowsForArtistFromSupabase,
   requestVenueGeocode,
   searchVenues,
+  searchVenuesNearby,
   setShowStatus,
 } from '../api';
+import { formatVenueNearbySubtitle } from '../venueSearchFormat';
+import { resolveCityCenterFromVenues, type VenueNearbyResult } from '../venueSearchLogic';
 import { createUserShow, type VenueCandidatePayload } from '../createUserShow';
 import { parseLocalDateInput, parseLocalTimeInput } from '../createUserShowLogic';
 import { isShowActive } from '../visibility';
 import { prefetchShowPack } from '../showPack';
-import type { Show, VenueSummary } from '../types';
+import type { Show } from '../types';
 import { ShowListItem } from './ShowListItem';
 
 type Step = 'artist' | 'pickExisting' | 'venue' | 'venuePick' | 'datetime';
@@ -65,7 +67,7 @@ export function AddShowContent() {
   const [venueName, setVenueName] = useState('');
   const [venueCountry, setVenueCountry] = useState('MX');
   const [selectedVenueId, setSelectedVenueId] = useState<string | null>(null);
-  const [venueResults, setVenueResults] = useState<VenueSummary[]>([]);
+  const [venueResults, setVenueResults] = useState<VenueNearbyResult[]>([]);
   const [venueSearchLoading, setVenueSearchLoading] = useState(false);
 
   const [venueCandidates, setVenueCandidates] = useState<VenueCandidatePayload[]>([]);
@@ -131,10 +133,29 @@ export function AddShowContent() {
     const handle = setTimeout(async () => {
       setVenueSearchLoading(true);
       try {
-        const results = await searchVenues(venueQuery, { city: venueCity, limit: 15 });
+        const city = venueCity.trim();
+        const center = city ? await resolveCityCenterFromVenues(city) : null;
+        const results = await searchVenuesNearby({
+          query: venueQuery,
+          city,
+          lat: center?.lat ?? null,
+          lng: center?.lng ?? null,
+          radiusKm: 75,
+          limit: 20,
+        });
         setVenueResults(results);
       } catch {
-        setVenueResults([]);
+        try {
+          const fallback = await searchVenues(venueQuery, { city: venueCity, limit: 20 });
+          setVenueResults(
+            fallback.map((venue) => ({
+              ...venue,
+              distance_km: null,
+            }))
+          );
+        } catch {
+          setVenueResults([]);
+        }
       } finally {
         setVenueSearchLoading(false);
       }
@@ -389,8 +410,9 @@ export function AddShowContent() {
                 setVenueCity(venue.city);
                 setVenueCountry(venue.country);
               }}>
-              <Text style={[typography.bodySemibold, { color: tokens.text }]}>
-                {formatShowVenueLine(venue)}
+              <Text style={[typography.bodySemibold, { color: tokens.text }]}>{venue.name}</Text>
+              <Text style={[typography.secondary, { color: tokens.textSecondary }]}>
+                {formatVenueNearbySubtitle(venue, t)}
               </Text>
             </Pressable>
           ))}

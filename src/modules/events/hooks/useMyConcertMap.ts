@@ -6,6 +6,8 @@ import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache'
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
+import { isQueryInitialLoad } from '@/core/query/queryLoadState';
+
 import { fetchAttendedShowsForMap } from '../api';
 import { buildMyMapData, filterAttendedShowsByYear, type MyMapData } from '../myMapLogic';
 import type { Show } from '../types';
@@ -40,7 +42,6 @@ export function useMyConcertMap(options: UseMyConcertMapOptions = {}) {
     }),
     enabled: enabled && Boolean(userId),
     placeholderData: (previous) => previous,
-    refetchOnMount: 'always',
   });
 
   const attendedShows = query.data ?? EMPTY;
@@ -58,7 +59,7 @@ export function useMyConcertMap(options: UseMyConcertMapOptions = {}) {
     filteredShows,
     mapData,
     allYearsData,
-    isLoading: query.isPending && query.data === undefined,
+    isLoading: isQueryInitialLoad(query.isPending, query.data),
     error:
       query.isError && query.data === undefined
         ? query.error instanceof Error
