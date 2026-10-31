@@ -1,13 +1,29 @@
 import type { ArtistSummary } from './types';
 import { createSupabaseAdminClient } from './supabase';
 
+type VoyShowRelation = {
+  artist_id: string;
+  artist: ArtistSummary | ArtistSummary[] | null;
+};
+
+/** Supabase may return embedded `shows` / `artist` as object or array depending on relation inference. */
 type VoyRow = {
   show_id: string;
-  shows: {
-    artist_id: string;
-    artist: ArtistSummary | ArtistSummary[] | null;
-  } | null;
+  shows: VoyShowRelation | VoyShowRelation[] | null;
 };
+
+function firstShowRelation(row: VoyRow): VoyShowRelation | null {
+  const shows = row.shows;
+  if (!shows) return null;
+  return Array.isArray(shows) ? (shows[0] ?? null) : shows;
+}
+
+function normalizeArtist(
+  artist: ArtistSummary | ArtistSummary[] | null | undefined
+): ArtistSummary | null {
+  if (!artist) return null;
+  return Array.isArray(artist) ? (artist[0] ?? null) : artist;
+}
 
 export async function listPopularArtistsByVoy(limit = 12): Promise<ArtistSummary[]> {
   const supabase = createSupabaseAdminClient();
@@ -20,11 +36,10 @@ export async function listPopularArtistsByVoy(limit = 12): Promise<ArtistSummary
 
   const counts = new Map<string, { artist: ArtistSummary; count: number }>();
 
-  for (const row of (data ?? []) as VoyRow[]) {
-    const show = row.shows;
+  for (const row of (data ?? []) as unknown as VoyRow[]) {
+    const show = firstShowRelation(row);
     if (!show) continue;
-    const artistRaw = show.artist;
-    const artist = Array.isArray(artistRaw) ? artistRaw[0] : artistRaw;
+    const artist = normalizeArtist(show.artist);
     if (!artist) continue;
     const existing = counts.get(artist.id);
     if (existing) {
