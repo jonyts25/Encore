@@ -4,7 +4,9 @@ import {
   flattenSetlistSongs,
   getSetlistFmProvider,
   parseSetlistFmEventDate,
+  parseSetlistFmLocalDate,
   resolveArtistMbid,
+  resolveSetlistFmVenueTimezone,
   type SetlistFmProvider,
   type SetlistFmSetlist,
 } from './providers/setlistfm';
@@ -161,11 +163,13 @@ async function persistSetlist(
   const venueId = await upsertVenue(supabase, setlist);
   const tourId = await upsertTour(supabase, artistId, tourName, setlist.eventDate);
   const showDate = parseSetlistFmEventDate(setlist.eventDate);
+  const localDate = parseSetlistFmLocalDate(setlist.eventDate);
   const showId = await upsertShow(supabase, {
     artistId,
     tourId,
     venueId,
     showDate,
+    localDate,
     setlistfmId: setlist.id,
   });
 
@@ -236,6 +240,12 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
 
   const lat = venue.city.coords?.lat ?? null;
   const lng = venue.city.coords?.long ?? null;
+  const timezone = resolveSetlistFmVenueTimezone({
+    city,
+    countryName: country,
+    countryCode: venue.city.country.code,
+    stateCode: venue.city.stateCode ?? venue.city.state,
+  });
 
   const { data, error } = await supabase
     .from('venues')
@@ -246,6 +256,7 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
       lat,
       lng,
       capacity: null,
+      timezone,
     })
     .select('id')
     .single();
@@ -253,10 +264,8 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
   if (error) throw error;
   const venueId = data.id as string;
 
-  if (lat == null || lng == null) {
-    const { geocodeVenueById } = await import('./venue-geocode');
-    await geocodeVenueById(supabase, venueId).catch(() => undefined);
-  }
+  const { geocodeVenueById } = await import('./venue-geocode');
+  await geocodeVenueById(supabase, venueId).catch(() => undefined);
 
   return venueId;
 }
@@ -331,6 +340,7 @@ async function upsertShow(
     tourId: string | null;
     venueId: string;
     showDate: string;
+    localDate: string;
     setlistfmId: string;
   }
 ): Promise<string> {
@@ -346,11 +356,17 @@ async function upsertShow(
       artist_id: string;
       tour_id: string | null;
       venue_id: string;
+      local_date: string;
+      time_confirmed: boolean;
+      source: 'setlistfm';
       show_date?: string;
     } = {
       artist_id: params.artistId,
       tour_id: params.tourId,
       venue_id: params.venueId,
+      local_date: params.localDate,
+      time_confirmed: false,
+      source: 'setlistfm',
     };
 
     if (!hasCustomShowTime(existingBySetlistFm.show_date as string)) {
@@ -382,6 +398,9 @@ async function upsertShow(
       tour_id: params.tourId,
       venue_id: params.venueId,
       show_date: params.showDate,
+      local_date: params.localDate,
+      time_confirmed: false,
+      source: 'setlistfm',
       setlistfm_id: params.setlistfmId,
     })
     .select('id')

@@ -33,6 +33,17 @@ export function parseSetlistFmEventDate(eventDate: string): string {
   return utc.toISOString();
 }
 
+/** Calendar date from setlist.fm `eventDate` (dd-MM-yyyy), not derived from UTC show_date. */
+export function parseSetlistFmLocalDate(eventDate: string): string {
+  const [day, month, year] = eventDate.split('-').map(Number);
+  if (!day || !month || !year) {
+    throw new Error(`Invalid setlist.fm eventDate: ${eventDate}`);
+  }
+  const dd = String(day).padStart(2, '0');
+  const mm = String(month).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
+}
+
 export function flattenSetlistSongs(setlist: SetlistFmSetlist): ParsedSetlistSong[] {
   const sets = asArray(setlist.sets?.set);
   const songs: ParsedSetlistSong[] = [];

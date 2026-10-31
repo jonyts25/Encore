@@ -18,6 +18,8 @@ import { useTranslation } from '@/core/i18n';
 import { useIsOffline } from '@/core/network/useIsOffline';
 import { queryKeys } from '@/core/query';
 import { ListRow, PillButton } from '@/core/ui';
+import { ListenSetlistButton } from '@/modules/music/components/ListenSetlistButton';
+import { SongListenButton } from '@/modules/music/components/SongListenButton';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing } from '@/core/ui/theme/spacing';
 import { typography } from '@/core/ui/theme/typography';
@@ -269,9 +271,17 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
               {t(predictionDisclaimerKey, predictionDisclaimerParams)}
             </Text>
           ) : null}
+          {!isPredictionLoading && predictedSongs.length > 0 ? (
+            <ListenSetlistButton artistName={artistName} />
+          ) : null}
           {predictedSongs.map((song, index) => (
             <Pressable key={song.song_id} onPress={() => openLyricsForTitle(song.title)}>
-              <ListRow subtitle={artistName} title={`${index + 1}. ${song.title}`} />
+              <View style={styles.songRow}>
+                <View style={styles.songRowMain}>
+                  <ListRow subtitle={artistName} title={`${index + 1}. ${song.title}`} />
+                </View>
+                <SongListenButton artistName={artistName} songTitle={song.title} />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -284,7 +294,12 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
           </Text>
           {practiceSongs.map((song: PracticePackSong) => (
             <Pressable key={song.songId || song.title} onPress={() => openLyricsForTitle(song.title)}>
-              <ListRow subtitle={artistName} title={song.title} />
+              <View style={styles.songRow}>
+                <View style={styles.songRowMain}>
+                  <ListRow subtitle={artistName} title={song.title} />
+                </View>
+                <SongListenButton artistName={artistName} songTitle={song.title} />
+              </View>
             </Pressable>
           ))}
         </View>
@@ -352,5 +367,12 @@ const styles = StyleSheet.create({
   disclaimer: {
     fontStyle: 'italic',
     marginBottom: spacing.xs,
+  },
+  songRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  songRowMain: {
+    flex: 1,
   },
 });

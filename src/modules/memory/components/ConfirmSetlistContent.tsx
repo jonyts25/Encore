@@ -45,6 +45,8 @@ import {
 } from '../setlistPrefillLogic';
 import { useShowMemory } from '../hooks/useShowMemory';
 
+import { ListenSetlistButton } from '@/modules/music/components/ListenSetlistButton';
+
 import { SetlistDraggableList } from './SetlistDraggableList';
 
 type ConfirmSetlistContentProps = {
@@ -309,13 +311,14 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
 
         <View style={styles.section}>
           <Text style={[typography.title, { color: tokens.text }]}>{t('memory.setlist.songsTitle')}</Text>
+          {artistName ? <ListenSetlistButton artistName={artistName} /> : null}
           {rowsToDraft(rows).items.length === 0 ? (
             <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{t('memory.setlist.empty')}</Text>
           ) : null}
         </View>
       </View>
     );
-  }, [note, rating, rows, show?.artist.name, t, tokens.accent, tokens.background, tokens.separator, tokens.surface, tokens.text, tokens.textSecondary]);
+  }, [artistName, note, rating, rows, show?.artist.name, t, tokens.accent, tokens.background, tokens.separator, tokens.surface, tokens.text, tokens.textSecondary]);
 
   const listFooter = useMemo((): ReactElement => {
     return (
@@ -405,6 +408,7 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
   return (
     <View style={{ flex: 1, backgroundColor: tokens.background }}>
       <SetlistDraggableList
+        artistName={artistName}
         ListFooterComponent={listFooter}
         ListHeaderComponent={listHeader}
         listRef={listRef}

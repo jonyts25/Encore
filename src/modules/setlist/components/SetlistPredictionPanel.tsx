@@ -5,6 +5,9 @@ import { useTranslation } from '@/core/i18n';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
+import { ListenSetlistButton } from '@/modules/music/components/ListenSetlistButton';
+import { SongListenButton } from '@/modules/music/components/SongListenButton';
+
 import { useShowPrediction } from '../hooks/useShowPrediction';
 import {
   getPredictionDisclaimerKey,
@@ -93,6 +96,8 @@ export function SetlistPredictionPanel({
 
           {!isCompact && metaLine ? <ThemedText style={styles.meta}>{metaLine}</ThemedText> : null}
 
+          {!isCompact ? <ListenSetlistButton artistName={artistName} /> : null}
+
           <View
             style={[
               styles.list,
@@ -117,6 +122,7 @@ export function SetlistPredictionPanel({
                   <Text numberOfLines={1} style={[styles.compactTitle, { color: tokens.text }]}>
                     {song.title}
                   </Text>
+                  <SongListenButton artistName={artistName} songTitle={song.title} size={20} />
                   {showConfidence && song.confidence != null ? (
                     <Text style={[styles.compactPct, { color: tokens.textSecondary }]}>
                       {formatConfidence(song.confidence)}
@@ -144,6 +150,7 @@ export function SetlistPredictionPanel({
                         onPress={() => openLyrics(song.title)}
                       />
                     </View>
+                    <SongListenButton artistName={artistName} songTitle={song.title} />
                     <Pressable
                       accessibilityLabel={t('setlist.openLive')}
                       accessibilityRole="button"

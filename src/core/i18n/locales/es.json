@@ -397,6 +397,14 @@
       "no_tour_data_fallback": "Repertorio general del artista"
     }
   },
+  "musicStreaming": {
+    "listenTitle": "Escuchar en",
+    "listenSong": "Escuchar esta canción",
+    "listenSetlist": "Escuchar el setlist",
+    "appleMusic": "Apple Music",
+    "spotify": "Spotify",
+    "youtubeMusic": "YouTube Music"
+  },
   "practice": {
     "emptyTitle": "Aún no sabemos qué van a tocar",
     "emptySubtitle": "No hay setlists de esta gira todavía. Elige las canciones que quieres practicar.",

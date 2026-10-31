@@ -22,6 +22,7 @@ import { hapticImpactLight } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
+import { SongListenButton } from '@/modules/music/components/SongListenButton';
 
 import {
   ENCORE_DIVIDER_KEY,
@@ -35,6 +36,7 @@ const AUTO_SCROLL_EDGE = 72;
 const AUTO_SCROLL_STEP = 10;
 
 type SetlistDraggableListProps = {
+  artistName: string;
   rows: SetlistListRow[];
   onRowsChange: (rows: SetlistListRow[]) => void;
   listRef: React.RefObject<FlatList<SetlistListRow> | null>;
@@ -87,6 +89,7 @@ type DragRowProps = {
   onDragStart: (index: number) => void;
   onDragUpdate: (index: number, translationY: number, absoluteY: number) => void;
   onDragEnd: () => void;
+  artistName: string;
 };
 
 function SetlistDragRow({
@@ -99,6 +102,7 @@ function SetlistDragRow({
   onDragStart,
   onDragUpdate,
   onDragEnd,
+  artistName,
 }: DragRowProps) {
   const { t } = useTranslation();
   const { tokens } = useEncoreTheme();
@@ -185,6 +189,7 @@ function SetlistDragRow({
           size={22}
         />
       </Pressable>
+      <SongListenButton artistName={artistName} songTitle={song.title} />
       <GestureDetector gesture={dragGesture}>
         <View accessibilityLabel={t('memory.setlist.dragHandle')} style={styles.handleHit}>
           <Ionicons color={tokens.textSecondary} name="reorder-three" size={24} />
@@ -195,6 +200,7 @@ function SetlistDragRow({
 }
 
 export function SetlistDraggableList({
+  artistName,
   rows,
   onRowsChange,
   listRef,
@@ -286,6 +292,7 @@ export function SetlistDraggableList({
   const renderRow = useCallback(
     ({ item, index }: ListRenderItemInfo<SetlistListRow>) => (
       <SetlistDragRow
+        artistName={artistName}
         dragTranslateY={dragTranslateY}
         index={index}
         isDragging={draggingIndex === index}
@@ -303,6 +310,7 @@ export function SetlistDraggableList({
       finishDrag,
       onDragStart,
       onDragUpdate,
+      artistName,
       onToggleHighlight,
       onTogglePlayed,
     ]

@@ -397,6 +397,14 @@
       "no_tour_data_fallback": "General artist repertoire"
     }
   },
+  "musicStreaming": {
+    "listenTitle": "Listen on",
+    "listenSong": "Listen to this song",
+    "listenSetlist": "Listen to the setlist",
+    "appleMusic": "Apple Music",
+    "spotify": "Spotify",
+    "youtubeMusic": "YouTube Music"
+  },
   "practice": {
     "emptyTitle": "We don't know the setlist yet",
     "emptySubtitle": "There are no setlists for this tour yet. Pick the songs you want to practice.",
