@@ -10,7 +10,7 @@ export type ProfileStats = {
 
 export function computeProfileStats(params: {
   attendedShows: Pick<Show, 'artist_id' | 'venue'>[];
-  goingShows: Pick<Show, 'show_date'>[];
+  goingShows: Pick<Show, 'show_date' | 'local_date' | 'time_confirmed' | 'venue'>[];
   now?: Date;
 }): ProfileStats {
   const { attendedShows, goingShows, now = new Date() } = params;
@@ -18,7 +18,7 @@ export function computeProfileStats(params: {
   const cities = new Set(
     attendedShows.map((show) => show.venue.city?.trim()).filter((city): city is string => Boolean(city))
   );
-  const upcomingGoing = goingShows.filter((show) => isShowActive(show.show_date, now)).length;
+  const upcomingGoing = goingShows.filter((show) => isShowActive(show, now)).length;
 
   return {
     showsAttended: attendedShows.length,

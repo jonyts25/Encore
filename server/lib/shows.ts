@@ -10,6 +10,8 @@ const SHOW_SELECT = `
   tour_id,
   venue_id,
   show_date,
+  local_date,
+  time_confirmed,
   setlistfm_id,
   created_at,
   artist:artists (
@@ -25,7 +27,8 @@ const SHOW_SELECT = `
     country,
     lat,
     lng,
-    capacity
+    capacity,
+    timezone
   )
 `;
 
@@ -132,9 +135,9 @@ export async function getHomeShowSections(params: {
     listUpcomingShows({ followedOnly: true, supabase, userId: params.userId }),
   ]);
 
-  const going = allGoing.filter((show) => isShowActive(show.show_date));
+  const going = allGoing.filter((show) => isShowActive(show));
   const goingAttendancePending = allGoing.filter(
-    (show) => !isShowActive(show.show_date) && getShowPhase(show.show_date) === 'past'
+    (show) => !isShowActive(show) && getShowPhase(show) === 'past'
   );
 
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));

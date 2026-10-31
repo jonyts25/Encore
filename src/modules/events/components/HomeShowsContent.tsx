@@ -17,7 +17,7 @@ import { useShowStatus } from '../hooks/useShowStatus';
 import type { Show } from '../types';
 import { AttendancePromptCard } from './AttendancePromptCard';
 import { HomeHeroShowCard } from './HomeHeroShowCard';
-import { getTodayGoingShow } from './TodayShowCta';
+import { getTodayGoingShow, pickPrimaryGoingShow } from '@/modules/events/visibility';
 
 const TAB_BAR_CLEARANCE = 56;
 
@@ -52,13 +52,6 @@ function AttendancePromptItem({ show }: { show: Show }) {
       }}
     />
   );
-}
-
-function pickHeroShow(going: Show[]): Show | null {
-  if (going.length === 0) return null;
-  return [...going].sort(
-    (a, b) => new Date(a.show_date).getTime() - new Date(b.show_date).getTime()
-  )[0];
 }
 
 function UpcomingCarouselItem({ show }: { show: Show }) {
@@ -129,7 +122,7 @@ export function HomeShowsContent() {
     );
   }
 
-  const heroShow = pickHeroShow(sections.going);
+  const heroShow = pickPrimaryGoingShow(sections.going);
   const hasData = hasAnyShows(sections);
   const carouselShows = sections.going.filter((show) => show.id !== heroShow?.id).slice(0, 8);
 

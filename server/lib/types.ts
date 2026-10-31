@@ -18,6 +18,7 @@ export type VenueSummary = {
   lng: number | null;
   capacity: number | null;
   photo_url?: string | null;
+  timezone?: string | null;
 };
 
 export type ShowWithRelations = {
@@ -26,6 +27,8 @@ export type ShowWithRelations = {
   tour_id: string | null;
   venue_id: string;
   show_date: string;
+  local_date?: string;
+  time_confirmed?: boolean;
   setlistfm_id: string | null;
   created_at: string;
   artist: ArtistSummary;

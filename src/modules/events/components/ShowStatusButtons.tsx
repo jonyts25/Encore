@@ -11,13 +11,14 @@ import { useEncoreTheme } from '@/core/ui/theme';
 import { typography } from '@/core/ui/theme/typography';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 
-import { getShowPhase, hasConfirmedTime } from '../visibility';
+import { getShowPhase, hasConfirmedTime, type ShowVisibilityInput } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
 import type { ShowStatus } from '../types';
 
 type ShowStatusButtonsProps = {
   showId: string;
   showDate?: string;
+  show?: ShowVisibilityInput;
   appearance?: 'default' | 'showDetail';
 };
 
@@ -30,7 +31,12 @@ function formatStartTime(showDate: string, locale: string): string | null {
   }).format(new Date(showDate));
 }
 
-export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: ShowStatusButtonsProps) {
+export function ShowStatusButtons({
+  showId,
+  showDate,
+  show,
+  appearance = 'default',
+}: ShowStatusButtonsProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { tokens } = useEncoreTheme();
@@ -38,7 +44,15 @@ export function ShowStatusButtons({ showId, showDate, appearance = 'default' }: 
     useShowStatus(showId);
   const [attendanceConfirmed, setAttendanceConfirmed] = useState(false);
 
-  const phase = showDate ? getShowPhase(showDate) : 'upcoming';
+  const visibilityShow =
+    show ??
+    (showDate
+      ? {
+          show_date: showDate,
+          venue: { timezone: null } satisfies ShowVisibilityInput['venue'],
+        }
+      : null);
+  const phase = visibilityShow ? getShowPhase(visibilityShow) : 'upcoming';
 
   const commitStatus = (nextStatus: ShowStatus) => {
     void (async () => {

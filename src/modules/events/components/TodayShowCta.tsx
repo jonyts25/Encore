@@ -5,20 +5,14 @@ import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 import { formatShowVenueLine } from '@/modules/events/api';
 import type { Show } from '@/modules/events/types';
-import { getShowPhase, isShowActive } from '@/modules/events/visibility';
+import { getTodayGoingShow } from '@/modules/events/visibility';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
+
+export { getTodayGoingShow };
 
 type TodayShowCtaProps = {
   show: Show;
 };
-
-export function getTodayGoingShow(shows: Show[]): Show | null {
-  return (
-    shows.find(
-      (show) => isShowActive(show.show_date) && getShowPhase(show.show_date) === 'today'
-    ) ?? null
-  );
-}
 
 export function TodayShowCta({ show }: TodayShowCtaProps) {
   const { t } = useTranslation();

@@ -103,7 +103,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     return sorted[0]?.title ?? null;
   }, [prediction, showConfidence]);
 
-  const phase = show ? getShowPhase(show.show_date) : 'upcoming';
+  const phase = show ? getShowPhase(show) : 'upcoming';
 
   const packCardTitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return null;
@@ -261,7 +261,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             </View>
           </View>
 
-          <ShowStatusButtons appearance="showDetail" showDate={show.show_date} showId={show.id} />
+          <ShowStatusButtons appearance="showDetail" show={show} showId={show.id} />
 
           {packRecord && packRecord.status !== 'idle' ? (
             <View style={[styles.packCard, { backgroundColor: tokens.surface }]}>

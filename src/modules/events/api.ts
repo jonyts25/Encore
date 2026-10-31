@@ -36,6 +36,8 @@ const SHOW_SELECT = `
   tour_id,
   venue_id,
   show_date,
+  local_date,
+  time_confirmed,
   setlistfm_id,
   created_at,
   artist:artists (
@@ -178,9 +180,9 @@ export async function fetchHomeShowSections(
     token ? fetchUpcomingShows({ followed: true, accessToken: token }) : Promise.resolve([]),
   ]);
 
-  const going = allGoing.filter((show) => isShowActive(show.show_date));
+  const going = allGoing.filter((show) => isShowActive(show));
   const goingAttendancePending = allGoing.filter(
-    (show) => !isShowActive(show.show_date) && getShowPhase(show.show_date) === 'past'
+    (show) => !isShowActive(show) && getShowPhase(show) === 'past'
   );
 
   const forYou = followedShows.filter((show) => !showIdsWithAnyStatus.has(show.id));
