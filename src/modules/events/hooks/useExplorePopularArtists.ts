@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 import type { ArtistSummary } from '../types';
@@ -22,11 +23,12 @@ export function useExplorePopularArtists(options: UseExplorePopularArtistsOption
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    void readOfflineQuery<ArtistSummary[]>(CACHE_KEY).then((cached) => {
-      if (cached?.length) {
-        queryClient.setQueryData(queryKeys.explorePopular(), cached);
-      }
-    });
+    void seedQueryClientFromCache(
+      queryClient,
+      queryKeys.explorePopular(),
+      () => readOfflineQuery<ArtistSummary[]>(CACHE_KEY),
+      (cached) => cached.length > 0
+    );
   }, [queryClient]);
 
   const query = useQuery<ArtistSummary[]>({

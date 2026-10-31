@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { getCachedLyrics } from '@/core/db/lyricsCache';
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { queryClientHasData } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -19,23 +20,30 @@ export function useLyrics(artist: string, title: string) {
   const enabled = Boolean(trimmedArtist && trimmedTitle);
   const cacheKey = `lyrics:${trimmedArtist.toLowerCase()}::${trimmedTitle.toLowerCase()}`;
 
+  const queryKey = queryKeys.lyrics(trimmedArtist, trimmedTitle);
+
   useEffect(() => {
     if (!enabled) return;
     void (async () => {
+      if (queryClientHasData(queryClient, queryKey)) return;
+
       const fromLyricsDb = await getCachedLyrics(trimmedArtist, trimmedTitle);
+      if (queryClientHasData(queryClient, queryKey)) return;
       if (fromLyricsDb) {
-        queryClient.setQueryData(queryKeys.lyrics(trimmedArtist, trimmedTitle), fromLyricsDb);
+        queryClient.setQueryData(queryKey, fromLyricsDb);
         return;
       }
+
       const cached = await readOfflineQuery<LyricsResult | null>(cacheKey);
+      if (queryClientHasData(queryClient, queryKey)) return;
       if (cached) {
-        queryClient.setQueryData(queryKeys.lyrics(trimmedArtist, trimmedTitle), cached);
+        queryClient.setQueryData(queryKey, cached);
       }
     })();
-  }, [cacheKey, enabled, queryClient, trimmedArtist, trimmedTitle]);
+  }, [cacheKey, enabled, queryClient, queryKey, trimmedArtist, trimmedTitle]);
 
   const query = useQuery<LyricsResult | null>({
-    queryKey: queryKeys.lyrics(trimmedArtist, trimmedTitle),
+    queryKey,
     queryFn: createStaleWhileRevalidateQueryFn({
       fetchFresh: () => fetchLyrics(trimmedArtist, trimmedTitle),
       readCache: async () => {

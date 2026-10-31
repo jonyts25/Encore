@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -23,11 +24,9 @@ export function useUpcomingShows(options: UseUpcomingShowsOptions = {}) {
   const cacheKey = `upcoming:${followedOnly ? 'followed' : 'all'}:${userId ?? 'guest'}`;
 
   useEffect(() => {
-    void readOfflineQuery<Show[]>(cacheKey).then((cached) => {
-      if (cached) {
-        queryClient.setQueryData(queryKeys.upcoming(followedOnly, userId), cached);
-      }
-    });
+    void seedQueryClientFromCache(queryClient, queryKeys.upcoming(followedOnly, userId), () =>
+      readOfflineQuery<Show[]>(cacheKey)
+    );
   }, [cacheKey, followedOnly, queryClient, userId]);
 
   const query = useQuery<Show[]>({

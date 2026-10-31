@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 import { useSession } from '@/modules/identity';
@@ -21,11 +22,12 @@ export function useShowStatus(showId: string) {
 
   useEffect(() => {
     if (!cacheKey || !userId) return;
-    void readOfflineQuery<ShowStatus | null>(cacheKey).then((cached) => {
-      if (cached !== null) {
-        queryClient.setQueryData(queryKeys.showStatus(showId, userId), cached);
-      }
-    });
+    void seedQueryClientFromCache(
+      queryClient,
+      queryKeys.showStatus(showId, userId),
+      () => readOfflineQuery<ShowStatus | null>(cacheKey),
+      (cached) => cached !== null
+    );
   }, [cacheKey, queryClient, showId, userId]);
 
   const statusQuery = useQuery<ShowStatus | null>({

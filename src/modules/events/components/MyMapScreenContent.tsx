@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -194,11 +195,16 @@ export function MyMapScreenContent() {
   const [year, setYear] = useState<number | 'all'>('all');
   const [selectedGroup, setSelectedGroup] = useState<MyMapVenueGroup | null>(null);
 
-  const { attendedShows, mapData, allYearsData, isLoading, error, refetch } = useMyConcertMap({
+  const { attendedShows, mapData, allYearsData, isLoading, error, refetch, isFetching } =
+    useMyConcertMap({
     userId: user?.id ?? null,
     enabled: Boolean(user),
-    year,
-  });
+      year,
+    });
+
+  const onRefresh = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   const onGeocodeFinished = useCallback(() => {
     void refetch();
@@ -265,7 +271,10 @@ export function MyMapScreenContent() {
           paddingBottom: insets.bottom + spacing.xl,
           gap: spacing.md,
         }}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl refreshing={isFetching && !isLoading} onRefresh={onRefresh} />
+        }>
         <View style={{ paddingHorizontal: spacing.screenHorizontal, gap: spacing.sm }}>
           <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{statsLine}</Text>
           {isGeocoding ? (

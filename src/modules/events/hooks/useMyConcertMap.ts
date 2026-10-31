@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -21,18 +22,17 @@ export function useMyConcertMap(options: UseMyConcertMapOptions = {}) {
   const { userId = null, enabled = true, year = 'all' } = options;
   const queryClient = useQueryClient();
   const cacheKey = userId ? `myMap:${userId}` : null;
+  const queryKey = userId ? queryKeys.myMap(userId) : (['myMap', 'disabled'] as const);
 
   useEffect(() => {
-    if (!cacheKey) return;
-    void readOfflineQuery<Show[]>(cacheKey).then((cached) => {
-      if (cached && userId) {
-        queryClient.setQueryData(queryKeys.myMap(userId), cached);
-      }
-    });
-  }, [cacheKey, queryClient, userId]);
+    if (!cacheKey || !userId) return;
+    void seedQueryClientFromCache(queryClient, queryKey, () =>
+      readOfflineQuery<Show[]>(cacheKey)
+    );
+  }, [cacheKey, queryClient, queryKey, userId]);
 
   const query = useQuery<Show[]>({
-    queryKey: userId ? queryKeys.myMap(userId) : ['myMap', 'disabled'],
+    queryKey,
     queryFn: createStaleWhileRevalidateQueryFn({
       fetchFresh: () => fetchAttendedShowsForMap(userId!),
       readCache: () => (cacheKey ? readOfflineQuery<Show[]>(cacheKey) : Promise.resolve(null)),
@@ -40,6 +40,7 @@ export function useMyConcertMap(options: UseMyConcertMapOptions = {}) {
     }),
     enabled: enabled && Boolean(userId),
     placeholderData: (previous) => previous,
+    refetchOnMount: 'always',
   });
 
   const attendedShows = query.data ?? EMPTY;
@@ -57,9 +58,9 @@ export function useMyConcertMap(options: UseMyConcertMapOptions = {}) {
     filteredShows,
     mapData,
     allYearsData,
-    isLoading: query.isPending && !query.data,
+    isLoading: query.isPending && query.data === undefined,
     error:
-      query.isError && !query.data
+      query.isError && query.data === undefined
         ? query.error instanceof Error
           ? query.error.message
           : 'Failed to load concert map'

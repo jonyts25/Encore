@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { getCachedShowFromPack } from '@/core/db/showPackCache';
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useTranslation } from '@/core/i18n';
+import { queryClientHasData } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -13,24 +14,30 @@ import type { Show } from '../types';
 export function useShow(showId: string) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const queryKey = queryKeys.show(showId);
 
   useEffect(() => {
     if (!showId) return;
     void (async () => {
+      if (queryClientHasData(queryClient, queryKey)) return;
+
       const fromPack = await getCachedShowFromPack(showId);
+      if (queryClientHasData(queryClient, queryKey)) return;
       if (fromPack) {
-        queryClient.setQueryData(queryKeys.show(showId), fromPack);
+        queryClient.setQueryData(queryKey, fromPack);
         return;
       }
+
       const cached = await readOfflineQuery<Show | null>(`show:${showId}`);
+      if (queryClientHasData(queryClient, queryKey)) return;
       if (cached) {
-        queryClient.setQueryData(queryKeys.show(showId), cached);
+        queryClient.setQueryData(queryKey, cached);
       }
     })();
-  }, [queryClient, showId]);
+  }, [queryClient, queryKey, showId]);
 
   const query = useQuery<Show | null>({
-    queryKey: queryKeys.show(showId),
+    queryKey,
     queryFn: createStaleWhileRevalidateQueryFn({
       fetchFresh: () => fetchShowById(showId),
       readCache: async () => {
@@ -44,15 +51,14 @@ export function useShow(showId: string) {
     placeholderData: (previous) => previous,
   });
 
-  const isLoading = query.isPending && query.data === undefined;
   const show = query.data ?? null;
-
-  let error: string | null = null;
-  if (query.isError && !show) {
-    error = query.error instanceof Error ? query.error.message : t('events.loadError');
-  } else if (!isLoading && show === null && query.isSuccess) {
-    error = t('events.showNotFound');
-  }
+  const isLoading = query.isPending && query.data === undefined;
+  const error =
+    query.isError && !show
+      ? query.error instanceof Error
+        ? query.error.message
+        : t('events.loadError')
+      : null;
 
   return { show, isLoading, error, refetch: query.refetch, isFetching: query.isFetching };
 }
