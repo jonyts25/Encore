@@ -32,6 +32,12 @@ const SHOW_SELECT = `
   )
 `;
 
+function filterActiveUpcomingShows<T extends { show_date: string; local_date?: string; time_confirmed?: boolean; venue?: { timezone?: string | null } }>(
+  shows: T[]
+): T[] {
+  return shows.filter((show) => isShowActive(show));
+}
+
 export async function listUpcomingShows(options?: {
   followedOnly?: boolean;
   supabase?: SupabaseClient;
@@ -62,7 +68,7 @@ export async function listUpcomingShows(options?: {
   const { data, error } = await query;
 
   if (error) throw error;
-  return (data ?? []) as unknown as ShowWithRelations[];
+  return filterActiveUpcomingShows((data ?? []) as unknown as ShowWithRelations[]);
 }
 
 async function listShowsByIds(
@@ -83,7 +89,9 @@ async function listShowsByIds(
   const { data, error } = await query;
 
   if (error) throw error;
-  return (data ?? []) as unknown as ShowWithRelations[];
+  const rows = (data ?? []) as unknown as ShowWithRelations[];
+  if (options?.upcomingOnly === false) return rows;
+  return filterActiveUpcomingShows(rows);
 }
 
 async function listUpcomingShowsForArtist(
@@ -98,7 +106,7 @@ async function listUpcomingShowsForArtist(
     .order('show_date', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as unknown as ShowWithRelations[];
+  return filterActiveUpcomingShows((data ?? []) as unknown as ShowWithRelations[]);
 }
 
 export type HomeShowSections = {
@@ -167,18 +175,23 @@ export async function getArtistShowSections(params: {
     .from('user_shows')
     .select('show_id, status')
     .eq('user_id', params.userId)
-    .in('status', ['voy', 'interesado', 'fui']);
+    .in('status', ['voy', 'interesado', 'fui', 'no_fui']);
 
   if (userShowsError) throw userShowsError;
 
-  const activeRows = (userShows ?? []).filter((row) => row.status !== 'fui');
+  const showIdsWithUserStatus = new Set((userShows ?? []).map((row) => row.show_id));
+  const yoursIds = new Set(
+    (userShows ?? [])
+      .filter((row) => row.status === 'voy' || row.status === 'interesado')
+      .map((row) => row.show_id)
+  );
+
+  const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
+  const other = upcomingForArtist.filter((show) => !showIdsWithUserStatus.has(show.id));
+
   const attendedIds = (userShows ?? [])
     .filter((row) => row.status === 'fui')
     .map((row) => row.show_id);
-
-  const yoursIds = new Set(activeRows.map((row) => row.show_id));
-  const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
-  const other = upcomingForArtist.filter((show) => !yoursIds.has(show.id));
 
   const attendedShows = await listShowsByIds(attendedIds, supabase, { upcomingOnly: false });
   const attended = attendedShows.filter((show) => show.artist_id === params.artistId);
