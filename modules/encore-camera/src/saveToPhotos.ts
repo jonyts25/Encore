@@ -2,7 +2,8 @@ import { requireNativeModule } from 'expo-modules-core';
 import { Platform } from 'react-native';
 
 export type SaveToPhotosResult = {
-  success: true;
+  saved: boolean;
+  assetId: string | null;
 };
 
 type EncoreCameraNativeModule = {
