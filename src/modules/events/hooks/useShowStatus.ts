@@ -45,6 +45,7 @@ export function useShowStatus(showId: string) {
     if (!userId) return;
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.home(userId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.myMap(userId) }),
       queryClient.invalidateQueries({ queryKey: ['artistShows'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.upcoming(true, userId) }),
     ]);

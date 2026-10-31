@@ -151,6 +151,33 @@ export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): P
   return data.shows;
 }
 
+export async function fetchAttendedShowsForMap(userId: string): Promise<Show[]> {
+  const resolvedUserId = await resolveUserIdForData(userId);
+
+  const { data: userShows, error: userShowsError } = await supabase
+    .from('user_shows')
+    .select('show_id, status')
+    .eq('user_id', resolvedUserId)
+    .eq('status', 'fui');
+
+  if (userShowsError) throw userShowsError;
+
+  const attendedIds = (userShows ?? []).map((row) => row.show_id);
+  return listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false });
+}
+
+export async function requestVenueGeocode(venueId: string, accessToken: string): Promise<void> {
+  if (!venueId.trim()) return;
+  try {
+    await apiFetch(`/api/venues/${encodeURIComponent(venueId)}/geocode`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    // Geocoding is best-effort and should not block show creation.
+  }
+}
+
 export async function fetchHomeShowSections(
   userId: string,
   accessToken?: string | null

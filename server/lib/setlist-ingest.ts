@@ -251,7 +251,14 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
     .single();
 
   if (error) throw error;
-  return data.id as string;
+  const venueId = data.id as string;
+
+  if (lat == null || lng == null) {
+    const { geocodeVenueById } = await import('./venue-geocode');
+    await geocodeVenueById(supabase, venueId).catch(() => undefined);
+  }
+
+  return venueId;
 }
 
 async function upsertTour(
