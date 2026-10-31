@@ -328,7 +328,18 @@
     "videoPlaybackComingSoon": "In-app playback is coming in the next version",
     "openInPhotos": "Open in Photos",
     "videoDownloadingICloud": "Downloading from iCloud…",
-    "videoLoadError": "We couldn't load this video."
+    "videoLoadError": "We couldn't load this video.",
+    "shareCta": "Share your night"
+  },
+  "showNightShare": {
+    "screenTitle": "Share your night",
+    "previewHint": "This is how it will look in your stories. Share once the image has loaded.",
+    "shareAction": "Share",
+    "shareError": "We couldn't create the image to share.",
+    "eyebrow": "I went to see",
+    "highlightsTitle": "My moments",
+    "liveSongCount": "{{count}} live songs",
+    "ratingA11y": "Rating {{rating}} out of 5"
   },
   "notifications": {
     "goingReminder": {

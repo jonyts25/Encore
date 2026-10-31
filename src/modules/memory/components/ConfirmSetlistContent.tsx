@@ -255,7 +255,7 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
         songs,
       });
       await refreshMemory();
-      router.back();
+      router.replace(`/show/${show.id}/share-night`);
     } catch {
       Alert.alert(t('memory.setlist.saveError'));
     } finally {
@@ -337,12 +337,19 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
           </View>
         ) : null}
 
-        <PillButton
-          disabled={!isDirty || saving}
-          title={saving ? t('common.loading') : t('memory.setlist.save')}
-          variant="primary"
-          onPress={() => void onSave()}
-        />
+        <View style={styles.footerActions}>
+          <PillButton
+            title={t('showNightShare.shareAction')}
+            variant="secondary"
+            onPress={() => router.push(`/show/${showId}/share-night`)}
+          />
+          <PillButton
+            disabled={!isDirty || saving}
+            title={saving ? t('common.loading') : t('memory.setlist.save')}
+            variant="primary"
+            onPress={() => void onSave()}
+          />
+        </View>
       </View>
     );
   }, [
@@ -354,7 +361,9 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
     saving,
     searchOpen,
     searchRaw,
+    router,
     searchResults,
+    showId,
     t,
     tokens.accent,
     tokens.separator,
@@ -446,6 +455,11 @@ const styles = StyleSheet.create({
   },
   stars: {
     flexDirection: 'row',
+    gap: 8,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
 });

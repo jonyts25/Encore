@@ -328,7 +328,18 @@
     "videoPlaybackComingSoon": "La reproducción en la app llega en la siguiente versión",
     "openInPhotos": "Ver en Fotos",
     "videoDownloadingICloud": "Descargando de iCloud…",
-    "videoLoadError": "No pudimos cargar este video."
+    "videoLoadError": "No pudimos cargar este video.",
+    "shareCta": "Compartir tu noche"
+  },
+  "showNightShare": {
+    "screenTitle": "Comparte tu noche",
+    "previewHint": "Así se verá en tus historias. Cuando la imagen termine de cargar, comparte.",
+    "shareAction": "Compartir",
+    "shareError": "No pudimos crear la imagen para compartir.",
+    "eyebrow": "Fui a ver a",
+    "highlightsTitle": "Mis momentos",
+    "liveSongCount": "{{count}} canciones en vivo",
+    "ratingA11y": "Calificación {{rating}} de 5"
   },
   "notifications": {
     "goingReminder": {

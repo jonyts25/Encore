@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { requestPermissionsAsync } from 'expo-media-library';
 import * as MediaLibrary from 'expo-media-library/legacy';
+import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -66,6 +67,7 @@ function GalleryThumb({ row, onMissing, onPress }: GalleryThumbProps) {
 
 export function ShowNightSection({ show }: ShowNightSectionProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { tokens } = useEncoreTheme();
   const { media, isLoading, refresh, userId } = useShowMedia(show.id, true);
 
@@ -190,11 +192,18 @@ export function ShowNightSection({ show }: ShowNightSectionProps) {
     <View style={styles.section}>
       <Text style={[typography.title, { color: tokens.text }]}>{t('showNight.title')}</Text>
 
-      <PillButton
-        title={t('showNight.searchLibrary')}
-        variant="secondary"
-        onPress={() => void searchLibrary()}
-      />
+      <View style={styles.actionRow}>
+        <PillButton
+          title={t('showNight.searchLibrary')}
+          variant="secondary"
+          onPress={() => void searchLibrary()}
+        />
+        <PillButton
+          title={t('showNight.shareCta')}
+          variant="secondary"
+          onPress={() => router.push(`/show/${show.id}/share-night`)}
+        />
+      </View>
 
       {isLoading ? <ActivityIndicator color={tokens.accent} style={styles.loader} /> : null}
 
@@ -290,6 +299,11 @@ const styles = StyleSheet.create({
   section: {
     gap: 12,
     marginTop: 8,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
   },
   loader: {
     marginVertical: 8,

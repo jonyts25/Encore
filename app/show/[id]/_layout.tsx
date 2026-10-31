@@ -11,6 +11,10 @@ export default function ShowDetailLayout() {
         name="setlist"
         options={{ headerShown: true, title: t('memory.setlist.title'), headerBackTitle: t('common.back') }}
       />
+      <Stack.Screen
+        name="share-night"
+        options={{ headerShown: true, title: t('showNightShare.screenTitle'), headerBackTitle: t('common.back') }}
+      />
     </Stack>
   );
 }
