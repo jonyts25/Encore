@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Encore uses the camera for LIVE mode during concerts.",
+    "NSMicrophoneUsageDescription": "Encore uses the microphone to record audio with video in LIVE mode.",
+    "NSPhotoLibraryAddUsageDescription": "Encore saves your concert videos to your photo library.",
+    "NSPhotoLibraryUsageDescription": "Encore looks for photos and videos you took at your concerts to save them to your history."
+  }
+}

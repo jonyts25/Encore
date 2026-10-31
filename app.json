@@ -8,13 +8,19 @@
     "icon": "./assets/images/icon.png",
     "scheme": "encore",
     "userInterfaceStyle": "automatic",
+    "locales": {
+      "en": "./languages/en.json",
+      "es": "./languages/es.json"
+    },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.jonathanrosique.encore",
       "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true,
         "NSCameraUsageDescription": "Encore usa la cámara para el modo LIVE durante conciertos.",
         "NSMicrophoneUsageDescription": "Encore usa el micrófono para grabar audio junto con el video en el modo LIVE.",
         "NSPhotoLibraryAddUsageDescription": "Encore guarda tus videos de conciertos en tu biblioteca de fotos.",
+        "NSPhotoLibraryUsageDescription": "Encore busca las fotos y videos que tomaste en tus conciertos para guardarlos en tu historial.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -27,6 +33,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": ["android.permission.READ_MEDIA_AUDIO"],
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -42,21 +49,29 @@
     },
     "plugins": [
       "expo-router",
-      "expo-localization",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": ["en", "es"],
+            "android": ["en", "es"]
+          }
+        }
+      ],
       "expo-sqlite",
       [
         "expo-camera",
         {
           "cameraPermission": "Encore uses the camera for LIVE mode during concerts.",
-          "microphonePermission": "Encore uses the microphone to record LIVE videos.",
+          "microphonePermission": "Encore uses the microphone to record audio with video in LIVE mode.",
           "recordAudioAndroid": true
         }
       ],
       [
         "expo-media-library",
         {
-          "photosPermission": "Encore saves LIVE recordings to your camera roll.",
-          "savePhotosPermission": "Encore saves LIVE recordings to your camera roll.",
+          "photosPermission": "Encore busca las fotos y videos que tomaste en tus conciertos para guardarlos en tu historial.",
+          "savePhotosPermission": "Encore guarda tus videos de conciertos en tu biblioteca de fotos.",
           "isAccessMediaLocationEnabled": false
         }
       ],

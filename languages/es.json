@@ -1,0 +1,8 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Encore usa la cámara para el modo LIVE durante conciertos.",
+    "NSMicrophoneUsageDescription": "Encore usa el micrófono para grabar audio junto con el video en el modo LIVE.",
+    "NSPhotoLibraryAddUsageDescription": "Encore guarda tus videos de conciertos en tu biblioteca de fotos.",
+    "NSPhotoLibraryUsageDescription": "Encore busca las fotos y videos que tomaste en tus conciertos para guardarlos en tu historial."
+  }
+}

@@ -67,8 +67,13 @@ enum EncoreCameraPhotos {
   }
 
   private static func saveVideo(at filePath: URL, promise: Promise) {
+    var createdLocalIdentifier: String?
+
     PHPhotoLibrary.shared().performChanges({
-      PHAssetCreationRequest.creationRequestForAssetFromVideo(atFileURL: filePath)
+      guard let request = PHAssetCreationRequest.creationRequestForAssetFromVideo(atFileURL: filePath) else {
+        return
+      }
+      createdLocalIdentifier = request.placeholderForCreatedAsset?.localIdentifier
     }) { success, error in
       DispatchQueue.main.async {
         if let error {
@@ -90,7 +95,10 @@ enum EncoreCameraPhotos {
         }
 
         removeTemporaryFile(at: filePath)
-        promise.resolve(["success": true])
+        promise.resolve([
+          "saved": true,
+          "assetId": createdLocalIdentifier as Any,
+        ])
       }
     }
   }
