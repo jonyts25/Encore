@@ -2,6 +2,12 @@ import type { Show, VenueSummary } from './types';
 
 export const VENUE_GEOCODE_RETRY_MS = 24 * 60 * 60 * 1000;
 
+export type VenueGeocodeAuthStatus = 'updated' | 'not_found' | 'skipped' | 'error';
+
+export function shouldRecordVenueGeocodeAttempt(status: VenueGeocodeAuthStatus): boolean {
+  return status === 'updated' || status === 'not_found' || status === 'skipped';
+}
+
 export function venueMissingCoordinates(venue: VenueSummary): boolean {
   return venue.lat == null || venue.lng == null || !Number.isFinite(venue.lat) || !Number.isFinite(venue.lng);
 }

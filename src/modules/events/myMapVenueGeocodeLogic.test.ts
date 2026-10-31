@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   filterVenueIdsEligibleForGeocode,
+  shouldRecordVenueGeocodeAttempt,
   uniqueUnlocatedVenueIds,
   VENUE_GEOCODE_RETRY_MS,
 } from './myMapVenueGeocodeLogic';
@@ -39,6 +40,13 @@ test('uniqueUnlocatedVenueIds dedupes venues missing coordinates', () => {
     show('v2', 19),
   ]);
   assert.deepEqual(ids.sort(), ['v1']);
+});
+
+test('shouldRecordVenueGeocodeAttempt skips error responses', () => {
+  assert.equal(shouldRecordVenueGeocodeAttempt('updated'), true);
+  assert.equal(shouldRecordVenueGeocodeAttempt('not_found'), true);
+  assert.equal(shouldRecordVenueGeocodeAttempt('skipped'), true);
+  assert.equal(shouldRecordVenueGeocodeAttempt('error'), false);
 });
 
 test('filterVenueIdsEligibleForGeocode respects 24h cooldown', () => {
