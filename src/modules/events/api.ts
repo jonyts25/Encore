@@ -39,6 +39,7 @@ const SHOW_SELECT = `
   show_date,
   local_date,
   time_confirmed,
+  source,
   setlistfm_id,
   created_at,
   artist:artists (

@@ -16,5 +16,6 @@ export const queryKeys = {
   myMap: (userId: string) => ['myMap', userId] as const,
   showMedia: (showId: string, userId: string) => ['showMedia', showId, userId] as const,
   discography: (userId: string) => ['discography', userId] as const,
+  homeFeed: (userId: string) => ['homeFeed', userId] as const,
   memory: (showId: string, userId: string) => ['memory', showId, userId] as const,
 };
