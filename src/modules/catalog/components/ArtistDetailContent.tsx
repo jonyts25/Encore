@@ -1,5 +1,4 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
@@ -7,11 +6,10 @@ import { PillButton } from '@/core/ui';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
 import { useSession } from '@/modules/identity';
 
-import { getArtistById } from '../api';
+import { useArtistDetail } from '../hooks/useArtistDetail';
 import { FollowArtistButton } from './FollowArtistButton';
 import { ArtistLinksRow } from './ArtistLinksRow';
 import { ArtistShowsSection } from './ArtistShowsSection';
-import type { Artist } from '../types';
 
 type ArtistDetailContentProps = {
   artistId: string;
@@ -21,32 +19,7 @@ export function ArtistDetailContent({ artistId }: ArtistDetailContentProps) {
   const { t } = useTranslation();
   const router = useRouter();
   const { isGuest } = useSession();
-  const [artist, setArtist] = useState<Artist | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await getArtistById(artistId);
-      if (!data) {
-        setError(t('catalog.artistNotFound'));
-        setArtist(null);
-        return;
-      }
-      setArtist(data);
-    } catch (err) {
-      setArtist(null);
-      setError(err instanceof Error ? err.message : t('catalog.loadError'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [artistId, t]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { artist, isLoading, error } = useArtistDetail(artistId);
 
   if (isLoading) {
     return (

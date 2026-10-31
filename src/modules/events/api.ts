@@ -286,6 +286,36 @@ export async function fetchShowByIdFromSupabase(showId: string): Promise<Show | 
   return normalizeShowRow(data as ShowRowFromSupabase);
 }
 
+export async function searchVenuesNearby(params: {
+  query: string;
+  city: string;
+  lat?: number | null;
+  lng?: number | null;
+  radiusKm?: number;
+  limit?: number;
+}): Promise<
+  Array<
+    VenueSummary & {
+      distance_km: number | null;
+    }
+  >
+> {
+  const { data, error } = await supabase.rpc('search_venues_nearby', {
+    p_query: params.query,
+    p_lat: params.lat ?? null,
+    p_lng: params.lng ?? null,
+    p_city: params.city.trim() || null,
+    p_radius_km: params.radiusKm ?? 75,
+    p_limit: params.limit ?? 20,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as Array<VenueSummary & { distance_km: number | null }>;
+}
+
 export async function searchVenues(
   query: string,
   options?: { city?: string; limit?: number }

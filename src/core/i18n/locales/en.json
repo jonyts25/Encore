@@ -27,6 +27,7 @@
     "venueTitle": "Venue",
     "venueCityPlaceholder": "City",
     "venueSearchPlaceholder": "Search venue by name…",
+    "venueDistance": "{{city}} · {{distance}} km",
     "venueNewTitle": "Or add a new one",
     "venueNamePlaceholder": "Venue name",
     "venueCandidatesTitle": "Is this the venue?",
