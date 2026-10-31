@@ -166,16 +166,38 @@ export async function fetchAttendedShowsForMap(userId: string): Promise<Show[]> 
   return listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false });
 }
 
-export async function requestVenueGeocode(venueId: string, accessToken: string): Promise<void> {
-  if (!venueId.trim()) return;
+type VenueGeocodeApiResult = {
+  result?: {
+    status?: 'updated' | 'not_found' | 'skipped';
+    venueId?: string;
+  };
+};
+
+export async function geocodeVenueWithAuth(
+  venueId: string,
+  accessToken: string
+): Promise<'updated' | 'not_found' | 'skipped' | 'error'> {
+  if (!venueId.trim()) return 'error';
   try {
-    await apiFetch(`/api/venues/${encodeURIComponent(venueId)}/geocode`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+    const data = await apiFetch<VenueGeocodeApiResult>(
+      `/api/venues/${encodeURIComponent(venueId)}/geocode`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    const status = data.result?.status;
+    if (status === 'updated' || status === 'not_found' || status === 'skipped') {
+      return status;
+    }
+    return 'error';
   } catch {
-    // Geocoding is best-effort and should not block show creation.
+    return 'error';
   }
+}
+
+export async function requestVenueGeocode(venueId: string, accessToken: string): Promise<void> {
+  await geocodeVenueWithAuth(venueId, accessToken);
 }
 
 export async function fetchHomeShowSections(

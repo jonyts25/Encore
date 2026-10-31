@@ -23,6 +23,7 @@ import { useSession } from '@/modules/identity';
 
 import { formatShowDate } from '../api';
 import { useMyConcertMap } from '../hooks/useMyConcertMap';
+import { useMyMapVenueGeocodeBackfill } from '../hooks/useMyMapVenueGeocodeBackfill';
 import {
   mapCoordinatesFromGroups,
   pinArtistForGroup,
@@ -186,17 +187,29 @@ export function MyMapScreenContent() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { tokens } = useEncoreTheme();
-  const { user } = useSession();
+  const { user, session } = useSession();
   const isOffline = useIsOffline();
   const mapRef = useRef<MapView | null>(null);
   const [mapLayout, setMapLayout] = useState<LayoutRectangle | null>(null);
   const [year, setYear] = useState<number | 'all'>('all');
   const [selectedGroup, setSelectedGroup] = useState<MyMapVenueGroup | null>(null);
 
-  const { mapData, allYearsData, isLoading, error } = useMyConcertMap({
+  const { attendedShows, mapData, allYearsData, isLoading, error, refetch } = useMyConcertMap({
     userId: user?.id ?? null,
     enabled: Boolean(user),
     year,
+  });
+
+  const onGeocodeFinished = useCallback(() => {
+    void refetch();
+  }, [refetch]);
+
+  const { isGeocoding } = useMyMapVenueGeocodeBackfill({
+    attendedShows,
+    accessToken: session?.access_token,
+    isOffline,
+    enabled: Boolean(user) && !isLoading,
+    onFinished: onGeocodeFinished,
   });
 
   const statsLine = t('myMap.summaryLine', {
@@ -255,6 +268,11 @@ export function MyMapScreenContent() {
         keyboardShouldPersistTaps="handled">
         <View style={{ paddingHorizontal: spacing.screenHorizontal, gap: spacing.sm }}>
           <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{statsLine}</Text>
+          {isGeocoding ? (
+            <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+              {t('myMap.geocodingVenues')}
+            </Text>
+          ) : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
             <Pressable
               style={[

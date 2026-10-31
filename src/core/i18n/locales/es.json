@@ -103,7 +103,8 @@
     "yearAll": "Todo",
     "offlineNotice": "Mapa disponible con conexión. Aquí van tus conciertos por recinto.",
     "unlocatedTitle": "{{count}} conciertos sin ubicación",
-    "empty": "Marca «Fui» en tus shows para verlos en el mapa."
+    "empty": "Marca «Fui» en tus shows para verlos en el mapa.",
+    "geocodingVenues": "Buscando ubicaciones de recintos…"
   },
   "profile": {
     "memberSince": "En Encore desde {{date}}",

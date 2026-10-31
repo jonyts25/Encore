@@ -103,7 +103,8 @@
     "yearAll": "All",
     "offlineNotice": "Map available when online. Showing your concerts by venue below.",
     "unlocatedTitle": "{{count}} concerts without location",
-    "empty": "Mark Went on your shows to see them on the map."
+    "empty": "Mark Went on your shows to see them on the map.",
+    "geocodingVenues": "Looking up venue locations…"
   },
   "profile": {
     "memberSince": "On Encore since {{date}}",
