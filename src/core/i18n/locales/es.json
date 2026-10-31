@@ -163,6 +163,15 @@
     "guestTitle": "Inicia sesión para ver tus shows",
     "guestSubtitle": "Marca conciertos como «Voy» o «Me interesa» y sigue artistas para recomendaciones.",
     "goToProfile": "Ir a Perfil",
+    "news": {
+      "title": "Novedades",
+      "dismiss": "Descartar",
+      "oneYearAgo": "Hace {{years}} año viste a {{artist}} en {{venue}}",
+      "oneYearAgo_other": "Hace {{years}} años viste a {{artist}} en {{venue}}",
+      "newConcert": "Nuevo concierto de {{artist}}",
+      "tourSetlist": "Así tocaron anoche en {{city}}: {{count}} canciones",
+      "goingCount": "Van {{count}} personas de Encore a este concierto"
+    },
     "sections": {
       "going": "Mis shows",
       "goingEmpty": "Marca «Voy» en un show para verlo aquí.",

@@ -5,12 +5,14 @@ import { clearLastKnownUser } from '@/modules/identity/lastKnownUser';
 
 import { clearAllOfflineQueries } from './offlineQueryCache';
 import { clearMemoryPending } from './memoryQueue';
+import { clearHomeFeedDismissed } from './homeFeedDismissed';
 import { clearShowMediaPending } from './showMediaQueue';
 
 export async function clearLocalUserData(userId: string | null): Promise<void> {
   await clearAllOfflineQueries();
   await clearShowMediaPending();
   await clearMemoryPending();
+  await clearHomeFeedDismissed(userId);
   clearLastKnownUser();
 
   try {

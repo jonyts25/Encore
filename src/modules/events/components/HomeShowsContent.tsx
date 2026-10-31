@@ -18,6 +18,8 @@ import type { Show } from '../types';
 import { AttendancePromptCard } from './AttendancePromptCard';
 import { HomeHeroShowCard } from './HomeHeroShowCard';
 import { getTodayGoingShow, pickPrimaryGoingShow } from '@/modules/events/visibility';
+import { useHomeFeed } from '../hooks/useHomeFeed';
+import { HomeNewsSection } from './HomeNewsSection';
 
 const TAB_BAR_CLEARANCE = 56;
 
@@ -85,6 +87,11 @@ export function HomeShowsContent() {
   const { sections, isLoading, error, refetch, isOffline, isFetching } = useHomeShowSections({
     userId: user?.id ?? null,
     accessToken: session?.access_token ?? null,
+    enabled: !sessionLoading && !isGuest,
+  });
+
+  const { items: newsItems, dismissItem: dismissNewsItem } = useHomeFeed({
+    userId: user?.id ?? null,
     enabled: !sessionLoading && !isGuest,
   });
 
@@ -164,6 +171,10 @@ export function HomeShowsContent() {
         {isOfflineSession ? <StatusPill label={t('home.offlineNotice')} /> : null}
         {isOffline && hasData && !isOfflineSession ? (
           <StatusPill label={t('offline.banner')} />
+        ) : null}
+
+        {!isInitialLoading && !error ? (
+          <HomeNewsSection items={newsItems} onDismiss={(id) => void dismissNewsItem(id)} />
         ) : null}
 
         {isInitialLoading ? (

@@ -163,6 +163,15 @@
     "guestTitle": "Sign in to see your shows",
     "guestSubtitle": "Mark concerts as Going or Interested and follow artists for recommendations.",
     "goToProfile": "Go to Profile",
+    "news": {
+      "title": "Updates",
+      "dismiss": "Dismiss",
+      "oneYearAgo": "{{years}} year ago you saw {{artist}} at {{venue}}",
+      "oneYearAgo_other": "{{years}} years ago you saw {{artist}} at {{venue}}",
+      "newConcert": "New show from {{artist}}",
+      "tourSetlist": "Last night in {{city}} they played {{count}} songs",
+      "goingCount": "{{count}} people on Encore are going to this show"
+    },
     "sections": {
       "going": "My shows",
       "goingEmpty": "Mark Going on a show to see it here.",
