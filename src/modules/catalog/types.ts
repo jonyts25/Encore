@@ -30,6 +30,14 @@ export type UserArtist = {
   user_id: string;
   artist_id: string;
   followed_at: string;
+  is_favorite?: boolean;
+  favorited_at?: string | null;
+};
+
+export type FollowedArtist = Artist & {
+  isFavorite: boolean;
+  favoritedAt: string | null;
+  followedAt: string;
 };
 
 export type ArtistFollowState = {

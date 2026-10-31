@@ -1,3 +1,10 @@
+export {
+  canMarkArtistFavorite,
+  countFavoriteArtists,
+  getFavoriteArtistIds,
+  MAX_FAVORITE_ARTISTS,
+  setArtistFavorite,
+} from './userArtists';
 export { hasEntitlement } from './hasEntitlement';
 export { useProfile } from './hooks/useProfile';
 export { useSession } from './hooks/useSession';

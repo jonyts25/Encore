@@ -36,6 +36,7 @@ export function CatalogScreenContent() {
     error,
     confirmCandidate,
     followedOnly,
+    refetch,
   } = useArtistCatalogSearch({
     viewMode: isGuest ? 'all' : viewMode,
     userId: user?.id ?? null,
@@ -47,8 +48,16 @@ export function CatalogScreenContent() {
     followedOnly && !showBusy && !isResolving && !isConfirming && !error && artists.length === 0;
 
   const renderItem = useCallback(
-    ({ item }: { item: Artist }) => <ArtistListItem artist={item} />,
-    []
+    ({ item }: { item: Artist }) => (
+      <ArtistListItem
+        artist={item}
+        showFavoriteToggle={followedOnly}
+        onFavoriteChanged={() => {
+          void refetch();
+        }}
+      />
+    ),
+    [followedOnly, refetch]
   );
 
   const listHeader = (
