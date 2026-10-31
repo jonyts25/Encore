@@ -10,6 +10,7 @@ export function useArtistFollow(artistId: string) {
   const [state, setState] = useState<ArtistFollowState>({
     isFollowing: false,
     followedAt: null,
+    isFavorite: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
@@ -17,7 +18,7 @@ export function useArtistFollow(artistId: string) {
 
   const refetch = useCallback(async () => {
     if (isGuest || !user) {
-      setState({ isFollowing: false, followedAt: null });
+      setState({ isFollowing: false, followedAt: null, isFavorite: false });
       setError(null);
       return;
     }
@@ -29,9 +30,10 @@ export function useArtistFollow(artistId: string) {
       setState({
         isFollowing: Boolean(row),
         followedAt: row?.followed_at ?? null,
+        isFavorite: Boolean(row?.is_favorite),
       });
     } catch (err) {
-      setState({ isFollowing: false, followedAt: null });
+      setState({ isFollowing: false, followedAt: null, isFavorite: false });
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
@@ -48,7 +50,11 @@ export function useArtistFollow(artistId: string) {
     setError(null);
     try {
       const row = await followArtist(user.id, artistId);
-      setState({ isFollowing: true, followedAt: row.followed_at });
+      setState({
+        isFollowing: true,
+        followedAt: row.followed_at,
+        isFavorite: Boolean(row.is_favorite),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       throw err;
@@ -63,7 +69,7 @@ export function useArtistFollow(artistId: string) {
     setError(null);
     try {
       await unfollowArtist(user.id, artistId);
-      setState({ isFollowing: false, followedAt: null });
+      setState({ isFollowing: false, followedAt: null, isFavorite: false });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
       throw err;
@@ -71,6 +77,10 @@ export function useArtistFollow(artistId: string) {
       setIsMutating(false);
     }
   }, [artistId, user]);
+
+  const setIsFavorite = useCallback((isFavorite: boolean) => {
+    setState((current) => ({ ...current, isFavorite }));
+  }, []);
 
   return {
     ...state,
@@ -80,6 +90,7 @@ export function useArtistFollow(artistId: string) {
     refetch,
     follow,
     unfollow,
+    setIsFavorite,
     requiresAuth: isGuest,
   };
 }

@@ -108,7 +108,11 @@
     "recapTitle": "Tu {{year}} en vivo",
     "recapSubtitle": "Tu recap del año llega en diciembre",
     "attendedTitle": "Shows a los que fuiste",
-    "attendedEmpty": "Aquí aparecerán los shows a los que vayas"
+    "attendedEmpty": "Aquí aparecerán los shows a los que vayas",
+    "yourArtistsTitle": "Tus artistas",
+    "yourArtistsSeeAll": "Ver todos",
+    "yourArtistsEmpty": "Sigue artistas desde Explorar o un show para verlos aquí.",
+    "yourArtistsListSubtitle": "Artistas que sigues — los favoritos van primero."
   },
   "home": {
     "tab": "Inicio",
