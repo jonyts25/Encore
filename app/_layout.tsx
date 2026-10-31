@@ -99,6 +99,7 @@ function RootLayoutNav() {
         <Stack.Screen name="show/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="add-show" options={{ title: '' }} />
         <Stack.Screen name="followed-artists" options={{ title: '' }} />
+        <Stack.Screen name="my-map" options={{ title: '' }} />
         <Stack.Screen name="settings" options={{ headerShown: false }} />
         <Stack.Screen name="lyrics" options={{ title: '' }} />
         <Stack.Screen

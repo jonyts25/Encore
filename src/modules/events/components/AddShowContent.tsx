@@ -27,6 +27,7 @@ import {
   fetchShowByIdFromSupabase,
   formatShowVenueLine,
   listUpcomingShowsForArtistFromSupabase,
+  requestVenueGeocode,
   searchVenues,
   setShowStatus,
 } from '../api';
@@ -145,9 +146,13 @@ export function AddShowContent() {
       const show = await fetchShowByIdFromSupabase(showId);
       if (show) {
         void prefetchShowPack(show, queryClient, { force: true });
+        if (session?.access_token) {
+          void requestVenueGeocode(show.venue_id, session.access_token);
+        }
       }
       if (user?.id) {
         await queryClient.invalidateQueries({ queryKey: queryKeys.home(user.id) });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.myMap(user.id) });
         await queryClient.invalidateQueries({ queryKey: ['artistShows'] });
       }
       Alert.alert(t('addShow.successTitle'), message, [
@@ -157,7 +162,7 @@ export function AddShowContent() {
         },
       ]);
     },
-    [queryClient, router, t, user?.id]
+    [queryClient, router, session?.access_token, t, user?.id]
   );
 
   const onSelectExistingShow = useCallback(

@@ -96,6 +96,15 @@
     "spanish": "Español",
     "english": "English"
   },
+  "myMap": {
+    "title": "Your map",
+    "open": "Open",
+    "summaryLine": "{{concerts}} concerts · {{cities}} cities · {{countries}} countries",
+    "yearAll": "All",
+    "offlineNotice": "Map available when online. Showing your concerts by venue below.",
+    "unlocatedTitle": "{{count}} concerts without location",
+    "empty": "Mark Went on your shows to see them on the map."
+  },
   "profile": {
     "memberSince": "On Encore since {{date}}",
     "avatarComingSoon": "Coming soon",

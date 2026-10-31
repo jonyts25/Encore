@@ -96,6 +96,15 @@
     "spanish": "Español",
     "english": "English"
   },
+  "myMap": {
+    "title": "Tu mapa",
+    "open": "Abrir",
+    "summaryLine": "{{concerts}} conciertos · {{cities}} ciudades · {{countries}} países",
+    "yearAll": "Todo",
+    "offlineNotice": "Mapa disponible con conexión. Aquí van tus conciertos por recinto.",
+    "unlocatedTitle": "{{count}} conciertos sin ubicación",
+    "empty": "Marca «Fui» en tus shows para verlos en el mapa."
+  },
   "profile": {
     "memberSince": "En Encore desde {{date}}",
     "avatarComingSoon": "Próximamente",
