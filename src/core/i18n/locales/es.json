@@ -11,7 +11,8 @@
   "common": {
     "appName": "Encore",
     "loading": "Cargando…",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "back": "Atrás"
   },
   "addShow": {
     "title": "Agregar show",
@@ -277,8 +278,8 @@
       "empty": "Agrega las canciones que sí tocaron.",
       "togglePlayed": "Marcar si la tocaron",
       "toggleHighlight": "Favorita de la noche",
-      "encoreStartsHere": "Empieza el encore",
-      "markEncoreStart": "Marcar inicio de encore",
+      "encoreDivider": "— Encore —",
+      "dragHandle": "Reordenar",
       "addSong": "Agregar canción",
       "addSongError": "No pudimos agregar la canción.",
       "save": "Guardar",
