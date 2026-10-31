@@ -38,6 +38,7 @@ function hasAnyShows(sections: {
 }
 
 function AttendancePromptItem({ show }: { show: Show }) {
+  const router = useRouter();
   const { updateStatus, isMutating } = useShowStatus(show.id);
 
   return (
@@ -45,7 +46,7 @@ function AttendancePromptItem({ show }: { show: Show }) {
       show={show}
       isBusy={isMutating}
       onConfirmAttended={() => {
-        void updateStatus('fui');
+        void updateStatus('fui').then(() => router.push(`/show/${show.id}/setlist`));
       }}
       onDeclineAttended={() => {
         void updateStatus('no_fui');
