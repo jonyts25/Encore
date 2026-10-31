@@ -27,8 +27,8 @@ function daysUntilShow(showDate: string): number {
 export function HomeHeroShowCard({ show, statusLabel, onOpenLive }: HomeHeroShowCardProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
-  const phase = getShowPhase(show.show_date);
-  const showIsActive = isShowActive(show.show_date);
+  const phase = getShowPhase(show);
+  const showIsActive = isShowActive(show);
   const isConcertDay = showIsActive && phase === 'today';
   const { label: packLabel } = useShowPackStatus(show, true);
 

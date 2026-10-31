@@ -67,7 +67,7 @@ export function showsThisWeekInCity(shows: Show[], city: string | null, now = ne
 
 export function upcomingShowsInCitySorted(shows: Show[], city: string | null, limit = 10): Show[] {
   return filterShowsByCity(shows, city)
-    .filter((show) => getShowPhase(show.show_date) !== 'past')
+    .filter((show) => getShowPhase(show) !== 'past')
     .sort((a, b) => new Date(a.show_date).getTime() - new Date(b.show_date).getTime())
     .slice(0, limit);
 }
