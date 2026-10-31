@@ -22,15 +22,14 @@ async function fetchCreatorDisplayNames(userIds: string[]): Promise<Map<string, 
   if (userIds.length === 0) return map;
 
   const uniqueIds = [...new Set(userIds)];
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('user_id, display_name')
-    .in('user_id', uniqueIds);
+  const { data, error } = await supabase.rpc('get_public_display_names', {
+    p_user_ids: uniqueIds,
+  });
 
   if (error) throw error;
 
-  for (const row of data ?? []) {
-    map.set(row.user_id as string, (row.display_name as string | null) ?? null);
+  for (const row of (data ?? []) as { user_id: string; display_name: string | null }[]) {
+    map.set(row.user_id, row.display_name ?? null);
   }
   return map;
 }
@@ -128,13 +127,25 @@ export async function deleteCommunityPlaylist(playlistId: string): Promise<void>
   if (error) throw error;
 }
 
-export async function recordCommunityPlaylistUse(playlistId: string, userId: string): Promise<void> {
-  const { error } = await supabase.from('community_playlist_uses').upsert(
-    {
-      playlist_id: playlistId,
-      user_id: userId,
-    },
-    { onConflict: 'playlist_id,user_id', ignoreDuplicates: true }
-  );
+/** Returns true when a new use row was inserted. */
+export async function recordCommunityPlaylistUse(
+  playlistId: string,
+  userId: string
+): Promise<boolean> {
+  const { data: existing, error: findError } = await supabase
+    .from('community_playlist_uses')
+    .select('playlist_id')
+    .eq('playlist_id', playlistId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (findError) throw findError;
+  if (existing) return false;
+
+  const { error } = await supabase.from('community_playlist_uses').insert({
+    playlist_id: playlistId,
+    user_id: userId,
+  });
   if (error) throw error;
+  return true;
 }

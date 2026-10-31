@@ -54,18 +54,35 @@ create policy "community_playlist_uses_insert_own"
   to authenticated
   with check (auth.uid() = user_id);
 
+create policy "community_playlist_uses_select_own"
+  on public.community_playlist_uses
+  for select
+  to authenticated
+  using (auth.uid() = user_id);
+
 create policy "community_playlist_uses_delete_own"
   on public.community_playlist_uses
   for delete
   to authenticated
   using (auth.uid() = user_id);
 
--- Creator display names on playlist cards (authenticated read-only).
-create policy "profiles_select_authenticated"
-  on public.profiles
-  for select
-  to authenticated
-  using (true);
+create or replace function public.get_public_display_names(p_user_ids uuid[])
+returns table (
+  user_id uuid,
+  display_name text
+)
+language sql
+security definer
+set search_path = public
+as $$
+  select p.user_id, p.display_name
+  from public.profiles p
+  where p.user_id = any (p_user_ids);
+$$;
+
+revoke all on function public.get_public_display_names(uuid[]) from public;
+revoke all on function public.get_public_display_names(uuid[]) from anon;
+grant execute on function public.get_public_display_names(uuid[]) to authenticated;
 
 create or replace function public.get_playlist_use_counts(p_playlist_ids uuid[])
 returns table (
@@ -89,4 +106,4 @@ revoke all on function public.get_playlist_use_counts(uuid[]) from anon;
 grant execute on function public.get_playlist_use_counts(uuid[]) to authenticated;
 
 grant select, insert, delete on public.community_playlists to authenticated;
-grant insert, delete on public.community_playlist_uses to authenticated;
+grant select, insert, delete on public.community_playlist_uses to authenticated;

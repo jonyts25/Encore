@@ -210,8 +210,8 @@ export function CommunityPlaylistsSection({ artistId, tourId }: CommunityPlaylis
     async (playlist: CommunityPlaylistRow) => {
       if (userId) {
         try {
-          await recordCommunityPlaylistUse(playlist.id, userId);
-          invalidate();
+          const recorded = await recordCommunityPlaylistUse(playlist.id, userId);
+          if (recorded) invalidate();
         } catch {
           // opening the link still succeeds if use logging fails
         }
