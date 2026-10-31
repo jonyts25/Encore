@@ -21,6 +21,7 @@ export type ShowPackRecord = {
   show: Show | null;
   prediction: SetlistPrediction | null;
   lyricsMissingTitles: string[];
+  lyricsBusyTitles: string[];
   practiceSongs: PracticePackSong[];
 };
 
@@ -38,6 +39,7 @@ type ShowPackRow = {
   lyrics_missing_json: string | null;
   practice_titles_json: string | null;
   practice_songs_json: string | null;
+  lyrics_busy_json: string | null;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -66,6 +68,7 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         'ALTER TABLE show_pack ADD COLUMN lyrics_missing_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN practice_titles_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN practice_songs_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_busy_json TEXT;',
       ]) {
         try {
           await db.execAsync(ddl);
@@ -149,8 +152,25 @@ function rowToRecord(row: ShowPackRow): ShowPackRecord {
     show,
     prediction,
     lyricsMissingTitles: parseMissingTitles(row.lyrics_missing_json),
+    lyricsBusyTitles: parseMissingTitles(row.lyrics_busy_json),
     practiceSongs: parsePracticeSongs(row.practice_songs_json, row.practice_titles_json),
   };
+}
+
+export async function listShowPackRecordsWithBusyLyrics(): Promise<ShowPackRecord[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<ShowPackRow>(
+    `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
+            status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
+            practice_titles_json, practice_songs_json, lyrics_busy_json
+     FROM show_pack
+     WHERE lyrics_busy_json IS NOT NULL AND lyrics_busy_json != '[]'`
+  );
+
+  const now = Date.now();
+  return rows
+    .map(rowToRecord)
+    .filter((record) => record.expiresAt == null || record.expiresAt >= now);
 }
 
 export async function purgeExpiredShowPacks(now = Date.now()): Promise<void> {
@@ -163,7 +183,7 @@ export async function getShowPackRecord(showId: string): Promise<ShowPackRecord 
   const row = await db.getFirstAsync<ShowPackRow>(
     `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
             status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-            practice_titles_json, practice_songs_json
+            practice_titles_json, practice_songs_json, lyrics_busy_json
      FROM show_pack WHERE show_id = ?`,
     showId
   );
@@ -185,8 +205,8 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     `INSERT OR REPLACE INTO show_pack (
       show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
       status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-      practice_titles_json, practice_songs_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      practice_titles_json, practice_songs_json, lyrics_busy_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     record.showId,
     record.status,
     record.lyricsCached,
@@ -199,7 +219,8 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     record.prediction ? JSON.stringify(record.prediction) : null,
     JSON.stringify(record.lyricsMissingTitles),
     JSON.stringify(record.practiceSongs.map((song) => song.title)),
-    JSON.stringify(record.practiceSongs)
+    JSON.stringify(record.practiceSongs),
+    JSON.stringify(record.lyricsBusyTitles)
   );
 }
 

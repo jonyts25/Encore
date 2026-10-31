@@ -274,6 +274,7 @@
     "packLyricsProgress": "{{cached}} of {{total}} lyrics",
     "showPackReadyForShow": "Ready for the show",
     "showPackDownloadingProgress": "Downloading {{cached}} of {{total}} lyrics",
+    "showPackDownloadingProgressRetrying": "{{cached}} of {{total}} · retrying {{retrying}}",
     "showPackMissingLyrics": "No lyrics: {{titles}}",
     "showPackRetry": "Retry download",
     "status": {

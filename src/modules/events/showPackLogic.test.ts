@@ -5,13 +5,16 @@ import { mapAddUserSongRpcError, parseAddUserSongResponse } from '../catalog/add
 import { normalizeSongTitle } from '../catalog/songTitleNormalize';
 
 import {
+  addLyricsBusyTitle,
   collectShowPackSongTitles,
   isShowPackComplete,
   isShowPackExpired,
   mergePracticeSong,
   mergePracticeTitles,
+  removeLyricsBusyTitle,
   shouldPrefetchShowPackRecord,
   showPackExpiresAt,
+  showPackProgressLabel,
   SHOW_PACK_STALE_AFTER_MS,
   SEVEN_DAYS_MS,
 } from './showPackLogic';
@@ -67,7 +70,10 @@ describe('showPackLogic', () => {
       status: 'ready',
       downloadedAt: now.getTime() - 60_000,
       statusUpdatedAt: now.getTime(),
+      lyricsCached: 10,
+      lyricsTotal: 10,
       lyricsMissingTitles: [] as string[],
+      lyricsBusyTitles: [] as string[],
       lyricsFailed: 0,
       expiresAt: now.getTime() + 1_000_000,
     };
@@ -101,7 +107,10 @@ describe('showPackLogic', () => {
           status: 'ready',
           downloadedAt: now.getTime() - 60_000,
           statusUpdatedAt: now.getTime(),
+          lyricsCached: 1,
+          lyricsTotal: 1,
           lyricsMissingTitles: [],
+          lyricsBusyTitles: [],
           lyricsFailed: 0,
           expiresAt: now.getTime() + 1_000_000,
           prediction: {
@@ -125,7 +134,10 @@ describe('showPackLogic', () => {
           status: 'ready',
           downloadedAt: now.getTime() - SHOW_PACK_STALE_AFTER_MS - 1,
           statusUpdatedAt: now.getTime(),
+          lyricsCached: 1,
+          lyricsTotal: 1,
           lyricsMissingTitles: [],
+          lyricsBusyTitles: [],
           lyricsFailed: 0,
           expiresAt: now.getTime() + 1_000_000,
           prediction: {
@@ -137,6 +149,32 @@ describe('showPackLogic', () => {
         { now }
       ),
       true
+    );
+  });
+
+  it('tracks busy titles separately from failed lyrics', () => {
+    assert.deepEqual(addLyricsBusyTitle(['A'], 'B'), ['A', 'B']);
+    assert.deepEqual(addLyricsBusyTitle(['A'], 'A'), ['A']);
+    assert.deepEqual(removeLyricsBusyTitle(['A', 'B'], 'A'), ['B']);
+  });
+
+  it('builds progress label with retrying count', () => {
+    assert.deepEqual(
+      showPackProgressLabel({ lyricsCached: 22, lyricsTotal: 28, lyricsBusyTitles: ['a', 'b', 'c', 'd', 'e'] }),
+      {
+        key: 'events.showPackDownloadingProgressRetrying',
+        cached: 22,
+        total: 28,
+        retrying: 5,
+      }
+    );
+    assert.deepEqual(
+      showPackProgressLabel({ lyricsCached: 22, lyricsTotal: 28, lyricsBusyTitles: [] }),
+      {
+        key: 'events.showPackDownloadingProgress',
+        cached: 22,
+        total: 28,
+      }
     );
   });
 

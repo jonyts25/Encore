@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@/core/i18n';
 import { getShowPackRecord, type ShowPackRecord } from '@/core/db/showPackCache';
 
+import { showPackProgressLabel } from '../showPackLogic';
 import { prefetchShowPack } from '../showPack';
 import type { Show } from '../types';
 
@@ -57,28 +58,42 @@ export function useShowPackStatus(show: Show | null, enabled: boolean) {
   let isPartial = false;
   let canRetry = false;
 
+  const progress = record ? showPackProgressLabel(record) : null;
+
   if (record?.status === 'downloading') {
-    label =
-      record.lyricsTotal > 0
-        ? t('events.showPackDownloadingProgress', {
-            cached: record.lyricsCached,
-            total: record.lyricsTotal,
-          })
-        : t('offline.showPackDownloading');
+    label = progress
+      ? t(progress.key, {
+          cached: progress.cached,
+          total: progress.total,
+          retrying: progress.retrying,
+        })
+      : t('offline.showPackDownloading');
     canRetry = true;
   } else if (record?.status === 'partial') {
     isPartial = true;
     canRetry = true;
-    label =
-      record.lyricsTotal > 0
-        ? t('events.showPackDownloadingProgress', {
-            cached: record.lyricsCached,
-            total: record.lyricsTotal,
-          })
-        : t('offline.showPackPartial');
+    label = progress
+      ? t(progress.key, {
+          cached: progress.cached,
+          total: progress.total,
+          retrying: progress.retrying,
+        })
+      : t('offline.showPackPartial');
   } else if (record?.status === 'ready') {
-    label = t('events.showPackReadyForShow');
-    canRetry = Boolean(record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0);
+    if (progress?.retrying) {
+      label = t(progress.key, {
+        cached: progress.cached,
+        total: progress.total,
+        retrying: progress.retrying,
+      });
+    } else {
+      label = t('events.showPackReadyForShow');
+    }
+    canRetry = Boolean(
+      record.lyricsMissingTitles.length > 0 ||
+        record.lyricsFailed > 0 ||
+        record.lyricsBusyTitles.length > 0
+    );
   }
 
   return { record, label, missingTitlesLine, isPartial, canRetry, retry, refresh };

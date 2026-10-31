@@ -242,6 +242,7 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
 
   const onSave = async () => {
     if (!userId || !show || !isDirty) return;
+    const isFirstConfirmation = memory?.setlist_confirmed_at == null;
     setSaving(true);
     try {
       const { items, encoreStartIndex } = rowsToDraft(rows);
@@ -255,7 +256,11 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
         songs,
       });
       await refreshMemory();
-      router.replace(`/show/${show.id}/share-night`);
+      if (isFirstConfirmation) {
+        router.replace(`/show/${show.id}/share-night`);
+      } else {
+        router.back();
+      }
     } catch {
       Alert.alert(t('memory.setlist.saveError'));
     } finally {

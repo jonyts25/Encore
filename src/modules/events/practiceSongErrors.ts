@@ -14,6 +14,8 @@ export function practiceSongErrorMessageKey(
       return 'practice.errors.lyricsMissing';
     case 'lyrics_network':
       return 'practice.errors.lyricsNetwork';
+    case 'lyrics_busy':
+      return 'practice.errors.lyricsNetwork';
     default:
       return 'practice.errors.unknown';
   }

@@ -1,21 +1,15 @@
+import { lrclibRequestDirectWithFetch } from './lrclibRequest';
+import { LrclibRequestQueue } from './lrclibQueue';
 import { parseLrc } from './lrc';
 import type { Lyrics, LyricsMatch, LyricsProvider, SyncedLyrics } from './types';
 
 const BASE_URL = 'https://lrclib.net/api';
 const LRCLIB_ATTRIBUTION = 'Lyrics via LRCLIB (lrclib.net)';
-const USER_AGENT = 'Encore/0.1 (https://github.com/jonyts25/Encore)';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const CACHE_MAX_ENTRIES = 2000;
-const RETRY_DELAYS_MS = [0, 1000, 3000];
+const MAX_CONCURRENT_LRCLIB_REQUESTS = 2;
 
-export class LyricsBusyError extends Error {
-  readonly code = 'lyrics_busy';
-
-  constructor() {
-    super('Lyrics service is busy');
-    this.name = 'LyricsBusyError';
-  }
-}
+export { LyricsBusyError } from './lrclibErrors';
 
 type LrclibRecord = {
   id: number;
@@ -41,10 +35,7 @@ type CacheEntry = {
 };
 
 const lyricsCache = new Map<string, CacheEntry>();
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const lrclibQueue = new LrclibRequestQueue(MAX_CONCURRENT_LRCLIB_REQUESTS);
 
 function cacheKey(artist: string, title: string): string {
   return `${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}`;
@@ -110,43 +101,9 @@ function mapSynced(record: LrclibRecord): SyncedLyrics | null {
 }
 
 async function lrclibRequest<T>(path: string): Promise<T> {
-  let lastTransient: Error | null = null;
-
-  for (const delayMs of RETRY_DELAYS_MS) {
-    if (delayMs > 0) {
-      await sleep(delayMs);
-    }
-
-    const response = await fetch(`${BASE_URL}${path}`, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': USER_AGENT,
-      },
-      cache: 'no-store',
-    });
-
-    if (response.status === 503 || response.status === 429) {
-      lastTransient = new Error(`LRCLIB temporary failure (${response.status})`);
-      continue;
-    }
-
-    if (response.status === 404) {
-      throw new Error('Lyrics not found');
-    }
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`LRCLIB request failed (${response.status}): ${text}`);
-    }
-
-    return (await response.json()) as T;
-  }
-
-  if (lastTransient) {
-    throw new LyricsBusyError();
-  }
-
-  throw new LyricsBusyError();
+  return lrclibQueue.enqueue(() =>
+    lrclibRequestDirectWithFetch<T>(path, BASE_URL, fetch)
+  );
 }
 
 function pickBestRecord(records: LrclibRecord[]): LrclibRecord | null {
