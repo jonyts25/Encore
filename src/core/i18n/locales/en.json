@@ -11,7 +11,8 @@
   "common": {
     "appName": "Encore",
     "loading": "Loading…",
-    "close": "Close"
+    "close": "Close",
+    "back": "Back"
   },
   "addShow": {
     "title": "Add show",
@@ -277,8 +278,8 @@
       "empty": "Add the songs they actually played.",
       "togglePlayed": "Mark as played",
       "toggleHighlight": "Highlight of the night",
-      "encoreStartsHere": "Encore starts here",
-      "markEncoreStart": "Mark encore start",
+      "encoreDivider": "— Encore —",
+      "dragHandle": "Reorder",
       "addSong": "Add song",
       "addSongError": "We couldn't add that song.",
       "save": "Save",

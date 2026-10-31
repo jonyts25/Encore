@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 
 import { buildArtistShowSections } from './artistShowSectionsLogic';
 import { computePredictionAccuracy } from '@/modules/memory/predictionAccuracyLogic';
+import { buildRowsFromDraft, rowsToDraft } from '@/modules/memory/setlistRowLogic';
 import { resolveSetlistPrefill } from '@/modules/memory/setlistPrefillLogic';
 
 import { formatVenueNearbySubtitle } from './venueSearchFormat';
@@ -143,6 +144,29 @@ describe('memory setlist logic', () => {
   it('scores prediction hits', () => {
     const score = computePredictionAccuracy(['a', 'b', 'c'], ['b', 'd']);
     assert.deepEqual(score, { hits: 1, total: 3 });
+  });
+
+  it('places encore divider before encore songs', () => {
+    const items = [
+      { key: '1', songId: 'a', title: 'A', played: true, isHighlight: false },
+      { key: '2', songId: 'b', title: 'B', played: true, isHighlight: false },
+      { key: '3', songId: 'c', title: 'C', played: true, isHighlight: false },
+    ];
+    const rows = buildRowsFromDraft(items, 2);
+    assert.equal(rows.filter((row) => row.kind === 'encore').length, 1);
+    const parsed = rowsToDraft(rows);
+    assert.equal(parsed.encoreStartIndex, 2);
+    assert.deepEqual(
+      parsed.items.map((row) => row.songId),
+      ['a', 'b', 'c']
+    );
+  });
+
+  it('treats divider at end as no encore', () => {
+    const items = [{ key: '1', songId: 'a', title: 'A', played: true, isHighlight: false }];
+    const rows = buildRowsFromDraft(items, null);
+    const parsed = rowsToDraft(rows);
+    assert.equal(parsed.encoreStartIndex, null);
   });
 });
 
