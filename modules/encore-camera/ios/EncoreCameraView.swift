@@ -40,7 +40,11 @@ final class EncoreCameraView: ExpoView {
   private var currentZoomFactor: CGFloat = 1
   private var pinchStartZoom: CGFloat = 1
   private var focusResetWorkItem: DispatchWorkItem?
+  private var pendingFocusLockWorkItem: DispatchWorkItem?
   private var focusExposureLocked = false
+  private var lastLongPressEndedAt: CFTimeInterval?
+  private static let tapSuppressAfterLongPress: TimeInterval = 0.35
+  private static let focusLockDelayAfterLongPress: TimeInterval = 0.3
   private var desiredTorchEnabled = false
   private var currentFormatSelection: EncoreCameraFormatSelection?
   private var activeStabilizationMode = "off"
@@ -738,6 +742,11 @@ final class EncoreCameraView: ExpoView {
   @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
     guard gesture.state == .ended else { return }
 
+    if let endedAt = lastLongPressEndedAt,
+       CACurrentMediaTime() - endedAt < Self.tapSuppressAfterLongPress {
+      return
+    }
+
     let layerPoint = gesture.location(in: previewView)
     let devicePoint = previewView.previewLayer.captureDevicePointConverted(fromLayerPoint: layerPoint)
 
@@ -766,15 +775,53 @@ final class EncoreCameraView: ExpoView {
   }
 
   @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-    guard gesture.state == .began else { return }
+    switch gesture.state {
+    case .began:
+      let layerPoint = gesture.location(in: previewView)
+      let devicePoint = previewView.previewLayer.captureDevicePointConverted(fromLayerPoint: layerPoint)
 
-    sessionQueue.async { [weak self] in
-      guard let self, let device = self.videoDevice else { return }
-      do {
-        try self.applyFocusExposureLock(locked: true, device: device)
-      } catch {
-        // Ignore transient lock failures.
+      DispatchQueue.main.async { [weak self] in
+        self?.onFocusPoint([
+          "x": Double(layerPoint.x),
+          "y": Double(layerPoint.y),
+        ])
       }
+
+      focusResetWorkItem?.cancel()
+      pendingFocusLockWorkItem?.cancel()
+
+      sessionQueue.async { [weak self] in
+        guard let self, let device = self.videoDevice else { return }
+
+        do {
+          try EncoreCameraFocus.focusAndExpose(at: devicePoint, device: device)
+        } catch {
+          // Ignore transient focus failures.
+        }
+
+        let lockWork = DispatchWorkItem { [weak self] in
+          guard let self, let device = self.videoDevice else { return }
+          do {
+            try self.applyFocusExposureLock(locked: true, device: device)
+          } catch {
+            // Ignore transient lock failures.
+          }
+          self.pendingFocusLockWorkItem = nil
+        }
+        self.pendingFocusLockWorkItem = lockWork
+        self.sessionQueue.asyncAfter(
+          deadline: .now() + Self.focusLockDelayAfterLongPress,
+          execute: lockWork
+        )
+      }
+
+    case .ended, .cancelled:
+      lastLongPressEndedAt = CACurrentMediaTime()
+      pendingFocusLockWorkItem?.cancel()
+      pendingFocusLockWorkItem = nil
+
+    default:
+      break
     }
   }
 

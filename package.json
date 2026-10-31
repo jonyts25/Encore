@@ -5,12 +5,12 @@
   "private": true,
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
-    "ios": "expo run:ios",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit && tsc --noEmit -p server",
     "typecheck:server": "tsc --noEmit -p server",
-    "test": "node --import tsx --test src/modules/identity/sessionStatus.test.ts src/modules/identity/profileStatsLogic.test.ts src/modules/identity/favoriteArtistsLogic.test.ts src/modules/events/showPackLogic.test.ts src/modules/events/showNightLogic.test.ts src/modules/events/homeFeedLogic.test.ts src/modules/memory/discographyLogic.test.ts src/modules/events/exploreLogic.test.ts src/modules/events/myMapLogic.test.ts src/modules/events/myMapVenueGeocodeLogic.test.ts src/modules/events/createUserShowLogic.test.ts src/core/query/staleWhileRevalidate.test.ts src/modules/live/recordingSaveTracker.test.ts src/modules/live/liveLyricsScrollLogic.test.ts src/modules/live/liveSongSearchLogic.test.ts src/modules/lyrics/scrollLogic.test.ts src/modules/events/visibility.test.ts src/modules/live/nativeCameraFallback.test.ts modules/encore-camera/src/nativeCameraFlag.test.ts",
+    "test": "node --import tsx --test src/modules/identity/sessionStatus.test.ts src/modules/identity/profileStatsLogic.test.ts src/modules/identity/favoriteArtistsLogic.test.ts src/modules/events/showPackLogic.test.ts src/modules/events/showNightLogic.test.ts src/modules/events/homeFeedLogic.test.ts src/modules/memory/discographyLogic.test.ts src/modules/events/exploreLogic.test.ts src/modules/events/myMapLogic.test.ts src/modules/events/myMapVenueGeocodeLogic.test.ts src/modules/events/createUserShowLogic.test.ts src/core/query/staleWhileRevalidate.test.ts src/modules/live/recordingSaveTracker.test.ts src/modules/live/liveLyricsScrollLogic.test.ts src/modules/live/liveSongSearchLogic.test.ts src/modules/lyrics/scrollLogic.test.ts src/modules/events/visibility.test.ts src/modules/live/nativeCameraFallback.test.ts modules/encore-camera/src/nativeCameraFlag.test.ts modules/encore-camera/src/tapAfterLongPressGuard.test.ts",
     "check:colors": "node scripts/check-colors.mjs",
     "lint": "tsc --noEmit"
   },
