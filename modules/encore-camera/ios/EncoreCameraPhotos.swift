@@ -95,9 +95,10 @@ enum EncoreCameraPhotos {
         }
 
         removeTemporaryFile(at: filePath)
+        let assetId: Any = createdLocalIdentifier ?? NSNull()
         promise.resolve([
           "saved": true,
-          "assetId": createdLocalIdentifier ?? NSNull(),
+          "assetId": assetId,
         ])
       }
     }
