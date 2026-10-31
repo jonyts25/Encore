@@ -5,6 +5,7 @@ import { readVenueGeocodeAttemptAt, recordVenueGeocodeAttempt } from '@/core/db/
 import { geocodeVenueWithAuth } from '../api';
 import {
   filterVenueIdsEligibleForGeocode,
+  shouldRecordVenueGeocodeAttempt,
   uniqueUnlocatedVenueIds,
 } from '../myMapVenueGeocodeLogic';
 import type { Show } from '../types';
@@ -56,8 +57,10 @@ export function useMyMapVenueGeocodeBackfill(options: UseMyMapVenueGeocodeBackfi
       try {
         for (const venueId of eligible) {
           if (cancelled || runId !== runIdRef.current) break;
-          await geocodeVenueWithAuth(venueId, accessToken);
-          await recordVenueGeocodeAttempt(venueId);
+          const status = await geocodeVenueWithAuth(venueId, accessToken);
+          if (shouldRecordVenueGeocodeAttempt(status)) {
+            await recordVenueGeocodeAttempt(venueId);
+          }
           await new Promise((resolve) => setTimeout(resolve, INTER_REQUEST_DELAY_MS));
         }
       } finally {
