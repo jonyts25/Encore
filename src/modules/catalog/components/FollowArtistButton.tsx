@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useArtistFollow } from '../hooks/useArtistFollow';
+import { ArtistFavoriteStar } from './ArtistFavoriteStar';
 
 type FollowArtistButtonProps = {
   artistId: string;
@@ -13,8 +14,17 @@ type FollowArtistButtonProps = {
 export function FollowArtistButton({ artistId }: FollowArtistButtonProps) {
   const { t } = useTranslation();
   const router = useRouter();
-  const { isFollowing, isLoading, isMutating, requiresAuth, follow, unfollow, error } =
-    useArtistFollow(artistId);
+  const {
+    isFollowing,
+    isFavorite,
+    isLoading,
+    isMutating,
+    requiresAuth,
+    follow,
+    unfollow,
+    setIsFavorite,
+    error,
+  } = useArtistFollow(artistId);
 
   const handlePress = () => {
     if (requiresAuth) {
@@ -49,18 +59,34 @@ export function FollowArtistButton({ artistId }: FollowArtistButtonProps) {
       {!requiresAuth && isFollowing ? (
         <ThemedText style={styles.followingLabel}>{t('catalog.following')}</ThemedText>
       ) : null}
-      <Button
-        disabled={isLoading || isMutating}
-        title={isLoading || isMutating ? t('common.loading') : title}
-        variant={isFollowing && !requiresAuth ? 'secondary' : 'primary'}
-        onPress={handlePress}
-      />
+      <View style={styles.actionsRow}>
+        <Button
+          disabled={isLoading || isMutating}
+          style={styles.followButton}
+          title={isLoading || isMutating ? t('common.loading') : title}
+          variant={isFollowing && !requiresAuth ? 'secondary' : 'primary'}
+          onPress={handlePress}
+        />
+        {isFollowing && !requiresAuth ? (
+          <ArtistFavoriteStar
+            artistId={artistId}
+            disabled={isMutating}
+            isFavorite={isFavorite}
+            onFavoriteChanged={setIsFavorite}
+          />
+        ) : null}
+      </View>
       {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  actionsRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 4,
+  },
   authHint: {
     fontSize: 13,
     opacity: 0.75,
@@ -73,6 +99,9 @@ const styles = StyleSheet.create({
   error: {
     color: '#D64545',
     textAlign: 'center',
+  },
+  followButton: {
+    flex: 1,
   },
   followingLabel: {
     color: '#2E9B4F',

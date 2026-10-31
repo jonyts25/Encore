@@ -13,11 +13,17 @@ import { ArtistListItem } from './ArtistListItem';
 
 const TAB_BAR_CLEARANCE = 56;
 
-export function CatalogScreenContent() {
+export type CatalogScreenContentProps = {
+  /** Full catalog vs followed-only list (e.g. profile → Ver todos). */
+  mode?: 'default' | 'followedOnly';
+};
+
+export function CatalogScreenContent({ mode = 'default' }: CatalogScreenContentProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { isGuest, user, isLoading: sessionLoading } = useSession();
-  const [viewMode, setViewMode] = useState<CatalogViewMode>('all');
+  const followedOnlyMode = mode === 'followedOnly';
+  const [viewMode, setViewMode] = useState<CatalogViewMode>(followedOnlyMode ? 'followed' : 'all');
 
   useEffect(() => {
     if (isGuest && viewMode === 'followed') {
@@ -38,7 +44,7 @@ export function CatalogScreenContent() {
     followedOnly,
     refetch,
   } = useArtistCatalogSearch({
-    viewMode: isGuest ? 'all' : viewMode,
+    viewMode: isGuest ? 'all' : followedOnlyMode ? 'followed' : viewMode,
     userId: user?.id ?? null,
     enabled: !sessionLoading,
   });
@@ -62,26 +68,32 @@ export function CatalogScreenContent() {
 
   const listHeader = (
     <View style={styles.header}>
-      <ThemedText style={styles.title}>{t('catalog.title')}</ThemedText>
-      <ThemedText style={styles.subtitle}>{t('catalog.subtitle')}</ThemedText>
+      <ThemedText style={styles.title}>
+        {followedOnlyMode ? t('profile.yourArtistsTitle') : t('catalog.title')}
+      </ThemedText>
+      <ThemedText style={styles.subtitle}>
+        {followedOnlyMode ? t('profile.yourArtistsListSubtitle') : t('catalog.subtitle')}
+      </ThemedText>
 
-      <ThemedView style={styles.filterRow}>
-        <Button
-          title={t('catalog.filterAll')}
-          variant={viewMode === 'all' ? 'primary' : 'secondary'}
-          style={styles.filterButton}
-          onPress={() => setViewMode('all')}
-        />
-        <Button
-          title={t('catalog.filterFollowed')}
-          variant={viewMode === 'followed' ? 'primary' : 'secondary'}
-          style={styles.filterButton}
-          disabled={isGuest}
-          onPress={() => setViewMode('followed')}
-        />
-      </ThemedView>
+      {!followedOnlyMode ? (
+        <ThemedView style={styles.filterRow}>
+          <Button
+            title={t('catalog.filterAll')}
+            variant={viewMode === 'all' ? 'primary' : 'secondary'}
+            style={styles.filterButton}
+            onPress={() => setViewMode('all')}
+          />
+          <Button
+            title={t('catalog.filterFollowed')}
+            variant={viewMode === 'followed' ? 'primary' : 'secondary'}
+            style={styles.filterButton}
+            disabled={isGuest}
+            onPress={() => setViewMode('followed')}
+          />
+        </ThemedView>
+      ) : null}
 
-      {isGuest ? (
+      {!followedOnlyMode && isGuest ? (
         <ThemedText style={styles.guestHint}>{t('catalog.followedRequiresAuth')}</ThemedText>
       ) : null}
 
@@ -158,7 +170,7 @@ export function CatalogScreenContent() {
         style={styles.list}
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingBottom: insets.bottom + TAB_BAR_CLEARANCE,
+          paddingBottom: insets.bottom + (followedOnlyMode ? 16 : TAB_BAR_CLEARANCE),
         }}
       />
     </ThemedView>

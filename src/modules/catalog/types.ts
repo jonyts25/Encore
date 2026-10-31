@@ -43,6 +43,7 @@ export type FollowedArtist = Artist & {
 export type ArtistFollowState = {
   isFollowing: boolean;
   followedAt: string | null;
+  isFavorite: boolean;
 };
 
 export type ArtistLinkPlatform =
