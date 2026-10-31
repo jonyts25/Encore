@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
 import { useIsOffline } from '@/core/network/useIsOffline';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -41,12 +42,10 @@ export function useHomeShowSections(options: UseHomeShowSectionsOptions = {}) {
   const cacheKey = userId ? `home:${userId}` : null;
 
   useEffect(() => {
-    if (!cacheKey) return;
-    void readOfflineQuery<HomeShowSections>(cacheKey).then((cached) => {
-      if (cached && userId) {
-        queryClient.setQueryData(queryKeys.home(userId), cached);
-      }
-    });
+    if (!cacheKey || !userId) return;
+    void seedQueryClientFromCache(queryClient, queryKeys.home(userId), () =>
+      readOfflineQuery<HomeShowSections>(cacheKey)
+    );
   }, [cacheKey, queryClient, userId]);
 
   const query = useQuery<HomeShowSections>({

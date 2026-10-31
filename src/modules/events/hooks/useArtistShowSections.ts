@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import { readOfflineQuery, writeOfflineQuery } from '@/core/db/offlineQueryCache';
+import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
@@ -31,11 +32,9 @@ export function useArtistShowSections(options: UseArtistShowSectionsOptions) {
 
   useEffect(() => {
     if (!artistId) return;
-    void readOfflineQuery<ArtistShowSections>(cacheKey).then((cached) => {
-      if (cached) {
-        queryClient.setQueryData(queryKeys.artistShows(artistId, userId), cached);
-      }
-    });
+    void seedQueryClientFromCache(queryClient, queryKeys.artistShows(artistId, userId), () =>
+      readOfflineQuery<ArtistShowSections>(cacheKey)
+    );
   }, [artistId, cacheKey, queryClient, userId]);
 
   const query = useQuery<ArtistShowSections>({
