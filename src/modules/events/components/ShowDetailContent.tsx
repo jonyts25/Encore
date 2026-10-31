@@ -307,7 +307,13 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             ) : null}
           </View>
 
-          <SetlistPredictionPanel artistName={show.artist.name} showId={show.id} variant="compact" />
+          <SetlistPredictionPanel
+            artistId={show.artist_id}
+            artistName={show.artist.name}
+            showId={show.id}
+            tourId={show.tour_id}
+            variant="compact"
+          />
         </View>
       </ScrollView>
 

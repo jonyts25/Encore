@@ -397,6 +397,24 @@
       "no_tour_data_fallback": "General artist repertoire"
     }
   },
+  "communityPlaylists": {
+    "title": "Community playlists",
+    "empty": "Got a playlist for this tour? Share it",
+    "add": "Add playlist",
+    "urlPlaceholder": "Paste the playlist link",
+    "titlePlaceholder": "Title (optional)",
+    "save": "Save",
+    "saveError": "Could not save the playlist",
+    "requiresAuth": "Sign in to add or use community playlists",
+    "invalidUrl": "Paste a playlist link from Apple Music, Spotify, or YouTube Music",
+    "addedBy": "by {{name}}",
+    "uses": "{{count}} people use it",
+    "uses_one": "1 person uses it",
+    "fallbackTitle": "{{service}} playlist",
+    "deleteTitle": "Remove playlist",
+    "deleteMessage": "Remove this playlist from the community?",
+    "deleteConfirm": "Remove"
+  },
   "musicStreaming": {
     "listenTitle": "Listen on",
     "listenSong": "Listen to this song",

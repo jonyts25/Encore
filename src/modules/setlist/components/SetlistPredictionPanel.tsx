@@ -5,6 +5,7 @@ import { useTranslation } from '@/core/i18n';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
+import { CommunityPlaylistsSection } from '@/modules/communityPlaylists/components/CommunityPlaylistsSection';
 import { ListenSetlistButton } from '@/modules/music/components/ListenSetlistButton';
 import { SongListenButton } from '@/modules/music/components/SongListenButton';
 
@@ -19,7 +20,9 @@ import type { SetlistPrediction } from '../types';
 
 type SetlistPredictionPanelProps = {
   showId: string;
+  artistId: string;
   artistName: string;
+  tourId: string | null;
   variant?: 'default' | 'compact';
 };
 
@@ -29,7 +32,9 @@ function formatConfidence(confidence: number): string {
 
 export function SetlistPredictionPanel({
   showId,
+  artistId,
   artistName,
+  tourId,
   variant = 'default',
 }: SetlistPredictionPanelProps) {
   const { t, i18n } = useTranslation();
@@ -86,6 +91,9 @@ export function SetlistPredictionPanel({
         <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
       ) : null}
 
+      <ListenSetlistButton artistName={artistName} />
+      <CommunityPlaylistsSection artistId={artistId} tourId={tourId} />
+
       {!isLoading && !error && prediction && prediction.songs.length > 0 ? (
         <>
           {!isCompact && disclaimerKey ? (
@@ -95,8 +103,6 @@ export function SetlistPredictionPanel({
           ) : null}
 
           {!isCompact && metaLine ? <ThemedText style={styles.meta}>{metaLine}</ThemedText> : null}
-
-          {!isCompact ? <ListenSetlistButton artistName={artistName} /> : null}
 
           <View
             style={[

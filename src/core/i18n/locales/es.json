@@ -397,6 +397,24 @@
       "no_tour_data_fallback": "Repertorio general del artista"
     }
   },
+  "communityPlaylists": {
+    "title": "Playlists de la comunidad",
+    "empty": "¿Tienes una playlist de esta gira? Compártela",
+    "add": "Agregar playlist",
+    "urlPlaceholder": "Pega el link de la playlist",
+    "titlePlaceholder": "Título (opcional)",
+    "save": "Guardar",
+    "saveError": "No se pudo guardar la playlist",
+    "requiresAuth": "Inicia sesión para agregar o usar playlists de la comunidad",
+    "invalidUrl": "Pega el link de una playlist de Apple Music, Spotify o YouTube Music",
+    "addedBy": "por {{name}}",
+    "uses": "{{count}} personas la usan",
+    "uses_one": "1 persona la usa",
+    "fallbackTitle": "Playlist de {{service}}",
+    "deleteTitle": "Eliminar playlist",
+    "deleteMessage": "¿Quitar esta playlist de la comunidad?",
+    "deleteConfirm": "Eliminar"
+  },
   "musicStreaming": {
     "listenTitle": "Escuchar en",
     "listenSong": "Escuchar esta canción",
