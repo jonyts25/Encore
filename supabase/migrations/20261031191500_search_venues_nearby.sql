@@ -20,7 +20,7 @@ returns table (
 language sql
 stable
 security invoker
-set search_path = public
+set search_path = public, extensions
 as $$
   with params as (
     select
