@@ -6,7 +6,9 @@ import {
   parseAddUserSongResponse,
   type ParsedAddUserSongResult,
 } from './addUserSongLogic';
-import type { Artist, ArtistLink, ArtistSearchResponse, UserArtist } from './types';
+import { sortFollowedArtists } from '@/modules/identity/favoriteArtistsLogic';
+
+import type { Artist, ArtistLink, ArtistSearchResponse, FollowedArtist, UserArtist } from './types';
 
 export type { ParsedAddUserSongResult };
 
@@ -104,28 +106,45 @@ export async function searchLocalArtists(query: string, limit = 100): Promise<Ar
   return filterArtists(await listPublicArtists(limit), normalized);
 }
 
-export async function listFollowedArtists(userId: string, limit = 100): Promise<Artist[]> {
+export async function listFollowedArtists(userId: string, limit = 100): Promise<FollowedArtist[]> {
   const { data, error } = await supabase
     .from('user_artists')
-    .select(`followed_at, artist:artists (${ARTIST_COLUMNS})`)
+    .select(`followed_at, is_favorite, favorited_at, artist:artists (${ARTIST_COLUMNS})`)
     .eq('user_id', userId)
-    .order('followed_at', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
 
-  return (data ?? [])
-    .map((row) => row.artist as Artist | Artist[] | null)
-    .flatMap((artist) => (Array.isArray(artist) ? artist : artist ? [artist] : []));
+  type Row = {
+    followed_at: string;
+    is_favorite: boolean;
+    favorited_at: string | null;
+    artist: Artist | Artist[] | null;
+  };
+
+  const mapped = (data ?? ([] as Row[]))
+    .map((row) => {
+      const artist = Array.isArray(row.artist) ? row.artist[0] : row.artist;
+      if (!artist) return null;
+      return {
+        ...artist,
+        isFavorite: Boolean(row.is_favorite),
+        favoritedAt: row.favorited_at,
+        followedAt: row.followed_at,
+      } satisfies FollowedArtist;
+    })
+    .filter((artist): artist is FollowedArtist => artist != null);
+
+  return sortFollowedArtists(mapped);
 }
 
 export async function searchFollowedArtists(
   userId: string,
   query: string,
   limit = 100
-): Promise<Artist[]> {
+): Promise<FollowedArtist[]> {
   const followed = await listFollowedArtists(userId, limit);
-  return filterArtists(followed, query);
+  return filterArtists(followed, query) as FollowedArtist[];
 }
 
 export async function searchPublicArtists(query: string, limit = 100): Promise<Artist[]> {
@@ -176,7 +195,7 @@ export async function getArtistFollow(
 ): Promise<UserArtist | null> {
   const { data, error } = await supabase
     .from('user_artists')
-    .select('user_id, artist_id, followed_at')
+    .select('user_id, artist_id, followed_at, is_favorite, favorited_at')
     .eq('user_id', userId)
     .eq('artist_id', artistId)
     .maybeSingle();
@@ -190,7 +209,7 @@ export async function followArtist(userId: string, artistId: string): Promise<Us
   const { data, error } = await supabase
     .from('user_artists')
     .insert({ user_id: userId, artist_id: artistId, followed_at: followedAt })
-    .select('user_id, artist_id, followed_at')
+    .select('user_id, artist_id, followed_at, is_favorite, favorited_at')
     .single();
 
   if (error) throw error;
