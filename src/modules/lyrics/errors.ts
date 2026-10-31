@@ -7,9 +7,15 @@ export class LyricsBusyError extends Error {
   }
 }
 
+export function isLyricsBusyError(error: unknown): boolean {
+  return error instanceof LyricsBusyError;
+}
+
 export function isLyricsNetworkFailure(error: unknown): boolean {
-  if (error instanceof LyricsBusyError) return true;
+  if (error instanceof LyricsBusyError) return false;
   if (error instanceof ApiError) {
+    const body = error.body as { error?: string } | null;
+    if (error.status === 503 && body?.error === 'lyrics_busy') return false;
     return error.status === 408 || error.status === 502 || error.status === 503;
   }
   if (error instanceof Error && error.name === 'AbortError') return true;

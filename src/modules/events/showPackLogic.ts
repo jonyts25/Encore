@@ -3,9 +3,12 @@ import { expiresAtAfterShowDate, SHOW_CACHE_TTL_MS } from '@/core/time/showCache
 import { normalizeSongTitle } from '@/modules/catalog/songTitleNormalize';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
+import type { Show } from './types';
+import { resolveShowLocalDate } from './visibility';
 import type { PracticePackSong } from './practicePackTypes';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
+export const LYRICS_BUSY_RETRY_DELAYS_MS = [30_000, 120_000, 300_000] as const;
 export const SHOW_PACK_STALE_AFTER_MS = 12 * MS_PER_HOUR;
 export const SHOW_PACK_ATTENTION_HORIZON_MS = 48 * MS_PER_HOUR;
 export const SHOW_PACK_STUCK_DOWNLOADING_MS = 10 * 60 * 1000;
@@ -15,10 +18,96 @@ export type ShowPackPrefetchRecord = {
   downloadedAt: number | null;
   statusUpdatedAt: number;
   prediction: SetlistPrediction | null;
+  lyricsCached: number;
+  lyricsTotal: number;
   lyricsMissingTitles: string[];
+  lyricsBusyTitles: string[];
   lyricsFailed: number;
   expiresAt: number | null;
 };
+
+export function addLyricsBusyTitle(titles: readonly string[], title: string): string[] {
+  const trimmed = title.trim();
+  if (!trimmed) return [...titles];
+  if (titles.includes(trimmed)) return [...titles];
+  return [...titles, trimmed];
+}
+
+export function removeLyricsBusyTitle(titles: readonly string[], title: string): string[] {
+  const trimmed = title.trim();
+  return titles.filter((entry) => entry !== trimmed);
+}
+
+export type ShowPackProgressLabel = {
+  key: 'events.showPackDownloadingProgress' | 'events.showPackDownloadingProgressRetrying';
+  cached: number;
+  total: number;
+  retrying?: number;
+};
+
+export function showPackProgressLabel(record: {
+  lyricsCached: number;
+  lyricsTotal: number;
+  lyricsBusyTitles: readonly string[];
+}): ShowPackProgressLabel | null {
+  if (record.lyricsTotal <= 0) return null;
+  const retrying = record.lyricsBusyTitles.length;
+  if (retrying > 0) {
+    return {
+      key: 'events.showPackDownloadingProgressRetrying',
+      cached: record.lyricsCached,
+      total: record.lyricsTotal,
+      retrying,
+    };
+  }
+  return {
+    key: 'events.showPackDownloadingProgress',
+    cached: record.lyricsCached,
+    total: record.lyricsTotal,
+  };
+}
+
+function getZonedHour(show: Pick<Show, 'show_date' | 'local_date' | 'venue'>, now: Date): number {
+  const tz = show.venue?.timezone?.trim() || 'America/Mexico_City';
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    hour12: false,
+  });
+  return Number(formatter.format(now));
+}
+
+function addCalendarDays(localDate: string, days: number): string {
+  const [year, month, day] = localDate.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/** Day before show (venue local) or show-day morning (before noon local). */
+export function isShowLyricsScheduleMilestone(
+  show: Pick<Show, 'show_date' | 'local_date' | 'venue'>,
+  now = new Date()
+): boolean {
+  const localDate = resolveShowLocalDate(show);
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: show.venue?.timezone?.trim() || 'America/Mexico_City',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+  const todayLocal = formatter.format(now);
+  const dayBefore = addCalendarDays(localDate, -1);
+
+  if (todayLocal === dayBefore) return true;
+  if (todayLocal === localDate && getZonedHour(show, now) < 12) return true;
+  return false;
+}
+
+export function isShowWithinLyricsPrefetchSchedule(
+  show: Pick<Show, 'show_date' | 'local_date' | 'venue'>,
+  now = new Date()
+): boolean {
+  return isShowWithinPackAttentionWindow(show.show_date, now) || isShowLyricsScheduleMilestone(show, now);
+}
 
 export function isShowPackPredictionStale(prediction: SetlistPrediction | null): boolean {
   if (!prediction) return true;
@@ -39,7 +128,11 @@ export function isShowWithinPackAttentionWindow(showDate: string, now = new Date
 export function shouldPrefetchShowPackRecord(
   record: ShowPackPrefetchRecord | null,
   showDate: string,
-  options?: { force?: boolean; now?: Date }
+  options?: {
+    force?: boolean;
+    now?: Date;
+    show?: Pick<Show, 'show_date' | 'local_date' | 'venue'>;
+  }
 ): boolean {
   const now = options?.now ?? new Date();
   const nowMs = now.getTime();
@@ -63,6 +156,21 @@ export function shouldPrefetchShowPackRecord(
       nowMs - record.downloadedAt > SHOW_PACK_STALE_AFTER_MS
     ) {
       return true;
+    }
+
+    if (options?.show && isShowLyricsScheduleMilestone(options.show, now)) {
+      const incomplete =
+        record.lyricsTotal > 0 && record.lyricsCached < record.lyricsTotal;
+      if (
+        incomplete ||
+        record.lyricsBusyTitles.length > 0 ||
+        isShowPackPredictionStale(record.prediction)
+      ) {
+        return true;
+      }
+      if (record.downloadedAt == null || nowMs - record.downloadedAt > SHOW_PACK_STALE_AFTER_MS) {
+        return true;
+      }
     }
 
     return false;

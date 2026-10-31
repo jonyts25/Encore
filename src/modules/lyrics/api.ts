@@ -116,7 +116,7 @@ export async function searchLyricsMatches(
   }
 }
 
-export { LyricsBusyError, isLyricsNetworkFailure } from './errors';
+export { LyricsBusyError, isLyricsBusyError, isLyricsNetworkFailure } from './errors';
 
 export function buildGeniusSearchUrl(artist: string, title: string): string {
   const query = encodeURIComponent(`${artist} ${title}`);

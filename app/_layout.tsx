@@ -11,7 +11,8 @@ import { bootLog } from '@/core/bootLog';
 import '@/core/i18n';
 import { I18nProvider } from '@/core/i18n/I18nProvider';
 import { QueryProvider } from '@/core/query';
-import { SessionProvider } from '@/modules/identity';
+import { useShowPackBusyLyricsRetry } from '@/modules/events/hooks/useShowPackBusyLyricsRetry';
+import { SessionProvider, useSession } from '@/modules/identity';
 import { EncoreThemeProvider, useEncoreTheme } from '@/core/ui/theme';
 import { AppErrorBoundary } from '@/core/ui/AppErrorBoundary';
 
@@ -76,6 +77,8 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
+  const { isGuest } = useSession();
+  useShowPackBusyLyricsRetry(!isGuest);
   const { resolvedScheme, tokens } = useEncoreTheme();
   const baseTheme = resolvedScheme === 'dark' ? DarkTheme : DefaultTheme;
   const navigationTheme = {
