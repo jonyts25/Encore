@@ -33,6 +33,8 @@ import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShow } from '../hooks/useShow';
 import { getShowPhase } from '../visibility';
+import { useShowStatus } from '../hooks/useShowStatus';
+import { ShowNightSection } from './ShowNightSection';
 import { ShowStatusButtons } from './ShowStatusButtons';
 
 const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
@@ -76,6 +78,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { tokens } = useEncoreTheme();
   const isOffline = useIsOffline();
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
+  const { status: userShowStatus } = useShowStatus(showId);
   const { prediction } = useShowPrediction(showId);
   const {
     record: packRecord,
@@ -262,6 +265,8 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           </View>
 
           <ShowStatusButtons appearance="showDetail" show={show} showId={show.id} />
+
+          {userShowStatus === 'fui' ? <ShowNightSection show={show} /> : null}
 
           {packRecord && packRecord.status !== 'idle' ? (
             <View style={[styles.packCard, { backgroundColor: tokens.surface }]}>

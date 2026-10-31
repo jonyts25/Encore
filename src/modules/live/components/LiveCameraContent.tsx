@@ -37,6 +37,7 @@ import { hapticImpactMedium } from '@/core/haptics';
 import { useTranslation } from '@/core/i18n';
 import { Glass, GlassIconButton, StatusPill } from '@/core/ui';
 import { Button, ThemedText } from '@/core/ui/Themed';
+import { useSession } from '@/modules/identity';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
@@ -48,7 +49,11 @@ import {
   notifyRecordingSaveFinished,
   waitForRecordingSave,
 } from '../recordingSaveTracker';
-import { saveMultiCamRecordings, saveRecordingToCameraRoll } from '../saveRecording';
+import {
+  saveMultiCamRecordings,
+  saveRecordingToCameraRoll,
+  type SaveRecordingContext,
+} from '../saveRecording';
 
 import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
 import { useLiveSession } from '../context/LiveSessionContext';
@@ -140,6 +145,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
   const isRecordingRef = useRef(false);
   const activeRecordingIdRef = useRef<string | null>(null);
   const recordingSongTitleRef = useRef(title);
+  const recordingSongIdRef = useRef<string | null>(null);
+  const { user } = useSession();
   const allowNavigationRef = useRef(false);
   const recordingSaveOutcomeRef = useRef<'idle' | 'success' | 'failed'>('idle');
   const stopRecordingAndSaveRef = useRef<() => Promise<boolean>>(async () => true);
@@ -212,7 +219,9 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   useEffect(() => {
     recordingSongTitleRef.current = activeTitle;
-  }, [activeTitle]);
+    const match = prediction?.songs.find((song) => song.title === activeTitle);
+    recordingSongIdRef.current = match?.song_id ?? null;
+  }, [activeTitle, prediction?.songs]);
 
   useEffect(() => {
     if (title.trim()) {
@@ -466,6 +475,15 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     }
   }, []);
 
+  const buildRecordingSaveContext = useCallback((): SaveRecordingContext => {
+    return {
+      userId: user?.id,
+      showId: showId ?? null,
+      songId: recordingSongIdRef.current,
+      takenAt: new Date().toISOString(),
+    };
+  }, [showId, user?.id]);
+
   const persistRecordingToCameraRoll = useCallback(
     async (uri: string) => {
       const target = useNativePreview ? 'native' : 'expo';
@@ -473,7 +491,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         setIsSaving(true);
       }
       try {
-        await saveRecordingToCameraRoll(uri, target);
+        await saveRecordingToCameraRoll(uri, target, buildRecordingSaveContext());
         await finalizeRecordingSession(true);
         recordingSaveOutcomeRef.current = 'success';
         if (isMountedRef.current) {
@@ -498,7 +516,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         notifyRecordingSaveFinished();
       }
     },
-    [finalizeRecordingSession, t, useNativePreview]
+    [buildRecordingSaveContext, finalizeRecordingSession, t, useNativePreview]
   );
 
   const persistMultiCamToCameraRoll = useCallback(
@@ -507,7 +525,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         setIsSaving(true);
       }
       try {
-        await saveMultiCamRecordings(backUri, frontUri);
+        await saveMultiCamRecordings(backUri, frontUri, buildRecordingSaveContext());
         await finalizeRecordingSession(true);
         recordingSaveOutcomeRef.current = 'success';
         if (isMountedRef.current) {
@@ -532,7 +550,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         notifyRecordingSaveFinished();
       }
     },
-    [finalizeRecordingSession, t]
+    [buildRecordingSaveContext, finalizeRecordingSession, t]
   );
 
   const warnIfLowStorage = useCallback(async () => {
