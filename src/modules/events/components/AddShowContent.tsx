@@ -33,6 +33,7 @@ import {
 } from '../api';
 import { createUserShow, type VenueCandidatePayload } from '../createUserShow';
 import { parseLocalDateInput, parseLocalTimeInput } from '../createUserShowLogic';
+import { isShowActive } from '../visibility';
 import { prefetchShowPack } from '../showPack';
 import type { Show, VenueSummary } from '../types';
 import { ShowListItem } from './ShowListItem';
@@ -92,7 +93,7 @@ export function AddShowContent() {
     setError(null);
     try {
       const shows = await listUpcomingShowsForArtistFromSupabase(artistId);
-      setUpcomingShows(shows);
+      setUpcomingShows(shows.filter((row) => isShowActive(row)));
       setStep(shows.length > 0 ? 'pickExisting' : 'venue');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('addShow.loadError'));

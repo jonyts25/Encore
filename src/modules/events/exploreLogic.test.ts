@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { buildArtistShowSections } from './artistShowSectionsLogic';
 import {
   collectExploreCities,
   exploreHasCityContent,
   filterShowsByCity,
   pickDefaultExploreCity,
   showsThisWeekInCity,
+  upcomingShowsInCitySorted,
 } from './exploreLogic';
 import type { Show } from './types';
 
@@ -98,5 +100,75 @@ describe('exploreLogic', () => {
       }),
     ];
     assert.equal(filterShowsByCity(shows, 'guadalajara').length, 1);
+  });
+
+  it('drops past shows from city upcoming even inside activeCutoff window', () => {
+    const now = new Date('2026-10-31T18:00:00.000Z');
+    const venue = { id: 'v1', name: 'Arena', city: 'Guadalajara', country: 'MX', timezone: 'America/Mexico_City' } as never;
+    const shows = [
+      show({
+        id: 'past',
+        show_date: '2026-10-30T21:00:00.000Z',
+        venue,
+      }),
+      show({
+        id: 'future',
+        show_date: '2026-11-15T21:00:00.000Z',
+        venue,
+      }),
+    ];
+    const upcoming = upcomingShowsInCitySorted(shows, 'Guadalajara', 10);
+    assert.deepEqual(
+      upcoming.map((row) => row.id),
+      ['future']
+    );
+    assert.equal(showsThisWeekInCity(shows, 'Guadalajara', now).length, 0);
+  });
+});
+
+describe('buildArtistShowSections', () => {
+  it('keeps a last-night fui show only in attended, not in other or yours', () => {
+    const now = new Date('2026-10-31T18:00:00.000Z');
+    const venue = {
+      id: 'venue-1',
+      name: 'Arena',
+      city: 'CDMX',
+      country: 'MX',
+      lat: null,
+      lng: null,
+      capacity: null,
+      timezone: 'America/Mexico_City',
+    } as never;
+    const lastNight = show({
+      id: 'show-last-night',
+      show_date: '2026-10-30T21:00:00.000Z',
+      venue,
+    });
+    const future = show({
+      id: 'show-future',
+      show_date: '2026-11-15T21:00:00.000Z',
+      venue,
+    });
+
+    const sections = buildArtistShowSections({
+      upcomingForArtist: [lastNight, future],
+      userShowRows: [{ show_id: lastNight.id, status: 'fui' }],
+      attendedShows: [lastNight],
+      artistId: 'artist-1',
+      now,
+    });
+
+    assert.deepEqual(
+      sections.yours.map((row) => row.id),
+      []
+    );
+    assert.deepEqual(
+      sections.other.map((row) => row.id),
+      [future.id]
+    );
+    assert.deepEqual(
+      sections.attended.map((row) => row.id),
+      [lastNight.id]
+    );
   });
 });
