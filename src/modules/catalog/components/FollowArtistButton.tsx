@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
-import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
+import { PillButton } from '@/core/ui';
+import { useEncoreTheme } from '@/core/ui/theme';
+import { typography } from '@/core/ui/theme';
 
 import { useArtistFollow } from '../hooks/useArtistFollow';
 import { ArtistFavoriteStar } from './ArtistFavoriteStar';
@@ -14,6 +16,7 @@ type FollowArtistButtonProps = {
 export function FollowArtistButton({ artistId }: FollowArtistButtonProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const { tokens } = useEncoreTheme();
   const {
     isFollowing,
     isFavorite,
@@ -32,80 +35,63 @@ export function FollowArtistButton({ artistId }: FollowArtistButtonProps) {
       return;
     }
 
-    void (async () => {
-      try {
-        if (isFollowing) {
-          await unfollow();
-        } else {
-          await follow();
-        }
-      } catch {
-        // Error state is surfaced below.
-      }
-    })();
+    if (isFollowing) {
+      Alert.alert(t('catalog.unfollowConfirmTitle'), t('catalog.unfollowConfirmMessage'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('catalog.unfollowConfirmAction'),
+          style: 'destructive',
+          onPress: () => {
+            void unfollow().catch(() => undefined);
+          },
+        },
+      ]);
+      return;
+    }
+
+    void follow().catch(() => undefined);
   };
 
   const title = requiresAuth
     ? t('catalog.follow')
     : isFollowing
-      ? t('catalog.unfollow')
+      ? t('catalog.followingCheck')
       : t('catalog.follow');
 
   return (
-    <ThemedView style={styles.container}>
-      {requiresAuth ? (
-        <ThemedText style={styles.authHint}>{t('catalog.followRequiresAuth')}</ThemedText>
-      ) : null}
-      {!requiresAuth && isFollowing ? (
-        <ThemedText style={styles.followingLabel}>{t('catalog.following')}</ThemedText>
-      ) : null}
-      <View style={styles.actionsRow}>
-        <Button
+    <View style={styles.container}>
+      <View style={styles.pillWrap}>
+        <PillButton
           disabled={isLoading || isMutating}
-          style={styles.followButton}
           title={isLoading || isMutating ? t('common.loading') : title}
           variant={isFollowing && !requiresAuth ? 'secondary' : 'primary'}
           onPress={handlePress}
         />
-        {isFollowing && !requiresAuth ? (
-          <ArtistFavoriteStar
-            artistId={artistId}
-            disabled={isMutating}
-            isFavorite={isFavorite}
-            onFavoriteChanged={setIsFavorite}
-          />
-        ) : null}
       </View>
-      {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
-    </ThemedView>
+      {isFollowing && !requiresAuth ? (
+        <ArtistFavoriteStar
+          artistId={artistId}
+          disabled={isMutating}
+          isFavorite={isFavorite}
+          size={22}
+          onFavoriteChanged={setIsFavorite}
+        />
+      ) : null}
+      {error ? (
+        <Text style={[typography.footnote, { color: tokens.recording }]}>{error}</Text>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  actionsRow: {
-    alignItems: 'flex-start',
+  container: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     gap: 4,
   },
-  authHint: {
-    fontSize: 13,
-    opacity: 0.75,
-    textAlign: 'center',
-  },
-  container: {
-    gap: 8,
-    marginTop: 8,
-  },
-  error: {
-    color: '#D64545',
-    textAlign: 'center',
-  },
-  followButton: {
-    flex: 1,
-  },
-  followingLabel: {
-    color: '#2E9B4F',
-    fontWeight: '600',
-    textAlign: 'center',
+  pillWrap: {
+    alignSelf: 'flex-start',
   },
 });

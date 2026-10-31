@@ -61,4 +61,6 @@ export type ArtistShowSections = {
   yours: Show[];
   other: Show[];
   attended: Show[];
+  userStatusByShowId: Partial<Record<string, ShowStatus>>;
+  ratingsByShowId: Partial<Record<string, number>>;
 };

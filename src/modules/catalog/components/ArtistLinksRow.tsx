@@ -1,9 +1,9 @@
+import { FontAwesome5 } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useEffect, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { useTranslation } from '@/core/i18n';
-import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { useEncoreTheme } from '@/core/ui/theme';
 
 import { fetchArtistLinks } from '../api';
 import type { ArtistLink, ArtistLinkPlatform } from '../types';
@@ -12,17 +12,28 @@ type ArtistLinksRowProps = {
   artistId: string;
 };
 
-const PLATFORM_GLYPH: Record<ArtistLinkPlatform, string> = {
-  spotify: 'Spotify',
-  youtube: 'YouTube',
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  website: 'Web',
-  apple_music: 'Apple',
-};
+const LINK_ORDER: ArtistLinkPlatform[] = ['apple_music', 'spotify', 'website', 'youtube'];
+
+function platformIcon(platform: (typeof LINK_ORDER)[number]): {
+  name: keyof typeof FontAwesome5.glyphMap;
+  color: string;
+} {
+  switch (platform) {
+    case 'apple_music':
+      return { name: 'apple', color: '#FA233B' };
+    case 'spotify':
+      return { name: 'spotify', color: '#1DB954' };
+    case 'website':
+      return { name: 'globe', color: '#6B7280' };
+    case 'youtube':
+      return { name: 'youtube', color: '#FF0000' };
+    default:
+      return { name: 'globe', color: '#6B7280' };
+  }
+}
 
 export function ArtistLinksRow({ artistId }: ArtistLinksRowProps) {
-  const { t } = useTranslation();
+  const { tokens } = useEncoreTheme();
   const [links, setLinks] = useState<ArtistLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,57 +53,59 @@ export function ArtistLinksRow({ artistId }: ArtistLinksRowProps) {
     void load();
   }, [load]);
 
-  if (isLoading || links.length === 0) {
+  const orderedLinks = useMemo(() => {
+    const byPlatform = new Map(links.map((link) => [link.platform, link]));
+    return LINK_ORDER.map((platform) => byPlatform.get(platform)).filter(
+      (link): link is ArtistLink => link != null
+    );
+  }, [links]);
+
+  if (isLoading || orderedLinks.length === 0) {
     return null;
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText style={styles.label}>{t('catalog.links')}</ThemedText>
-      <ThemedView style={styles.row}>
-        {links.map((link) => (
+    <View style={styles.row}>
+      {orderedLinks.map((link) => {
+        if (!LINK_ORDER.includes(link.platform as (typeof LINK_ORDER)[number])) return null;
+        const icon = platformIcon(link.platform as (typeof LINK_ORDER)[number]);
+        return (
           <Pressable
             key={link.platform}
             accessibilityRole="link"
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.iconButton,
+              { backgroundColor: tokens.surface, borderColor: tokens.separator },
+              pressed && styles.pressed,
+            ]}
             onPress={() => {
               void WebBrowser.openBrowserAsync(link.url);
-            }}
-            style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}>
-            <ThemedText style={styles.chipText}>{PLATFORM_GLYPH[link.platform]}</ThemedText>
+            }}>
+            <FontAwesome5 color={icon.color} name={icon.name} size={18} />
           </Pressable>
-        ))}
-      </ThemedView>
-    </ThemedView>
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  chip: {
-    backgroundColor: 'rgba(77, 163, 255, 0.16)',
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+  iconButton: {
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
   },
-  chipPressed: {
-    opacity: 0.8,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  container: {
-    gap: 8,
-    marginTop: 8,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '600',
-    opacity: 0.7,
-    textTransform: 'uppercase',
+  pressed: {
+    opacity: 0.75,
   },
   row: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
+    justifyContent: 'center',
   },
 });

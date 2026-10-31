@@ -22,10 +22,8 @@ import { useArtistCatalogSearch } from '@/modules/catalog/hooks/useArtistCatalog
 import { useSession } from '@/modules/identity';
 
 import {
-  artistsFromAttendedShows,
   buildVenueBuckets,
   collectExploreCities,
-  exploreHasCityContent,
   filterShowsByCity,
   groupExploreSearch,
   pickDefaultExploreCity,
@@ -211,8 +209,6 @@ export function ExploreScreenContent() {
     () => buildVenueBuckets(shows, selectedCity),
     [selectedCity, shows]
   );
-  const seenArtists = useMemo(() => artistsFromAttendedShows(sections.attended), [sections.attended]);
-
   const searchGroups = useMemo(
     () =>
       groupExploreSearch(
@@ -223,14 +219,6 @@ export function ExploreScreenContent() {
       ),
     [catalogArtists, query, selectedCity, shows]
   );
-
-  const hasCityContent = exploreHasCityContent({
-    weekShows,
-    upcoming: upcomingList,
-    seenArtists,
-    popularArtists,
-    venues: venueBuckets,
-  });
 
   const [venueModal, setVenueModal] = useState<ExploreVenueBucket | null>(null);
 
@@ -326,57 +314,54 @@ export function ExploreScreenContent() {
           </ScrollView>
         ) : null}
 
-        {hasCityContent && selectedCity ? (
-          <>
-            {weekShows.length > 0 ? (
-              <View style={styles.section}>
-                <SectionHeader title={t('explore.thisWeek', { city: selectedCity })} />
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
-                  {weekShows.map((show) => (
-                    <ExploreWeekCard key={show.id} show={show} />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
+        {selectedCity && weekShows.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title={t('explore.thisWeek', { city: selectedCity })} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.carousel}>
+              {weekShows.map((show) => (
+                <ExploreWeekCard key={show.id} show={show} />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
-            {upcomingList.length > 0 ? (
-              <View style={styles.section}>
-                <SectionHeader
-                  actionLabel={t('explore.viewCalendar')}
-                  title={t('explore.comingSoon')}
-                  onActionPress={() => router.push('/shows')}
-                />
-                {upcomingList.map((show) => (
-                  <ExploreUpcomingRow key={show.id} show={show} />
-                ))}
-              </View>
-            ) : null}
+        {selectedCity && upcomingList.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader
+              actionLabel={t('explore.viewCalendar')}
+              title={t('explore.comingSoonInCity', { city: selectedCity })}
+              onActionPress={() => router.push('/shows')}
+            />
+            {upcomingList.map((show) => (
+              <ExploreUpcomingRow key={show.id} show={show} />
+            ))}
+          </View>
+        ) : null}
 
-            <ArtistCircleRow artists={seenArtists} title={t('explore.artistsSeen')} />
-            <ArtistCircleRow artists={popularArtists} title={t('explore.popular')} />
+        {popularArtists.length > 0 ? (
+          <ArtistCircleRow artists={popularArtists} title={t('explore.popular')} />
+        ) : null}
 
-            {venueBuckets.length > 0 ? (
-              <View style={styles.section}>
-                <SectionHeader title={t('explore.venuesInCity', { city: selectedCity })} />
-                <View style={styles.venueGrid}>
-                  {venueBuckets.map((bucket) => (
-                    <Pressable
-                      key={bucket.venue.id}
-                      style={[styles.venueTile, { backgroundColor: tokens.surface }]}
-                      onPress={() => setVenueModal(bucket)}>
-                      <Ionicons color={tokens.accent} name="location-outline" size={18} />
-                      <Text style={[typography.bodySemibold, { color: tokens.text }]} numberOfLines={2}>
-                        {bucket.venue.name}
-                      </Text>
-                      <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
-                        {t('explore.venueUpcoming', { count: bucket.upcomingCount })}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-          </>
+        {selectedCity && venueBuckets.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title={t('explore.venuesInCity', { city: selectedCity })} />
+            <View style={styles.venueGrid}>
+              {venueBuckets.map((bucket) => (
+                <Pressable
+                  key={bucket.venue.id}
+                  style={[styles.venueTile, { backgroundColor: tokens.surface }]}
+                  onPress={() => setVenueModal(bucket)}>
+                  <Ionicons color={tokens.accent} name="location-outline" size={18} />
+                  <Text style={[typography.bodySemibold, { color: tokens.text }]} numberOfLines={2}>
+                    {bucket.venue.name}
+                  </Text>
+                  <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+                    {t('explore.venueUpcoming', { count: bucket.upcomingCount })}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
         ) : null}
 
         <Card>

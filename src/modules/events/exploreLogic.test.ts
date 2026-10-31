@@ -78,7 +78,6 @@ describe('exploreLogic', () => {
       exploreHasCityContent({
         weekShows: [],
         upcoming: [],
-        seenArtists: [],
         popularArtists: [],
         venues: [],
       }),
@@ -88,7 +87,6 @@ describe('exploreLogic', () => {
       exploreHasCityContent({
         weekShows: [],
         upcoming: [show({ id: '1', show_date: '2026-11-01T03:00:00.000Z', venue: { id: 'v', name: 'A', city: 'X', country: 'MX' } as never })],
-        seenArtists: [],
         popularArtists: [],
         venues: [],
       }),

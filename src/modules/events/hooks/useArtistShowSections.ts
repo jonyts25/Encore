@@ -21,6 +21,8 @@ const EMPTY_SECTIONS: ArtistShowSections = {
   yours: [],
   other: [],
   attended: [],
+  userStatusByShowId: {},
+  ratingsByShowId: {},
 };
 
 function hasSectionData(sections: ArtistShowSections): boolean {

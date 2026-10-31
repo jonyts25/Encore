@@ -161,14 +161,12 @@ export function uniqueVenuesFromShows(shows: Show[]): VenueSummary[] {
 export function exploreHasCityContent(params: {
   weekShows: Show[];
   upcoming: Show[];
-  seenArtists: ArtistSummary[];
   popularArtists: ArtistSummary[];
   venues: ExploreVenueBucket[];
 }): boolean {
   return (
     params.weekShows.length > 0 ||
     params.upcoming.length > 0 ||
-    params.seenArtists.length > 0 ||
     params.popularArtists.length > 0 ||
     params.venues.length > 0
   );

@@ -250,7 +250,13 @@ export async function fetchArtistShowSections(
 
   if (!userId) {
     const other = upcomingForArtist.filter((show) => isShowActive(show));
-    return { yours: [], other, attended: [] };
+    return {
+      yours: [],
+      other,
+      attended: [],
+      userStatusByShowId: {},
+      ratingsByShowId: {},
+    };
   }
 
   const { data: userShows, error: userShowsError } = await supabase
@@ -267,12 +273,38 @@ export async function fetchArtistShowSections(
 
   const attendedShows = await listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false });
 
-  return buildArtistShowSections({
+  const userShowRows = (userShows ?? []) as { show_id: string; status: ShowStatus }[];
+  const userStatusByShowId: Partial<Record<string, ShowStatus>> = {};
+  for (const row of userShowRows) {
+    if (row.status === 'voy' || row.status === 'interesado') {
+      userStatusByShowId[row.show_id] = row.status;
+    }
+  }
+
+  const ratingsByShowId: Partial<Record<string, number>> = {};
+  if (attendedIds.length > 0) {
+    const { data: memories, error: memoriesError } = await supabase
+      .from('memories')
+      .select('show_id, rating')
+      .eq('user_id', userId)
+      .in('show_id', attendedIds);
+    if (memoriesError) throw memoriesError;
+    for (const row of memories ?? []) {
+      const rating = row.rating as number | null;
+      if (rating != null && rating >= 1) {
+        ratingsByShowId[row.show_id as string] = rating;
+      }
+    }
+  }
+
+  const sections = buildArtistShowSections({
     upcomingForArtist,
-    userShowRows: (userShows ?? []) as { show_id: string; status: ShowStatus }[],
+    userShowRows,
     attendedShows,
     artistId,
   });
+
+  return { ...sections, userStatusByShowId, ratingsByShowId };
 }
 
 export async function fetchShowByIdFromSupabase(showId: string): Promise<Show | null> {

@@ -1,16 +1,31 @@
-import { StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
-import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { useEncoreTheme } from '@/core/ui/theme';
+import { spacing, typography } from '@/core/ui/theme';
 import { useSession } from '@/modules/identity';
-import { ShowSection, useArtistShowSections } from '@/modules/events';
+import { useArtistShowSections } from '@/modules/events';
+
+import {
+  buildArtistLiveStats,
+  buildArtistUpcomingShows,
+  formatArtistLastSeenMonthYear,
+} from '../artistPageLogic';
+
+import { ArtistConcertRow } from './ArtistConcertRow';
 
 type ArtistShowsSectionProps = {
   artistId: string;
 };
 
+type ConcertSegment = 'upcoming' | 'attended';
+
 export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const router = useRouter();
+  const { tokens } = useEncoreTheme();
   const { isGuest, user, isLoading: sessionLoading } = useSession();
 
   const { sections, isLoading, error } = useArtistShowSections({
@@ -19,72 +34,155 @@ export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
     enabled: !sessionLoading,
   });
 
-  const hasSectionData =
-    sections.yours.length > 0 ||
-    sections.other.length > 0 ||
-    sections.attended.length > 0;
+  const upcoming = useMemo(
+    () => buildArtistUpcomingShows(sections.yours, sections.other),
+    [sections.other, sections.yours]
+  );
+  const attended = sections.attended;
+  const hasAttended = !isGuest && attended.length > 0;
+  const [segment, setSegment] = useState<ConcertSegment>('upcoming');
 
-  if ((sessionLoading || isLoading) && !hasSectionData && !error) {
+  const liveStats = useMemo(() => buildArtistLiveStats(attended), [attended]);
+
+  if ((sessionLoading || isLoading) && upcoming.length === 0 && attended.length === 0 && !error) {
     return (
-      <ThemedView style={styles.loading}>
-        <ThemedText>{t('common.loading')}</ThemedText>
-      </ThemedView>
+      <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{t('common.loading')}</Text>
     );
   }
 
   if (error) {
-    return <ThemedText style={styles.error}>{error}</ThemedText>;
+    return <Text style={[typography.secondary, { color: tokens.recording }]}>{error}</Text>;
   }
 
-  const hasYours = !isGuest && sections.yours.length > 0;
-  const hasOther = sections.other.length > 0;
-  const hasAttended = !isGuest && sections.attended.length > 0;
-
-  if (!hasYours && !hasOther && !hasAttended) {
-    return <ThemedText style={styles.empty}>{t('catalog.artistShowsEmpty')}</ThemedText>;
-  }
+  const activeSegment = segment === 'attended' && hasAttended ? 'attended' : 'upcoming';
 
   return (
-    <ThemedView style={styles.container}>
-      {!isGuest ? (
-        <ShowSection
-          title={t('catalog.artistShowsYours')}
-          shows={sections.yours}
-          emptyMessage={t('catalog.artistShowsYoursEmpty')}
-        />
+    <View style={styles.block}>
+      {liveStats ? (
+        <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+          {liveStats.count === 1
+            ? t('catalog.seenLive_one', {
+                venue: liveStats.lastShow.venue.name,
+                when: formatArtistLastSeenMonthYear(liveStats.lastShow.show_date, i18n.language),
+              })
+            : t('catalog.seenLive', {
+                count: liveStats.count,
+                venue: liveStats.lastShow.venue.name,
+                when: formatArtistLastSeenMonthYear(liveStats.lastShow.show_date, i18n.language),
+              })}
+        </Text>
       ) : null}
-      <ShowSection
-        title={t('catalog.artistShowsOther')}
-        shows={sections.other}
-        emptyMessage={t('catalog.artistShowsOtherEmpty')}
-      />
-      {!isGuest ? (
-        <ShowSection
-          title={t('catalog.artistShowsAttended')}
-          shows={sections.attended}
-          emptyMessage={t('catalog.artistShowsAttendedEmpty')}
-        />
+
+      <Text style={[typography.title, { color: tokens.text }]}>{t('catalog.concertsTitle')}</Text>
+
+      {hasAttended ? (
+        <View style={styles.segmentRow}>
+          <SegmentPill
+            active={activeSegment === 'upcoming'}
+            label={t('catalog.concertsUpcoming')}
+            onPress={() => setSegment('upcoming')}
+          />
+          <SegmentPill
+            active={activeSegment === 'attended'}
+            label={t('catalog.concertsAttended')}
+            onPress={() => setSegment('attended')}
+          />
+        </View>
       ) : null}
-    </ThemedView>
+
+      {activeSegment === 'upcoming' ? (
+        upcoming.length > 0 ? (
+          <View>
+            {upcoming.map((show) => (
+              <ArtistConcertRow
+                key={show.id}
+                show={show}
+                userStatus={sections.userStatusByShowId[show.id] ?? null}
+              />
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyBlock}>
+            <Text style={[typography.body, { color: tokens.textSecondary }]}>
+              {t('catalog.noUpcomingConcerts')}
+            </Text>
+            {!isGuest ? (
+              <Pressable
+                accessibilityRole="link"
+                onPress={() =>
+                  router.push({ pathname: '/add-show', params: { artistId } })
+                }>
+                <Text style={[typography.bodySemibold, { color: tokens.accent }]}>
+                  {t('catalog.addConcertLink')}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        )
+      ) : (
+        <View>
+          {[...attended]
+            .sort((a, b) => new Date(b.show_date).getTime() - new Date(a.show_date).getTime())
+            .map((show) => (
+              <ArtistConcertRow
+                key={show.id}
+                rating={sections.ratingsByShowId[show.id] ?? null}
+                show={show}
+              />
+            ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function SegmentPill({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { tokens } = useEncoreTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.segmentPill,
+        {
+          backgroundColor: active ? tokens.accent : tokens.surface,
+          borderColor: tokens.separator,
+        },
+      ]}>
+      <Text
+        style={[
+          typography.bodySemibold,
+          { color: active ? tokens.onAccent : tokens.text },
+        ]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    gap: 4,
-    marginTop: 8,
+  block: {
+    gap: spacing.md,
   },
-  empty: {
-    fontSize: 14,
-    lineHeight: 20,
-    opacity: 0.7,
+  emptyBlock: {
+    gap: spacing.sm,
   },
-  error: {
-    color: '#D64545',
-    marginTop: 8,
+  segmentPill: {
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
   },
-  loading: {
-    marginTop: 8,
-    paddingVertical: 8,
+  segmentRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
 });
