@@ -19,4 +19,5 @@ as $$
 $$;
 
 revoke all on function public.get_show_going_counts(uuid[]) from public;
+revoke all on function public.get_show_going_counts(uuid[]) from anon;
 grant execute on function public.get_show_going_counts(uuid[]) to authenticated;
