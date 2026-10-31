@@ -16,7 +16,6 @@ import { Card, GlassIconButton, SectionHeader } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
 import { ProfileFollowedArtistsSection } from '@/modules/catalog/components/ProfileFollowedArtistsSection';
-import { ProfileMyMapCard } from '@/modules/events/components/ProfileMyMapCard';
 import { ShowPhotoCarouselCard } from '@/modules/events/components/ShowPhotoCarouselCard';
 import { useHomeShowSections } from '@/modules/events/hooks/useHomeShowSections';
 import { computeProfileStats } from '@/modules/identity/profileStatsLogic';
@@ -146,8 +145,6 @@ export function ProfileScreenContent() {
       </View>
 
       {user ? <ProfileFollowedArtistsSection userId={user.id} /> : null}
-
-      {user ? <ProfileMyMapCard /> : null}
 
       <Card>
         <Text style={[typography.bodySemibold, { color: tokens.text }]}>

@@ -18,6 +18,13 @@ export default function TabLayout() {
           md="explore"
         />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="discography">
+        <NativeTabs.Trigger.Label>{t('discography.tab')}</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'opticaldisc', selected: 'opticaldisc.fill' }}
+          md="album"
+        />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <NativeTabs.Trigger.Label>{t('identity.tab')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

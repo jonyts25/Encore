@@ -50,6 +50,24 @@
     "loadError": "Could not load this artist's shows.",
     "submitError": "Could not create the show. Try again."
   },
+  "discography": {
+    "tab": "Discography",
+    "title": "Your discography",
+    "yearAll": "All",
+    "stats": {
+      "concerts": "Concerts",
+      "artists": "Artists",
+      "liveSongs": "Live songs",
+      "cities": "Cities",
+      "confirmSetlists": "Confirm your setlists"
+    },
+    "favoritesSeen": "You saw {{seen}} of your {{total}} favorites",
+    "songsCount": "{{count}} songs",
+    "confirmSetlist": "What did they play?",
+    "empty": "Mark concerts as Attended to start your discography",
+    "exploreCta": "Explore",
+    "requiresAuth": "Sign in to view your discography."
+  },
   "explore": {
     "tab": "Explore",
     "title": "Explore",
