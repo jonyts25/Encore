@@ -1,0 +1,19 @@
+{
+  "name": "",
+  "edition_year": 2027,
+  "venue": {
+    "name": "",
+    "city": ""
+  },
+  "start_date": "YYYY-MM-DD",
+  "end_date": "YYYY-MM-DD",
+  "lineup": [
+    {
+      "artist": "",
+      "day": "YYYY-MM-DD",
+      "stage": null,
+      "start": "HH:MM",
+      "end": "HH:MM"
+    }
+  ]
+}

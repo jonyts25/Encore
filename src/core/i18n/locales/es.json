@@ -96,6 +96,32 @@
     "spanish": "Español",
     "english": "English"
   },
+  "festivals": {
+    "admin": {
+      "groupTitle": "ADMIN",
+      "title": "Admin · Cargar festival",
+      "subtitle": "Pega el JSON del festival. Los shows se crean en el catálogo; la agenda del usuario sigue siendo user_shows con «Voy».",
+      "jsonPlaceholder": "Pega festival-template.json aquí…",
+      "validate": "Validar",
+      "save": "Guardar",
+      "summary": "{{days}} días · {{lineup}} presentaciones · {{found}} artistas en catálogo · {{missing}} faltantes",
+      "missingList": "Faltantes: {{names}}",
+      "saveSuccessTitle": "Festival guardado",
+      "saveSuccessBody": "Shows creados: {{created}} · actualizados: {{updated}} · artistas sin match: {{missing}}",
+      "errors": {
+        "invalid_json": "JSON inválido",
+        "invalid_shape": "Formato incorrecto",
+        "missing_name": "Falta el nombre del festival",
+        "invalid_edition_year": "Año de edición inválido",
+        "invalid_dates": "Fechas inválidas (usa YYYY-MM-DD)",
+        "invalid_date_range": "La fecha final debe ser posterior a la inicial",
+        "missing_venue": "Falta el recinto",
+        "missing_lineup": "La lineup no puede estar vacía",
+        "save_failed": "No se pudo guardar el festival",
+        "forbidden": "Solo administradores pueden cargar festivales"
+      }
+    }
+  },
   "profile": {
     "memberSince": "En Encore desde {{date}}",
     "avatarComingSoon": "Próximamente",
