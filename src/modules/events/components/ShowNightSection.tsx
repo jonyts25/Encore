@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { requestPermissionsAsync } from 'expo-media-library';
 import * as MediaLibrary from 'expo-media-library/legacy';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -20,7 +20,7 @@ import { typography } from '@/core/ui/theme/typography';
 
 import { persistShowMediaBatch } from '../showMediaApi';
 import { useShowMedia } from '../hooks/useShowMedia';
-import { getShowNightSearchWindow, mapMediaLibraryType } from '../showNightLogic';
+import { getShowNightSearchWindow, mapMediaLibraryType, photosLibraryAssetUri } from '../showNightLogic';
 import type { Show } from '../types';
 import type { ShowMediaRow, ShowMediaType } from '../showMediaTypes';
 
@@ -36,11 +36,33 @@ type ShowNightSectionProps = {
   show: Show;
 };
 
-type GalleryItem = {
+type GalleryThumbProps = {
   row: ShowMediaRow;
-  uri: string | null;
-  missing: boolean;
+  onMissing: (assetId: string) => void;
+  onPress: () => void;
 };
+
+function GalleryThumb({ row, onMissing, onPress }: GalleryThumbProps) {
+  const { tokens } = useEncoreTheme();
+
+  return (
+    <Pressable
+      style={[styles.thumbWrap, { backgroundColor: tokens.surface }]}
+      onPress={onPress}>
+      <Image
+        contentFit="cover"
+        source={{ uri: photosLibraryAssetUri(row.asset_id) }}
+        style={styles.thumb}
+        onError={() => onMissing(row.asset_id)}
+      />
+      {row.media_type === 'video' ? (
+        <View style={styles.videoBadge}>
+          <Ionicons color="#fff" name="play" size={14} />
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
 
 export function ShowNightSection({ show }: ShowNightSectionProps) {
   const { t } = useTranslation();
@@ -52,8 +74,7 @@ export function ShowNightSection({ show }: ShowNightSectionProps) {
   const [pickerAssets, setPickerAssets] = useState<PickerAsset[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [savingPicker, setSavingPicker] = useState(false);
-  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
-  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [hiddenAssetIds, setHiddenAssetIds] = useState<Set<string>>(new Set());
   const [viewer, setViewer] = useState<{ assetId: string; mediaType: ShowMediaType } | null>(
     null
   );
@@ -62,38 +83,23 @@ export function ShowNightSection({ show }: ShowNightSectionProps) {
 
   const searchWindow = useMemo(() => getShowNightSearchWindow(show), [show]);
 
-  const loadGalleryUris = useCallback(async (rows: ShowMediaRow[]) => {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      setGalleryItems(rows.map((row) => ({ row, uri: null, missing: false })));
-      return;
-    }
-
-    setGalleryLoading(true);
-    const resolved = await Promise.all(
-      rows.map(async (row): Promise<GalleryItem> => {
-        try {
-          const info = await MediaLibrary.getAssetInfoAsync(row.asset_id);
-          return {
-            row,
-            uri: info.localUri ?? info.uri,
-            missing: false,
-          };
-        } catch {
-          return { row, uri: null, missing: true };
-        }
-      })
-    );
-    setGalleryItems(resolved.filter((item) => !item.missing));
-    setGalleryLoading(false);
-  }, []);
+  const visibleMedia = useMemo(
+    () => media.filter((row) => !hiddenAssetIds.has(row.asset_id)),
+    [hiddenAssetIds, media]
+  );
 
   useEffect(() => {
-    if (media.length === 0) {
-      setGalleryItems([]);
-      return;
-    }
-    void loadGalleryUris(media);
-  }, [loadGalleryUris, media]);
+    setHiddenAssetIds(new Set());
+  }, [media]);
+
+  const markGalleryAssetMissing = (assetId: string) => {
+    setHiddenAssetIds((prev) => {
+      if (prev.has(assetId)) return prev;
+      const next = new Set(prev);
+      next.add(assetId);
+      return next;
+    });
+  };
 
   const searchLibrary = async () => {
     if (Platform.OS === 'web') return;
@@ -176,8 +182,8 @@ export function ShowNightSection({ show }: ShowNightSectionProps) {
   };
 
   const countLabel =
-    galleryItems.length > 0
-      ? t('showNight.count', { count: galleryItems.length })
+    visibleMedia.length > 0
+      ? t('showNight.count', { count: visibleMedia.length })
       : null;
 
   return (
@@ -190,38 +196,27 @@ export function ShowNightSection({ show }: ShowNightSectionProps) {
         onPress={() => void searchLibrary()}
       />
 
-      {isLoading || galleryLoading ? (
-        <ActivityIndicator color={tokens.accent} style={styles.loader} />
-      ) : null}
+      {isLoading ? <ActivityIndicator color={tokens.accent} style={styles.loader} /> : null}
 
       {countLabel ? (
         <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{countLabel}</Text>
       ) : null}
 
-      {galleryItems.length > 0 ? (
+      {visibleMedia.length > 0 ? (
         <FlatList
-          data={galleryItems}
-          keyExtractor={(item) => item.row.id}
+          data={visibleMedia}
+          keyExtractor={(item) => item.id}
           numColumns={GRID_COLUMNS}
           scrollEnabled={false}
           columnWrapperStyle={styles.gridRow}
           renderItem={({ item }) => (
-            <Pressable
-              style={[styles.thumbWrap, { backgroundColor: tokens.surface }]}
+            <GalleryThumb
+              row={item}
+              onMissing={markGalleryAssetMissing}
               onPress={() =>
-                setViewer({ assetId: item.row.asset_id, mediaType: item.row.media_type })
-              }>
-              {item.uri ? (
-                <Image contentFit="cover" source={{ uri: item.uri }} style={styles.thumb} />
-              ) : (
-                <View style={styles.thumbPlaceholder} />
-              )}
-              {item.row.media_type === 'video' ? (
-                <View style={styles.videoBadge}>
-                  <Ionicons color="#fff" name="play" size={14} />
-                </View>
-              ) : null}
-            </Pressable>
+                setViewer({ assetId: item.asset_id, mediaType: item.media_type })
+              }
+            />
           )}
         />
       ) : null}
@@ -312,10 +307,6 @@ const styles = StyleSheet.create({
   thumb: {
     width: '100%',
     height: '100%',
-  },
-  thumbPlaceholder: {
-    flex: 1,
-    backgroundColor: '#333',
   },
   videoBadge: {
     position: 'absolute',

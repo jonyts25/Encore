@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { buildArtistShowSections } from './artistShowSectionsLogic';
+import { computePredictionAccuracy } from '@/modules/memory/predictionAccuracyLogic';
+import { buildRowsFromDraft, rowsToDraft } from '@/modules/memory/setlistRowLogic';
+import { resolveSetlistPrefill } from '@/modules/memory/setlistPrefillLogic';
+
+import { formatVenueNearbySubtitle } from './venueSearchFormat';
 import {
   collectExploreCities,
   exploreHasCityContent,
   filterShowsByCity,
   pickDefaultExploreCity,
   showsThisWeekInCity,
+  upcomingShowsInCitySorted,
 } from './exploreLogic';
 import type { Show } from './types';
 
@@ -98,5 +105,124 @@ describe('exploreLogic', () => {
       }),
     ];
     assert.equal(filterShowsByCity(shows, 'guadalajara').length, 1);
+  });
+
+  it('drops past shows from city upcoming even inside activeCutoff window', () => {
+    const now = new Date('2026-10-31T18:00:00.000Z');
+    const venue = { id: 'v1', name: 'Arena', city: 'Guadalajara', country: 'MX', timezone: 'America/Mexico_City' } as never;
+    const shows = [
+      show({
+        id: 'past',
+        show_date: '2026-10-30T21:00:00.000Z',
+        venue,
+      }),
+      show({
+        id: 'future',
+        show_date: '2026-11-15T21:00:00.000Z',
+        venue,
+      }),
+    ];
+    const upcoming = upcomingShowsInCitySorted(shows, 'Guadalajara', 10);
+    assert.deepEqual(
+      upcoming.map((row) => row.id),
+      ['future']
+    );
+    assert.equal(showsThisWeekInCity(shows, 'Guadalajara', now).length, 0);
+  });
+});
+
+describe('memory setlist logic', () => {
+  it('prefers show_songs over prediction', () => {
+    const draft = resolveSetlistPrefill(
+      [{ song_id: 'a', title: 'A', position: 1, is_encore: false }],
+      [{ song_id: 'b', title: 'B', confidence: 1, frequency_pct: 1, avg_position: 1, is_wildcard: false, appeared_in_shows: 1, total_shows: 1 }]
+    );
+    assert.equal(draft.length, 1);
+    assert.equal(draft[0]?.songId, 'a');
+  });
+
+  it('scores prediction hits', () => {
+    const score = computePredictionAccuracy(['a', 'b', 'c'], ['b', 'd']);
+    assert.deepEqual(score, { hits: 1, total: 3 });
+  });
+
+  it('places encore divider before encore songs', () => {
+    const items = [
+      { key: '1', songId: 'a', title: 'A', played: true, isHighlight: false },
+      { key: '2', songId: 'b', title: 'B', played: true, isHighlight: false },
+      { key: '3', songId: 'c', title: 'C', played: true, isHighlight: false },
+    ];
+    const rows = buildRowsFromDraft(items, 2);
+    assert.equal(rows.filter((row) => row.kind === 'encore').length, 1);
+    const parsed = rowsToDraft(rows);
+    assert.equal(parsed.encoreStartIndex, 2);
+    assert.deepEqual(
+      parsed.items.map((row) => row.songId),
+      ['a', 'b', 'c']
+    );
+  });
+
+  it('treats divider at end as no encore', () => {
+    const items = [{ key: '1', songId: 'a', title: 'A', played: true, isHighlight: false }];
+    const rows = buildRowsFromDraft(items, null);
+    const parsed = rowsToDraft(rows);
+    assert.equal(parsed.encoreStartIndex, null);
+  });
+});
+
+describe('formatVenueNearbySubtitle', () => {
+  it('formats city and rounded distance', () => {
+    const label = formatVenueNearbySubtitle(
+      { city: 'Zapopan', country: 'MX', distance_km: 8.2 },
+      (_key, params) => `${params?.city} · ${params?.distance} km`
+    );
+    assert.equal(label, 'Zapopan · 8 km');
+  });
+});
+
+describe('buildArtistShowSections', () => {
+  it('keeps a last-night fui show only in attended, not in other or yours', () => {
+    const now = new Date('2026-10-31T18:00:00.000Z');
+    const venue = {
+      id: 'venue-1',
+      name: 'Arena',
+      city: 'CDMX',
+      country: 'MX',
+      lat: null,
+      lng: null,
+      capacity: null,
+      timezone: 'America/Mexico_City',
+    } as never;
+    const lastNight = show({
+      id: 'show-last-night',
+      show_date: '2026-10-30T21:00:00.000Z',
+      venue,
+    });
+    const future = show({
+      id: 'show-future',
+      show_date: '2026-11-15T21:00:00.000Z',
+      venue,
+    });
+
+    const sections = buildArtistShowSections({
+      upcomingForArtist: [lastNight, future],
+      userShowRows: [{ show_id: lastNight.id, status: 'fui' }],
+      attendedShows: [lastNight],
+      artistId: 'artist-1',
+      now,
+    });
+
+    assert.deepEqual(
+      sections.yours.map((row) => row.id),
+      []
+    );
+    assert.deepEqual(
+      sections.other.map((row) => row.id),
+      [future.id]
+    );
+    assert.deepEqual(
+      sections.attended.map((row) => row.id),
+      [lastNight.id]
+    );
   });
 });

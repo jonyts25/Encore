@@ -11,6 +11,7 @@ import type {
   UserShow,
   VenueSummary,
 } from './types';
+import { artistPageUserStatuses, buildArtistShowSections } from './artistShowSectionsLogic';
 import { activeCutoffIso, getShowPhase, hasConfirmedTime, isShowActive } from './visibility';
 
 type UpcomingShowsResponse = {
@@ -148,7 +149,7 @@ export async function fetchUpcomingShows(options?: FetchUpcomingShowsOptions): P
   }
 
   const data = await apiFetch<UpcomingShowsResponse>(path, { headers });
-  return data.shows;
+  return data.shows.filter((show) => isShowActive(show));
 }
 
 export async function fetchAttendedShowsForMap(userId: string): Promise<Show[]> {
@@ -222,13 +223,14 @@ export async function fetchHomeShowSections(
     .map((row) => row.show_id);
   const attendedIds = rows.filter((row) => row.status === 'fui').map((row) => row.show_id);
 
-  const [allGoing, interested, attended, followedShows] = await Promise.all([
+  const [allGoing, interestedRaw, attended, followedShows] = await Promise.all([
     listShowsByIdsFromSupabase(goingIds, { upcomingOnly: false }),
     listShowsByIdsFromSupabase(interestedIds),
     listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false }),
     token ? fetchUpcomingShows({ followed: true, accessToken: token }) : Promise.resolve([]),
   ]);
 
+  const interested = interestedRaw.filter((show) => isShowActive(show));
   const going = allGoing.filter((show) => isShowActive(show));
   const goingAttendancePending = allGoing.filter(
     (show) => !isShowActive(show) && getShowPhase(show) === 'past'
@@ -246,30 +248,30 @@ export async function fetchArtistShowSections(
   const upcomingForArtist = await listUpcomingShowsForArtistFromSupabase(artistId);
 
   if (!userId) {
-    return { yours: [], other: upcomingForArtist, attended: [] };
+    const other = upcomingForArtist.filter((show) => isShowActive(show));
+    return { yours: [], other, attended: [] };
   }
 
   const { data: userShows, error: userShowsError } = await supabase
     .from('user_shows')
     .select('show_id, status')
     .eq('user_id', userId)
-    .in('status', ['voy', 'interesado', 'fui']);
+    .in('status', artistPageUserStatuses());
 
   if (userShowsError) throw userShowsError;
 
-  const activeRows = (userShows ?? []).filter((row) => row.status !== 'fui');
   const attendedIds = (userShows ?? [])
     .filter((row) => row.status === 'fui')
     .map((row) => row.show_id);
 
-  const yoursIds = new Set(activeRows.map((row) => row.show_id));
-  const yours = upcomingForArtist.filter((show) => yoursIds.has(show.id));
-  const other = upcomingForArtist.filter((show) => !yoursIds.has(show.id));
-
   const attendedShows = await listShowsByIdsFromSupabase(attendedIds, { upcomingOnly: false });
-  const attended = attendedShows.filter((show) => show.artist_id === artistId);
 
-  return { yours, other, attended };
+  return buildArtistShowSections({
+    upcomingForArtist,
+    userShowRows: (userShows ?? []) as { show_id: string; status: ShowStatus }[],
+    attendedShows,
+    artistId,
+  });
 }
 
 export async function fetchShowByIdFromSupabase(showId: string): Promise<Show | null> {
@@ -282,6 +284,36 @@ export async function fetchShowByIdFromSupabase(showId: string): Promise<Show | 
   if (error) throw error;
   if (!data) return null;
   return normalizeShowRow(data as ShowRowFromSupabase);
+}
+
+export async function searchVenuesNearby(params: {
+  query: string;
+  city: string;
+  lat?: number | null;
+  lng?: number | null;
+  radiusKm?: number;
+  limit?: number;
+}): Promise<
+  Array<
+    VenueSummary & {
+      distance_km: number | null;
+    }
+  >
+> {
+  const { data, error } = await supabase.rpc('search_venues_nearby', {
+    p_query: params.query,
+    p_lat: params.lat ?? null,
+    p_lng: params.lng ?? null,
+    p_city: params.city.trim() || null,
+    p_radius_km: params.radiusKm ?? 75,
+    p_limit: params.limit ?? 20,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as Array<VenueSummary & { distance_km: number | null }>;
 }
 
 export async function searchVenues(

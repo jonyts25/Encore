@@ -8,6 +8,8 @@ import { queryClientHasData } from '@/core/query/seedQueryClientFromCache';
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
+import { isQueryInitialLoad } from '@/core/query/queryLoadState';
+
 import { fetchShowById } from '../api';
 import type { Show } from '../types';
 
@@ -52,7 +54,7 @@ export function useShow(showId: string) {
   });
 
   const show = query.data ?? null;
-  const isLoading = query.isPending && query.data === undefined;
+  const isLoading = isQueryInitialLoad(query.isPending, query.data);
   const error =
     query.isError && !show
       ? query.error instanceof Error

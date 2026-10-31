@@ -19,7 +19,12 @@ export function ArtistShowsSection({ artistId }: ArtistShowsSectionProps) {
     enabled: !sessionLoading,
   });
 
-  if (sessionLoading || isLoading) {
+  const hasSectionData =
+    sections.yours.length > 0 ||
+    sections.other.length > 0 ||
+    sections.attended.length > 0;
+
+  if ((sessionLoading || isLoading) && !hasSectionData && !error) {
     return (
       <ThemedView style={styles.loading}>
         <ThemedText>{t('common.loading')}</ThemedText>

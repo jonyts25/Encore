@@ -1,5 +1,5 @@
 import type { ArtistSummary, Show, VenueSummary } from './types';
-import { getShowPhase } from './visibility';
+import { isShowActive } from './visibility';
 
 export type ExploreSearchGroups = {
   artists: ArtistSummary[];
@@ -55,7 +55,7 @@ export function filterShowsByCity(shows: Show[], city: string | null): Show[] {
 }
 
 export function showsThisWeekInCity(shows: Show[], city: string | null, now = new Date()): Show[] {
-  const inCity = filterShowsByCity(shows, city);
+  const inCity = filterShowsByCity(shows, city).filter((show) => isShowActive(show, now));
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const end = new Date(start.getTime() + WEEK_MS);
@@ -67,13 +67,13 @@ export function showsThisWeekInCity(shows: Show[], city: string | null, now = ne
 
 export function upcomingShowsInCitySorted(shows: Show[], city: string | null, limit = 10): Show[] {
   return filterShowsByCity(shows, city)
-    .filter((show) => getShowPhase(show) !== 'past')
+    .filter((show) => isShowActive(show))
     .sort((a, b) => new Date(a.show_date).getTime() - new Date(b.show_date).getTime())
     .slice(0, limit);
 }
 
 export function buildVenueBuckets(shows: Show[], city: string | null): ExploreVenueBucket[] {
-  const inCity = filterShowsByCity(shows, city);
+  const inCity = filterShowsByCity(shows, city).filter((show) => isShowActive(show));
   const byVenue = new Map<string, ExploreVenueBucket>();
 
   for (const show of inCity) {

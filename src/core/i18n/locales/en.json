@@ -11,7 +11,8 @@
   "common": {
     "appName": "Encore",
     "loading": "Loading…",
-    "close": "Close"
+    "close": "Close",
+    "back": "Back"
   },
   "addShow": {
     "title": "Add show",
@@ -27,6 +28,7 @@
     "venueTitle": "Venue",
     "venueCityPlaceholder": "City",
     "venueSearchPlaceholder": "Search venue by name…",
+    "venueDistance": "{{city}} · {{distance}} km",
     "venueNewTitle": "Or add a new one",
     "venueNamePlaceholder": "Venue name",
     "venueCandidatesTitle": "Is this the venue?",
@@ -276,12 +278,44 @@
       "daysAgo": "{{count}} d ago"
     }
   },
+  "memory": {
+    "summary": {
+      "title": "Your show memory",
+      "rating": "Rating: {{rating}}/5",
+      "songCount": "{{count}} confirmed songs",
+      "viewSetlist": "View setlist",
+      "whatTheyPlayed": "What did they play?"
+    },
+    "setlist": {
+      "title": "What did they play?",
+      "subtitle": "Confirm {{artist}}'s setlist and rate the night.",
+      "ratingTitle": "Rating",
+      "star": "{{value}} stars",
+      "notePlaceholder": "Optional note about the concert…",
+      "songsTitle": "Setlist",
+      "empty": "Add the songs they actually played.",
+      "togglePlayed": "Mark as played",
+      "toggleHighlight": "Highlight of the night",
+      "encoreDivider": "— Encore —",
+      "dragHandle": "Reorder",
+      "addSong": "Add song",
+      "addSongError": "We couldn't add that song.",
+      "save": "Save",
+      "saveError": "We couldn't save your memory. Try again.",
+      "savedTitle": "Memory saved",
+      "savedBody": "Your setlist and rating were saved.",
+      "predictionScore": "We got {{hits}} of {{total}} songs right",
+      "requiresAttended": "Mark the show as attended before confirming the setlist."
+    }
+  },
   "showNight": {
     "title": "Your night",
     "searchLibrary": "Find photos from that night",
     "count": "{{count}} photos and videos",
     "emptySearch": "We couldn't find photos from that night",
-    "save": "Save"
+    "save": "Save",
+    "videoPlaybackComingSoon": "In-app playback is coming in the next version",
+    "openInPhotos": "Open in Photos"
   },
   "identity": {
     "tab": "Profile",

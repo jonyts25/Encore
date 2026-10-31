@@ -4,11 +4,13 @@ import { queryClient } from '@/core/query/client';
 import { clearLastKnownUser } from '@/modules/identity/lastKnownUser';
 
 import { clearAllOfflineQueries } from './offlineQueryCache';
+import { clearMemoryPending } from './memoryQueue';
 import { clearShowMediaPending } from './showMediaQueue';
 
 export async function clearLocalUserData(userId: string | null): Promise<void> {
   await clearAllOfflineQueries();
   await clearShowMediaPending();
+  await clearMemoryPending();
   clearLastKnownUser();
 
   try {

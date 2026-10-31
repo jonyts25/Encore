@@ -11,7 +11,8 @@
   "common": {
     "appName": "Encore",
     "loading": "Cargando…",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "back": "Atrás"
   },
   "addShow": {
     "title": "Agregar show",
@@ -27,6 +28,7 @@
     "venueTitle": "Recinto",
     "venueCityPlaceholder": "Ciudad",
     "venueSearchPlaceholder": "Buscar recinto por nombre…",
+    "venueDistance": "{{city}} · {{distance}} km",
     "venueNewTitle": "O agrega uno nuevo",
     "venueNamePlaceholder": "Nombre del recinto",
     "venueCandidatesTitle": "¿Es este recinto?",
@@ -276,12 +278,44 @@
       "daysAgo": "hace {{count}} d"
     }
   },
+  "memory": {
+    "summary": {
+      "title": "Tu memoria del show",
+      "rating": "Calificación: {{rating}}/5",
+      "songCount": "{{count}} canciones confirmadas",
+      "viewSetlist": "Ver setlist",
+      "whatTheyPlayed": "¿Qué tocaron?"
+    },
+    "setlist": {
+      "title": "¿Qué tocaron?",
+      "subtitle": "Confirma el setlist de {{artist}} y califica la noche.",
+      "ratingTitle": "Calificación",
+      "star": "{{value}} estrellas",
+      "notePlaceholder": "Nota opcional sobre el concierto…",
+      "songsTitle": "Setlist",
+      "empty": "Agrega las canciones que sí tocaron.",
+      "togglePlayed": "Marcar si la tocaron",
+      "toggleHighlight": "Favorita de la noche",
+      "encoreDivider": "— Encore —",
+      "dragHandle": "Reordenar",
+      "addSong": "Agregar canción",
+      "addSongError": "No pudimos agregar la canción.",
+      "save": "Guardar",
+      "saveError": "No pudimos guardar tu memoria. Inténtalo de nuevo.",
+      "savedTitle": "Memoria guardada",
+      "savedBody": "Tu setlist y calificación quedaron guardados.",
+      "predictionScore": "Acertamos {{hits}} de {{total}} canciones",
+      "requiresAttended": "Marca el show como «Fui» para confirmar el setlist."
+    }
+  },
   "showNight": {
     "title": "Tu noche",
     "searchLibrary": "Buscar fotos de esa noche",
     "count": "{{count}} fotos y videos",
     "emptySearch": "No encontramos fotos de esa noche",
-    "save": "Guardar"
+    "save": "Guardar",
+    "videoPlaybackComingSoon": "La reproducción en la app llega en la siguiente versión",
+    "openInPhotos": "Ver en Fotos"
   },
   "identity": {
     "tab": "Perfil",

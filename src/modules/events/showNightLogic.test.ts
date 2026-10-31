@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { getShowNightSearchWindow } from './showNightLogic';
+import { getShowNightSearchWindow, photosLibraryAssetUri } from './showNightLogic';
 import type { Show } from './types';
 
 function baseShow(overrides: Partial<Show> = {}): Show {
@@ -32,6 +32,17 @@ function baseShow(overrides: Partial<Show> = {}): Show {
     ...overrides,
   };
 }
+
+describe('photosLibraryAssetUri', () => {
+  it('builds ph:// URIs for many assets without async resolution', () => {
+    const ids = Array.from({ length: 25 }, (_, index) => `A1B2C3D4-0000-4000-8000-${String(index).padStart(12, '0')}`);
+    const uris = ids.map(photosLibraryAssetUri);
+    assert.equal(uris.length, 25);
+    for (const [index, uri] of uris.entries()) {
+      assert.equal(uri, `ph://${ids[index]}`);
+    }
+  });
+});
 
 describe('getShowNightSearchWindow', () => {
   it('uses ±2h / +6h when show time is confirmed', () => {

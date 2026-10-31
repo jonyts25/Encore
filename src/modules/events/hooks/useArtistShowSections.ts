@@ -6,6 +6,8 @@ import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache'
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
+import { isQueryInitialLoad } from '@/core/query/queryLoadState';
+
 import { fetchArtistShowSections } from '../api';
 import type { ArtistShowSections } from '../types';
 
@@ -49,7 +51,7 @@ export function useArtistShowSections(options: UseArtistShowSectionsOptions) {
   });
 
   const sections = query.data ?? EMPTY_SECTIONS;
-  const isLoading = query.isPending && !query.data;
+  const isLoading = isQueryInitialLoad(query.isPending, query.data);
   const error =
     query.isError && !hasSectionData(sections)
       ? query.error instanceof Error

@@ -7,6 +7,8 @@ import { seedQueryClientFromCache } from '@/core/query/seedQueryClientFromCache'
 import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevalidate';
 import { queryKeys } from '@/core/query';
 
+import { isQueryInitialLoad } from '@/core/query/queryLoadState';
+
 import { fetchHomeShowSections } from '../api';
 import { prefetchGoingShowPacks } from '../showPack';
 import type { HomeShowSections } from '../types';
@@ -66,7 +68,7 @@ export function useHomeShowSections(options: UseHomeShowSectionsOptions = {}) {
   }, [isOffline, query.data, queryClient, userId]);
 
   const sections = query.data ?? EMPTY_SECTIONS;
-  const isLoading = query.isPending && !query.data;
+  const isLoading = isQueryInitialLoad(query.isPending, query.data);
   const error =
     query.isError && !hasSectionData(sections)
       ? query.error instanceof Error
