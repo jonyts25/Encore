@@ -1,21 +1,15 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import * as MediaLibrary from 'expo-media-library/legacy';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Linking, Modal, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
-import { GlassIconButton } from '@/core/ui';
-import { useEncoreTheme } from '@/core/ui/theme';
+import { GlassIconButton, PillButton } from '@/core/ui';
+import { typography } from '@/core/ui/theme/typography';
+
+import { photosLibraryAssetUri } from '../showNightLogic';
 import type { ShowMediaType } from '../showMediaTypes';
+
+const PHOTOS_APP_REDIRECT = 'photos-redirect://';
 
 type ShowMediaFullscreenModalProps = {
   visible: boolean;
@@ -32,42 +26,13 @@ export function ShowMediaFullscreenModal({
 }: ShowMediaFullscreenModalProps) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { tokens } = useEncoreTheme();
-  const [uri, setUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (!visible || !assetId) {
-      setUri(null);
-      return;
-    }
+  const uri = assetId ? photosLibraryAssetUri(assetId) : null;
 
-    let cancelled = false;
-    setLoading(true);
-    void (async () => {
-      try {
-        const info = await MediaLibrary.getAssetInfoAsync(assetId);
-        if (cancelled) return;
-        setUri(info.localUri ?? info.uri);
-      } catch {
-        if (!cancelled) setUri(null);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [assetId, visible]);
-
-  const openVideo = async () => {
-    if (!uri) return;
-    try {
-      await Linking.openURL(uri);
-    } catch {
-      // No system handler; thumbnail remains visible.
-    }
+  const openPhotosApp = () => {
+    void Linking.openURL(PHOTOS_APP_REDIRECT).catch(() => {
+      // Photos app unavailable; user can dismiss the modal.
+    });
   };
 
   return (
@@ -76,22 +41,25 @@ export function ShowMediaFullscreenModal({
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
           <GlassIconButton accessibilityLabel={t('common.close')} icon="close" onPress={onClose} />
         </View>
-        {loading ? (
-          <ActivityIndicator color={tokens.onAccent} size="large" style={styles.loader} />
-        ) : uri ? (
-          <Pressable
-            disabled={mediaType !== 'video'}
-            style={styles.mediaWrap}
-            onPress={() => {
-              if (mediaType === 'video') void openVideo();
-            }}>
+        {uri && mediaType === 'photo' ? (
+          <View style={styles.mediaWrap}>
             <Image contentFit="contain" source={{ uri }} style={styles.media} />
-            {mediaType === 'video' ? (
-              <View style={styles.playOverlay} pointerEvents="none">
-                <Ionicons color="#fff" name="play-circle" size={72} />
-              </View>
-            ) : null}
-          </Pressable>
+          </View>
+        ) : null}
+        {uri && mediaType === 'video' ? (
+          <View style={styles.videoWrap}>
+            <Image contentFit="contain" source={{ uri }} style={styles.videoThumb} />
+            <View style={styles.videoMessage}>
+              <Text style={[typography.body, styles.videoCopy, { color: '#fff' }]}>
+                {t('showNight.videoPlaybackComingSoon')}
+              </Text>
+              <PillButton
+                title={t('showNight.openInPhotos')}
+                variant="primary"
+                onPress={openPhotosApp}
+              />
+            </View>
+          </View>
         ) : null}
       </View>
     </Modal>
@@ -106,9 +74,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     zIndex: 2,
   },
-  loader: {
-    flex: 1,
-  },
   mediaWrap: {
     flex: 1,
     justifyContent: 'center',
@@ -118,10 +83,22 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  playOverlay: {
-    ...StyleSheet.absoluteFill,
+  videoWrap: {
+    flex: 1,
     justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 24,
+  },
+  videoThumb: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 12,
+  },
+  videoMessage: {
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    gap: 16,
+  },
+  videoCopy: {
+    textAlign: 'center',
   },
 });

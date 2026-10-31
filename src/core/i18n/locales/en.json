@@ -263,7 +263,9 @@
     "searchLibrary": "Find photos from that night",
     "count": "{{count}} photos and videos",
     "emptySearch": "We couldn't find photos from that night",
-    "save": "Save"
+    "save": "Save",
+    "videoPlaybackComingSoon": "In-app playback is coming in the next version",
+    "openInPhotos": "Open in Photos"
   },
   "identity": {
     "tab": "Profile",
