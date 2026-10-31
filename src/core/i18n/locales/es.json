@@ -258,6 +258,13 @@
       "daysAgo": "hace {{count}} d"
     }
   },
+  "showNight": {
+    "title": "Tu noche",
+    "searchLibrary": "Buscar fotos de esa noche",
+    "count": "{{count}} fotos y videos",
+    "emptySearch": "No encontramos fotos de esa noche",
+    "save": "Guardar"
+  },
   "identity": {
     "tab": "Perfil",
     "profileTitle": "Tu perfil",
