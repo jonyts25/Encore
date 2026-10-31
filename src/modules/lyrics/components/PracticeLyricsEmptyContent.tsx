@@ -27,6 +27,12 @@ import { practiceSongErrorMessageKey } from '@/modules/events/practiceSongErrors
 import { addPracticeSongToShowPack } from '@/modules/events/showPack';
 import type { Show } from '@/modules/events/types';
 import { filterSongsByQuery, normalizeSongSearchQuery } from '@/modules/live/liveSongSearchLogic';
+import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
+import {
+  getPredictionDisclaimerKey,
+  getPredictionDisclaimerParams,
+  sortPredictedSongsForDisplay,
+} from '@/modules/setlist/predictionDisplay';
 
 import { useLyricsSearchMatches } from '../hooks/useLyricsSearchMatches';
 
@@ -44,7 +50,7 @@ type SearchListItem = {
 };
 
 export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -73,6 +79,19 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
 
   const catalogSongs = artistSongsQuery.data ?? [];
   const practiceSongs = practiceSongsQuery.data ?? [];
+  const { prediction, isLoading: isPredictionLoading } = useShowPrediction(show.id);
+
+  const predictedSongs = useMemo(() => {
+    if (!prediction || prediction.songs.length === 0) return [];
+    return sortPredictedSongsForDisplay(prediction);
+  }, [prediction]);
+
+  const predictionDisclaimerKey = prediction
+    ? getPredictionDisclaimerKey(prediction.structure)
+    : null;
+  const predictionDisclaimerParams = prediction
+    ? getPredictionDisclaimerParams(prediction, i18n.language)
+    : undefined;
 
   const suggestionSongs = useMemo(() => {
     const practiced = new Set(practiceSongs.map((song) => song.title));
@@ -237,6 +256,27 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
         </View>
       ) : null}
 
+      {!searchMode && (isPredictionLoading || predictedSongs.length > 0) ? (
+        <View style={styles.section}>
+          <Text style={[typography.bodySemibold, { color: tokens.text }]}>
+            {t('practice.probableSetlist')}
+          </Text>
+          {isPredictionLoading ? (
+            <ActivityIndicator color={tokens.accent} style={styles.loader} />
+          ) : null}
+          {predictionDisclaimerKey ? (
+            <Text style={[typography.footnote, styles.disclaimer, { color: tokens.textSecondary }]}>
+              {t(predictionDisclaimerKey, predictionDisclaimerParams)}
+            </Text>
+          ) : null}
+          {predictedSongs.map((song, index) => (
+            <Pressable key={song.song_id} onPress={() => openLyricsForTitle(song.title)}>
+              <ListRow subtitle={artistName} title={`${index + 1}. ${song.title}`} />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+
       {practiceSongs.length > 0 ? (
         <View style={styles.section}>
           <Text style={[typography.bodySemibold, { color: tokens.text }]}>
@@ -308,5 +348,9 @@ const styles = StyleSheet.create({
   section: {
     gap: 4,
     marginTop: spacing.xl,
+  },
+  disclaimer: {
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
   },
 });

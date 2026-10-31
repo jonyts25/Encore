@@ -15,8 +15,9 @@ import { fetchShowById } from './api';
 import type { PracticePackSong } from './practicePackTypes';
 import {
   collectShowPackSongTitles,
-  isShowPackExpired,
+  isShowWithinPackAttentionWindow,
   mergePracticeSong,
+  shouldPrefetchShowPackRecord,
 } from './showPackLogic';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
@@ -47,7 +48,6 @@ export type AddPracticeSongResult =
 
 const LYRICS_BATCH_SIZE = 2;
 const LYRICS_BATCH_PAUSE_MS = 500;
-const STUCK_DOWNLOADING_MS = 10 * 60 * 1000;
 
 function isPrefetchQueryMissingOrFailed(
   queryClient: QueryClient,
@@ -77,27 +77,11 @@ export function isShowEligibleForShowPack(showDate: string, now = new Date()): b
 
 async function shouldPrefetchShowPack(
   showId: string,
+  showDate: string,
   options?: { force?: boolean }
 ): Promise<boolean> {
-  if (options?.force) return true;
-
   const record = await getShowPackRecord(showId);
-  if (!record) return true;
-
-  if (isShowPackExpired(record)) return true;
-
-  if (record.status === 'partial') return true;
-
-  if (record.status === 'downloading') {
-    return Date.now() - record.statusUpdatedAt >= STUCK_DOWNLOADING_MS;
-  }
-
-  if (record.status === 'ready') {
-    if (record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0) return true;
-    return false;
-  }
-
-  return true;
+  return shouldPrefetchShowPackRecord(record, showDate, options);
 }
 
 export async function prefetchShowPack(
@@ -106,7 +90,7 @@ export async function prefetchShowPack(
   options?: { force?: boolean }
 ): Promise<void> {
   const showId = show.id;
-  const shouldRun = await shouldPrefetchShowPack(showId, options);
+  const shouldRun = await shouldPrefetchShowPack(showId, show.show_date, options);
   if (!shouldRun) return;
 
   const expiresAt = lyricsExpiresAfterShow(show.show_date);
@@ -370,10 +354,14 @@ export async function prefetchGoingShowPacks(
   shows: Show[],
   queryClient: QueryClient
 ): Promise<void> {
-  const eligible = shows.filter((show) => isShowEligibleForShowPack(show.show_date));
+  const eligible = shows.filter(
+    (show) =>
+      isShowEligibleForShowPack(show.show_date) &&
+      isShowWithinPackAttentionWindow(show.show_date)
+  );
 
   for (const show of eligible) {
-    const shouldRun = await shouldPrefetchShowPack(show.id);
+    const shouldRun = await shouldPrefetchShowPack(show.id, show.show_date);
     if (!shouldRun) continue;
     void prefetchShowPack(show, queryClient);
   }

@@ -295,6 +295,7 @@
     "searchPlaceholder": "Search by title…",
     "searchEmpty": "No songs match in this artist's catalog.",
     "yourSongs": "Your practice songs",
+    "probableSetlist": "Probable setlist",
     "suggestions": "From the catalog",
     "tapToAdd": "Tap to add",
     "errors": {

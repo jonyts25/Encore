@@ -6,7 +6,13 @@ import { useEncoreTheme } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
 
 import { useShowPrediction } from '../hooks/useShowPrediction';
-import type { PredictedSong, SetlistPrediction, SetlistPredictionStructure } from '../types';
+import {
+  getPredictionDisclaimerKey,
+  getPredictionDisclaimerParams,
+  predictionShowsConfidence,
+  sortPredictedSongsForDisplay,
+} from '../predictionDisplay';
+import type { SetlistPrediction } from '../types';
 
 type SetlistPredictionPanelProps = {
   showId: string;
@@ -14,57 +20,8 @@ type SetlistPredictionPanelProps = {
   variant?: 'default' | 'compact';
 };
 
-const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
-  'mostly_fixed',
-  'rotating',
-  'no_tour_data_fallback',
-];
-
 function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
-}
-
-function sortByConfidence(songs: PredictedSong[]): PredictedSong[] {
-  return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-}
-
-function sortBySetlistOrder(songs: PredictedSong[]): PredictedSong[] {
-  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
-}
-
-function formatReferenceDate(isoDate: string, locale: string): string {
-  const date = new Date(isoDate);
-  const tag = locale.startsWith('en') ? 'en-US' : 'es-MX';
-  return new Intl.DateTimeFormat(tag, {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
-}
-
-function formatReferenceDates(dates: string[], locale: string): string {
-  return dates.map((date) => formatReferenceDate(date, locale)).join(', ');
-}
-
-function getDisclaimerKey(structure: SetlistPredictionStructure): string | null {
-  if (structure === 'single_show_reference') return 'setlist.referenceSingleShow';
-  if (structure === 'limited_tour_data') return 'setlist.referenceLimitedTour';
-  if (structure === 'no_tour_data_fallback') return 'setlist.fallbackNoTour';
-  return null;
-}
-
-function getDisclaimerParams(
-  prediction: SetlistPrediction,
-  locale: string
-): Record<string, string> | undefined {
-  const dates = prediction.reference_show_dates ?? [];
-  if (prediction.structure === 'single_show_reference' && dates[0]) {
-    return { date: formatReferenceDate(dates[0], locale) };
-  }
-  if (prediction.structure === 'limited_tour_data' && dates.length > 0) {
-    return { dates: formatReferenceDates(dates, locale) };
-  }
-  return undefined;
 }
 
 export function SetlistPredictionPanel({
@@ -92,17 +49,10 @@ export function SetlistPredictionPanel({
     });
   };
 
-  const showConfidence = prediction
-    ? CONFIDENCE_STRUCTURES.includes(prediction.structure)
-    : false;
-  const disclaimerKey = prediction ? getDisclaimerKey(prediction.structure) : null;
-  const disclaimerParams = prediction ? getDisclaimerParams(prediction, locale) : undefined;
-  const sortedSongs =
-    prediction && showConfidence
-      ? sortByConfidence(prediction.songs)
-      : prediction
-        ? sortBySetlistOrder(prediction.songs)
-        : [];
+  const showConfidence = prediction ? predictionShowsConfidence(prediction.structure) : false;
+  const disclaimerKey = prediction ? getPredictionDisclaimerKey(prediction.structure) : null;
+  const disclaimerParams = prediction ? getPredictionDisclaimerParams(prediction, locale) : undefined;
+  const sortedSongs = prediction ? sortPredictedSongsForDisplay(prediction) : [];
 
   const isCompact = variant === 'compact';
 

@@ -10,7 +10,9 @@ import {
   isShowPackExpired,
   mergePracticeSong,
   mergePracticeTitles,
+  shouldPrefetchShowPackRecord,
   showPackExpiresAt,
+  SHOW_PACK_STALE_AFTER_MS,
   SEVEN_DAYS_MS,
 } from './showPackLogic';
 import { formatShowCardMetaLine } from './showVenueTime';
@@ -56,6 +58,86 @@ describe('showPackLogic', () => {
   it('detects expired packs', () => {
     assert.equal(isShowPackExpired({ expiresAt: Date.now() - 1 }), true);
     assert.equal(isShowPackExpired({ expiresAt: Date.now() + 60_000 }), false);
+  });
+
+  it('prefetches ready pack when prediction is empty or insufficient_data', () => {
+    const showDate = '2026-10-31T03:00:00.000Z';
+    const now = new Date('2026-10-30T00:00:00.000Z');
+    const base = {
+      status: 'ready',
+      downloadedAt: now.getTime() - 60_000,
+      statusUpdatedAt: now.getTime(),
+      lyricsMissingTitles: [] as string[],
+      lyricsFailed: 0,
+      expiresAt: now.getTime() + 1_000_000,
+    };
+
+    assert.equal(
+      shouldPrefetchShowPackRecord({ ...base, prediction: null }, showDate, { now }),
+      true
+    );
+    assert.equal(
+      shouldPrefetchShowPackRecord(
+        {
+          ...base,
+          prediction: {
+            structure: 'insufficient_data',
+            songs: [],
+          } as never,
+        },
+        showDate,
+        { now }
+      ),
+      true
+    );
+  });
+
+  it('skips prefetch for fresh ready pack with useful prediction', () => {
+    const showDate = '2026-10-31T03:00:00.000Z';
+    const now = new Date('2026-10-30T00:00:00.000Z');
+    assert.equal(
+      shouldPrefetchShowPackRecord(
+        {
+          status: 'ready',
+          downloadedAt: now.getTime() - 60_000,
+          statusUpdatedAt: now.getTime(),
+          lyricsMissingTitles: [],
+          lyricsFailed: 0,
+          expiresAt: now.getTime() + 1_000_000,
+          prediction: {
+            structure: 'single_show_reference',
+            songs: [{ song_id: '1', title: 'Song' }],
+          } as never,
+        },
+        showDate,
+        { now }
+      ),
+      false
+    );
+  });
+
+  it('prefetches stale ready pack within 48h of show', () => {
+    const showDate = '2026-10-31T03:00:00.000Z';
+    const now = new Date('2026-10-30T18:00:00.000Z');
+    assert.equal(
+      shouldPrefetchShowPackRecord(
+        {
+          status: 'ready',
+          downloadedAt: now.getTime() - SHOW_PACK_STALE_AFTER_MS - 1,
+          statusUpdatedAt: now.getTime(),
+          lyricsMissingTitles: [],
+          lyricsFailed: 0,
+          expiresAt: now.getTime() + 1_000_000,
+          prediction: {
+            structure: 'single_show_reference',
+            songs: [{ song_id: '1', title: 'Song' }],
+          } as never,
+        },
+        showDate,
+        { now }
+      ),
+      true
+    );
   });
 
   it('marks ready packs without network failures as complete', () => {
