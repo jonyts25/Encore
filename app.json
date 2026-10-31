@@ -3,7 +3,10 @@
     "name": "Encore",
     "slug": "encore",
     "version": "0.1.0",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "encore",
@@ -21,7 +24,11 @@
         "NSMicrophoneUsageDescription": "Encore usa el micrófono para grabar audio junto con el video en el modo LIVE.",
         "NSPhotoLibraryAddUsageDescription": "Encore guarda tus videos de conciertos en tu biblioteca de fotos.",
         "NSPhotoLibraryUsageDescription": "Encore busca las fotos y videos que tomaste en tus conciertos para guardarlos en tu historial.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": [
+          "instagram-stories",
+          "instagram"
+        ]
       }
     },
     "android": {
@@ -33,7 +40,9 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "blockedPermissions": ["android.permission.READ_MEDIA_AUDIO"],
+      "blockedPermissions": [
+        "android.permission.READ_MEDIA_AUDIO"
+      ],
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -53,8 +62,14 @@
         "expo-localization",
         {
           "supportedLocales": {
-            "ios": ["en", "es"],
-            "android": ["en", "es"]
+            "ios": [
+              "en",
+              "es"
+            ],
+            "android": [
+              "en",
+              "es"
+            ]
           }
         }
       ],
@@ -83,7 +98,16 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-video",
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

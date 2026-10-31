@@ -12,7 +12,9 @@
     "appName": "Encore",
     "loading": "Loading…",
     "close": "Close",
-    "back": "Back"
+    "back": "Back",
+    "cancel": "Cancel",
+    "continue": "Continue"
   },
   "addShow": {
     "title": "Add show",
@@ -324,7 +326,17 @@
     "emptySearch": "We couldn't find photos from that night",
     "save": "Save",
     "videoPlaybackComingSoon": "In-app playback is coming in the next version",
-    "openInPhotos": "Open in Photos"
+    "openInPhotos": "Open in Photos",
+    "videoDownloadingICloud": "Downloading from iCloud…",
+    "videoLoadError": "We couldn't load this video."
+  },
+  "notifications": {
+    "goingReminder": {
+      "title": "Did you go?",
+      "body": "How was {{artist}}? Save your night",
+      "permissionTitle": "Night reminder",
+      "permissionBody": "We'll notify you the next morning so you can save your night"
+    }
   },
   "identity": {
     "tab": "Profile",
@@ -419,6 +431,7 @@
     }
   },
   "live": {
+    "focusExposureLocked": "AE/AF locked",
     "screenTitle": "LIVE",
     "openMode": "LIVE mode (camera)",
     "requestingPermissions": "Requesting permissions…",

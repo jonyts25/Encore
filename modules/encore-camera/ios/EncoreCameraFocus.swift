@@ -37,4 +37,39 @@ enum EncoreCameraFocus {
       device.exposureMode = .continuousAutoExposure
     }
   }
+
+  static func setExposureBias(_ value: Float, device: AVCaptureDevice) throws {
+    try device.lockForConfiguration()
+    defer { device.unlockForConfiguration() }
+
+    let clamped = min(max(value, device.minExposureTargetBias), device.maxExposureTargetBias)
+    device.setExposureTargetBias(clamped, completionHandler: nil)
+  }
+
+  static func setFocusExposureLock(_ locked: Bool, device: AVCaptureDevice) throws {
+    try device.lockForConfiguration()
+    defer { device.unlockForConfiguration() }
+
+    if locked {
+      if device.isFocusModeSupported(.locked) {
+        device.focusMode = .locked
+      }
+      if device.isExposureModeSupported(.locked) {
+        device.exposureMode = .locked
+      }
+      return
+    }
+
+    if device.isFocusModeSupported(.continuousAutoFocus) {
+      device.focusMode = .continuousAutoFocus
+    } else if device.isFocusModeSupported(.autoFocus) {
+      device.focusMode = .autoFocus
+    }
+
+    if device.isExposureModeSupported(.continuousAutoExposure) {
+      device.exposureMode = .continuousAutoExposure
+    } else if device.isExposureModeSupported(.autoExpose) {
+      device.exposureMode = .autoExpose
+    }
+  }
 }

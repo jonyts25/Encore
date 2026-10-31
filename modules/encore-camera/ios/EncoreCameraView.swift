@@ -19,6 +19,8 @@ final class EncoreCameraView: ExpoView {
   let onAvailableCamerasChanged = EventDispatcher()
   let onTorchChanged = EventDispatcher()
   let onCameraSwitched = EventDispatcher()
+  let onFocusPoint = EventDispatcher()
+  let onFocusExposureLockChanged = EventDispatcher()
 
   private let previewView = EncoreCameraPreviewView()
   private let sessionQueue = DispatchQueue(label: "com.encore.camera.session", qos: .userInitiated)
@@ -38,6 +40,7 @@ final class EncoreCameraView: ExpoView {
   private var currentZoomFactor: CGFloat = 1
   private var pinchStartZoom: CGFloat = 1
   private var focusResetWorkItem: DispatchWorkItem?
+  private var focusExposureLocked = false
   private var desiredTorchEnabled = false
   private var currentFormatSelection: EncoreCameraFormatSelection?
   private var activeStabilizationMode = "off"
@@ -71,6 +74,11 @@ final class EncoreCameraView: ExpoView {
     let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
     tap.delegate = self
     previewView.addGestureRecognizer(tap)
+
+    let longPress = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+    longPress.minimumPressDuration = 0.5
+    longPress.delegate = self
+    previewView.addGestureRecognizer(longPress)
   }
 
   deinit {
@@ -733,15 +741,101 @@ final class EncoreCameraView: ExpoView {
     let layerPoint = gesture.location(in: previewView)
     let devicePoint = previewView.previewLayer.captureDevicePointConverted(fromLayerPoint: layerPoint)
 
+    DispatchQueue.main.async { [weak self] in
+      self?.onFocusPoint([
+        "x": Double(layerPoint.x),
+        "y": Double(layerPoint.y),
+      ])
+    }
+
     sessionQueue.async { [weak self] in
       guard let self, let device = self.videoDevice else { return }
 
       do {
+        if self.focusExposureLocked {
+          try self.applyFocusExposureLock(locked: false, device: device)
+        }
         try EncoreCameraFocus.focusAndExpose(at: devicePoint, device: device)
-        self.scheduleContinuousFocusReset()
+        if !self.focusExposureLocked {
+          self.scheduleContinuousFocusReset()
+        }
       } catch {
         // Ignore transient focus failures.
       }
+    }
+  }
+
+  @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+    guard gesture.state == .began else { return }
+
+    sessionQueue.async { [weak self] in
+      guard let self, let device = self.videoDevice else { return }
+      do {
+        try self.applyFocusExposureLock(locked: true, device: device)
+      } catch {
+        // Ignore transient lock failures.
+      }
+    }
+  }
+
+  func setExposureBias(value: Double, promise: Promise) {
+    sessionQueue.async { [weak self] in
+      guard let self, let device = self.videoDevice else {
+        promise.rejectEncore("ERR_CAMERA", "Camera device unavailable")
+        return
+      }
+
+      do {
+        try EncoreCameraFocus.setExposureBias(Float(value), device: device)
+        let payload = self.exposureBiasPayload(for: device)
+        DispatchQueue.main.async {
+          promise.resolve(payload)
+        }
+      } catch {
+        promise.rejectEncore("ERR_EXPOSURE", error.localizedDescription)
+      }
+    }
+  }
+
+  func setFocusExposureLock(locked: Bool, promise: Promise) {
+    sessionQueue.async { [weak self] in
+      guard let self, let device = self.videoDevice else {
+        promise.rejectEncore("ERR_CAMERA", "Camera device unavailable")
+        return
+      }
+
+      do {
+        try self.applyFocusExposureLock(locked: locked, device: device)
+        DispatchQueue.main.async {
+          promise.resolve(["locked": locked])
+        }
+      } catch {
+        promise.rejectEncore("ERR_FOCUS_LOCK", error.localizedDescription)
+      }
+    }
+  }
+
+  func getExposureBiasState() -> [String: Double] {
+    guard let device = videoDevice else {
+      return ["bias": 0, "min": 0, "max": 0]
+    }
+    return exposureBiasPayload(for: device)
+  }
+
+  private func exposureBiasPayload(for device: AVCaptureDevice) -> [String: Double] {
+    [
+      "bias": Double(device.exposureTargetBias),
+      "min": Double(device.minExposureTargetBias),
+      "max": Double(device.maxExposureTargetBias),
+    ]
+  }
+
+  private func applyFocusExposureLock(locked: Bool, device: AVCaptureDevice) throws {
+    focusResetWorkItem?.cancel()
+    focusExposureLocked = locked
+    try EncoreCameraFocus.setFocusExposureLock(locked, device: device)
+    DispatchQueue.main.async { [weak self] in
+      self?.onFocusExposureLockChanged(["locked": locked])
     }
   }
 
@@ -798,11 +892,12 @@ final class EncoreCameraView: ExpoView {
 
   private func scheduleContinuousFocusReset() {
     focusResetWorkItem?.cancel()
+    if focusExposureLocked { return }
 
     let workItem = DispatchWorkItem { [weak self] in
       guard let self else { return }
       self.sessionQueue.async {
-        guard let device = self.videoDevice else { return }
+        guard let device = self.videoDevice, !self.focusExposureLocked else { return }
         do {
           try EncoreCameraFocus.resetContinuous(on: device)
         } catch {

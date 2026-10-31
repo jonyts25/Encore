@@ -86,7 +86,9 @@ public class EncoreCameraModule: Module {
         "onZoomChanged",
         "onAvailableCamerasChanged",
         "onTorchChanged",
-        "onCameraSwitched"
+        "onCameraSwitched",
+        "onFocusPoint",
+        "onFocusExposureLockChanged"
       )
 
       AsyncFunction("getTorchState") { (view: EncoreCameraView) -> [String: Bool] in
@@ -153,6 +155,18 @@ public class EncoreCameraModule: Module {
 
       AsyncFunction("isRecording") { (view: EncoreCameraView) -> Bool in
         view.getIsRecording()
+      }
+
+      AsyncFunction("setExposureBias") { (view: EncoreCameraView, value: Double, promise: Promise) in
+        view.setExposureBias(value: value, promise: promise)
+      }
+
+      AsyncFunction("getExposureBiasState") { (view: EncoreCameraView) -> [String: Double] in
+        view.getExposureBiasState()
+      }
+
+      AsyncFunction("setFocusExposureLock") { (view: EncoreCameraView, locked: Bool, promise: Promise) in
+        view.setFocusExposureLock(locked: locked, promise: promise)
       }
     }
 

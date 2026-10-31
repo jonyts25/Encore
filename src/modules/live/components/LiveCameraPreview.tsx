@@ -2,6 +2,9 @@ import { CameraView } from 'expo-camera';
 import {
   EncoreCameraView,
   type EncoreCameraState,
+  type EncoreCameraExposureBiasState,
+  type EncoreCameraFocusExposureLockEvent,
+  type EncoreCameraFocusPointEvent,
   type EncoreCameraViewRef,
   type EncoreCameraZoomState,
 } from 'encore-camera';
@@ -21,6 +24,9 @@ export type LiveCameraPreviewRef = {
   setNativeTorch: (enabled: boolean) => Promise<boolean>;
   selectNativeLens: (cameraId: string, zoomFactor: number) => Promise<void>;
   setNativeZoom: (factor: number) => Promise<void>;
+  setNativeExposureBias: (value: number) => Promise<EncoreCameraExposureBiasState>;
+  getNativeExposureBiasState: () => Promise<EncoreCameraExposureBiasState>;
+  setNativeFocusExposureLock: (locked: boolean) => Promise<{ locked: boolean }>;
 };
 
 type LiveCameraPreviewProps = {
@@ -38,6 +44,8 @@ type LiveCameraPreviewProps = {
   onNativeRecordingFinished?: (uri: string) => void;
   onNativeRecordingError?: (message: string) => void;
   onExpoZoomChange?: (zoom: number) => void;
+  onNativeFocusPoint?: (point: EncoreCameraFocusPointEvent) => void;
+  onNativeFocusExposureLockChanged?: (event: EncoreCameraFocusExposureLockEvent) => void;
 };
 
 type PendingRecording = {
@@ -62,6 +70,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
       onNativeRecordingFinished,
       onNativeRecordingError,
       onExpoZoomChange,
+      onNativeFocusPoint,
+      onNativeFocusExposureLockChanged,
     },
     ref
   ) {
@@ -74,6 +84,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     const onNativeRecordingFinishedRef = useRef(onNativeRecordingFinished);
     const onNativeRecordingErrorRef = useRef(onNativeRecordingError);
     const onExpoZoomChangeRef = useRef(onExpoZoomChange);
+    const onNativeFocusPointRef = useRef(onNativeFocusPoint);
+    const onNativeFocusExposureLockChangedRef = useRef(onNativeFocusExposureLockChanged);
     const expoZoomRef = useRef(zoom);
     const pinchStartZoomRef = useRef(zoom);
 
@@ -83,6 +95,8 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
     onNativeRecordingFinishedRef.current = onNativeRecordingFinished;
     onNativeRecordingErrorRef.current = onNativeRecordingError;
     onExpoZoomChangeRef.current = onExpoZoomChange;
+    onNativeFocusPointRef.current = onNativeFocusPoint;
+    onNativeFocusExposureLockChangedRef.current = onNativeFocusExposureLockChanged;
     expoZoomRef.current = zoom;
 
     const notifyNativeCameraState = (state: EncoreCameraState) => {
@@ -153,6 +167,27 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
         const zoomState = await nativeRef.setZoom(factor);
         notifyNativeZoomChanged(zoomState);
       },
+      setNativeExposureBias: async (value: number) => {
+        const nativeRef = nativeCameraRef.current;
+        if (!nativeRef) {
+          throw new Error('Native camera is not ready');
+        }
+        return nativeRef.setExposureBias(value);
+      },
+      getNativeExposureBiasState: async () => {
+        const nativeRef = nativeCameraRef.current;
+        if (!nativeRef) {
+          throw new Error('Native camera is not ready');
+        }
+        return nativeRef.getExposureBiasState();
+      },
+      setNativeFocusExposureLock: async (locked: boolean) => {
+        const nativeRef = nativeCameraRef.current;
+        if (!nativeRef) {
+          throw new Error('Native camera is not ready');
+        }
+        return nativeRef.setFocusExposureLock(locked);
+      },
     }));
 
     if (useNativePreview) {
@@ -193,6 +228,12 @@ export const LiveCameraPreview = forwardRef<LiveCameraPreviewRef, LiveCameraPrev
               return;
             }
             onNativeRecordingErrorRef.current?.(event.nativeEvent.message);
+          }}
+          onFocusPoint={(event) => {
+            onNativeFocusPointRef.current?.(event.nativeEvent);
+          }}
+          onFocusExposureLockChanged={(event) => {
+            onNativeFocusExposureLockChangedRef.current?.(event.nativeEvent);
           }}
         />
       );

@@ -12,7 +12,9 @@
     "appName": "Encore",
     "loading": "Cargando…",
     "close": "Cerrar",
-    "back": "Atrás"
+    "back": "Atrás",
+    "cancel": "Cancelar",
+    "continue": "Continuar"
   },
   "addShow": {
     "title": "Agregar show",
@@ -324,7 +326,17 @@
     "emptySearch": "No encontramos fotos de esa noche",
     "save": "Guardar",
     "videoPlaybackComingSoon": "La reproducción en la app llega en la siguiente versión",
-    "openInPhotos": "Ver en Fotos"
+    "openInPhotos": "Ver en Fotos",
+    "videoDownloadingICloud": "Descargando de iCloud…",
+    "videoLoadError": "No pudimos cargar este video."
+  },
+  "notifications": {
+    "goingReminder": {
+      "title": "¿Fuiste?",
+      "body": "¿Qué tal estuvo {{artist}}? Guarda tu noche",
+      "permissionTitle": "Recordatorio de tu noche",
+      "permissionBody": "Te avisamos la mañana siguiente para guardar tu noche"
+    }
   },
   "identity": {
     "tab": "Perfil",
@@ -419,6 +431,7 @@
     }
   },
   "live": {
+    "focusExposureLocked": "AE/AF bloqueado",
     "screenTitle": "LIVE",
     "openMode": "Modo LIVE (cámara)",
     "requestingPermissions": "Solicitando permisos…",

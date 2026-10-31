@@ -14,6 +14,7 @@ import { QueryProvider } from '@/core/query';
 import { SessionProvider } from '@/modules/identity';
 import { EncoreThemeProvider, useEncoreTheme } from '@/core/ui/theme';
 import { AppErrorBoundary } from '@/core/ui/AppErrorBoundary';
+import { GoingReminderBootstrap } from '@/modules/notifications/GoingReminderBootstrap';
 
 
 export const unstable_settings = {
@@ -93,6 +94,7 @@ function RootLayoutNav() {
   return (
     <ThemeProvider value={navigationTheme}>
       <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
+      <GoingReminderBootstrap />
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="artist/[id]" options={{ title: '', headerLargeTitle: false }} />

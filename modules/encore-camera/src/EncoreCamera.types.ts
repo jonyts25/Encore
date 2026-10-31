@@ -118,6 +118,21 @@ export type EncoreCameraAvailableCamerasEvent = {
   selectedCameraId: string | null;
 };
 
+export type EncoreCameraFocusPointEvent = {
+  x: number;
+  y: number;
+};
+
+export type EncoreCameraFocusExposureLockEvent = {
+  locked: boolean;
+};
+
+export type EncoreCameraExposureBiasState = {
+  bias: number;
+  min: number;
+  max: number;
+};
+
 export type EncoreCameraViewRef = {
   startRecording: (options?: EncoreCameraRecordingOptions) => Promise<void>;
   stopRecording: () => Promise<EncoreCameraRecordingFinishedEvent>;
@@ -134,6 +149,9 @@ export type EncoreCameraViewRef = {
   getSupportedFormats: () => Promise<EncoreCameraSupportedFormat[]>;
   setFormat: (options: EncoreCameraFormatSelection) => Promise<EncoreCameraSetFormatResult>;
   getStabilizationState: () => Promise<EncoreCameraStabilizationState>;
+  setExposureBias: (value: number) => Promise<EncoreCameraExposureBiasState>;
+  getExposureBiasState: () => Promise<EncoreCameraExposureBiasState>;
+  setFocusExposureLock: (locked: boolean) => Promise<{ locked: boolean }>;
 };
 
 export type EncoreCameraViewProps = {
@@ -150,5 +168,9 @@ export type EncoreCameraViewProps = {
   }) => void;
   onTorchChanged?: (event: { nativeEvent: EncoreCameraTorchState }) => void;
   onCameraSwitched?: (event: { nativeEvent: EncoreCameraSwitchedEvent }) => void;
+  onFocusPoint?: (event: { nativeEvent: EncoreCameraFocusPointEvent }) => void;
+  onFocusExposureLockChanged?: (event: {
+    nativeEvent: EncoreCameraFocusExposureLockEvent;
+  }) => void;
   style?: StyleProp<ViewStyle>;
 };

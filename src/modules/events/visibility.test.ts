@@ -7,6 +7,7 @@ import {
   getShowEnd,
   getShowPhase,
   getTodayGoingShow,
+  goingReminderTriggerUtc,
   hasConfirmedTime,
   isShowActive,
   pickPrimaryGoingShow,
@@ -149,4 +150,30 @@ test('pickPrimaryGoingShow falls back to nearest upcoming when no today show', (
 
   assert.equal(pickPrimaryGoingShow([next, later], now)?.id, 'next');
   assert.equal(getTodayGoingShow([next, later], now), null);
+});
+
+test('goingReminderTriggerUtc is 10:00 venue-local on the day after the show', () => {
+  const s = show({
+    show_date: '2026-10-30T03:00:00.000Z',
+    local_date: '2026-10-29',
+    time_confirmed: true,
+  });
+  const trigger = goingReminderTriggerUtc(s, new Date('2026-10-29T12:00:00.000Z'));
+  assert.ok(trigger);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(trigger!);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value;
+  assert.equal(get('year'), '2026');
+  assert.equal(get('month'), '10');
+  assert.equal(get('day'), '30');
+  assert.equal(get('hour'), '10');
+  assert.equal(get('minute'), '00');
+  assert.equal(goingReminderTriggerUtc(s, new Date('2026-10-30T17:00:00.000Z')), null);
 });

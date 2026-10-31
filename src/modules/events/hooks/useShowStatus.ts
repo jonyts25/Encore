@@ -8,6 +8,12 @@ import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevali
 import { queryKeys } from '@/core/query';
 import { useSession } from '@/modules/identity';
 
+import {
+  cancelShowGoingReminder,
+  ensureGoingReminderPermission,
+  scheduleShowGoingReminder,
+} from '@/modules/notifications/showGoingReminder';
+
 import { fetchShowById, getUserShowStatus, removeShowStatus, setShowStatus } from '../api';
 import { prefetchShowPack } from '../showPack';
 import type { Show, ShowStatus } from '../types';
@@ -73,6 +79,16 @@ export function useShowStatus(showId: string) {
       if (userId) {
         queryClient.setQueryData(queryKeys.showStatus(showId, userId), row.status);
       }
+      if (row.status === 'voy') {
+        let show =
+          queryClient.getQueryData<Show | null>(queryKeys.show(showId)) ??
+          (await fetchShowById(showId));
+        if (show) {
+          await scheduleShowGoingReminder(show, t);
+        }
+      } else {
+        await cancelShowGoingReminder(showId);
+      }
       await invalidateRelated();
       await triggerShowPack(row.status);
     },
@@ -84,6 +100,7 @@ export function useShowStatus(showId: string) {
       if (userId) {
         queryClient.setQueryData(queryKeys.showStatus(showId, userId), null);
       }
+      await cancelShowGoingReminder(showId);
       await invalidateRelated();
     },
   });
@@ -104,6 +121,9 @@ export function useShowStatus(showId: string) {
         throw new Error(t('offline.requiresConnection'));
       }
       setOfflineMessage(null);
+      if (nextStatus === 'voy') {
+        await ensureGoingReminderPermission(t);
+      }
       await updateMutation.mutateAsync(nextStatus);
     },
     [ensureOnline, session?.access_token, t, updateMutation]

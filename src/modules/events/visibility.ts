@@ -83,6 +83,18 @@ export function resolveShowLocalDate(show: ShowVisibilityInput): string {
   return formatLocalDateYmd(parts.year, parts.month, parts.day);
 }
 
+/** 10:00 venue-local on the calendar day after the show; null if that moment has passed. */
+export function goingReminderTriggerUtc(
+  show: ShowVisibilityInput,
+  now: Date = new Date()
+): Date | null {
+  const tz = resolveVenueTimezone(show.venue);
+  const nextDay = addCalendarDays(resolveShowLocalDate(show), 1);
+  const trigger = zonedWallClockToUtc(nextDay, 10, 0, 0, tz);
+  if (trigger.getTime() <= now.getTime()) return null;
+  return trigger;
+}
+
 function zonedWallClockToUtc(
   localDate: string,
   hour: number,

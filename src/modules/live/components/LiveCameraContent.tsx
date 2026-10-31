@@ -55,6 +55,7 @@ import {
   type SaveRecordingContext,
 } from '../saveRecording';
 
+import { LiveCameraFocusOverlay } from './LiveCameraFocusOverlay';
 import { LiveCameraPreview, type LiveCameraPreviewRef } from './LiveCameraPreview';
 import { useLiveSession } from '../context/LiveSessionContext';
 import { LiveConcertBottomBar } from './LiveConcertBottomBar';
@@ -178,6 +179,8 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     'topRight'
   );
   const [pipExpanded, setPipExpanded] = useState(false);
+  const [nativeFocusPoint, setNativeFocusPoint] = useState<{ x: number; y: number } | null>(null);
+  const [nativeFocusLocked, setNativeFocusLocked] = useState(false);
 
   const { activeTitle, setActiveTitle } = useLiveSession();
   const [isRecording, setIsRecording] = useState(false);
@@ -917,7 +920,25 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
         onNativeRecordingFinished={useNativePreview ? handleNativeRecordingFinished : undefined}
         onNativeRecordingError={useNativePreview ? handleNativeRecordingError : undefined}
         onExpoZoomChange={useNativePreview ? undefined : setZoom}
+        onNativeFocusPoint={
+          useNativePreview && !multiCamActive
+            ? (point) => setNativeFocusPoint(point)
+            : undefined
+        }
+        onNativeFocusExposureLockChanged={
+          useNativePreview && !multiCamActive
+            ? (event) => setNativeFocusLocked(event.locked)
+            : undefined
+        }
       />
+      {useNativePreview && !multiCamActive ? (
+        <LiveCameraFocusOverlay
+          enabled
+          focusLocked={nativeFocusLocked}
+          focusPoint={nativeFocusPoint}
+          previewRef={previewRef}
+        />
+      ) : null}
       {useNativePreview && multiCamActive ? (
         <>
           <EncoreMultiCamBackPreview active={multiCamPreviewActive} style={StyleSheet.absoluteFill} />
