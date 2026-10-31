@@ -263,7 +263,9 @@
     "searchLibrary": "Buscar fotos de esa noche",
     "count": "{{count}} fotos y videos",
     "emptySearch": "No encontramos fotos de esa noche",
-    "save": "Guardar"
+    "save": "Guardar",
+    "videoPlaybackComingSoon": "La reproducción en la app llega en la siguiente versión",
+    "openInPhotos": "Ver en Fotos"
   },
   "identity": {
     "tab": "Perfil",

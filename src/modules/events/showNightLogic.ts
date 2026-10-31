@@ -128,3 +128,8 @@ export function mapMediaLibraryType(
   if (mediaType === 'video') return 'video';
   return null;
 }
+
+/** iOS Photos asset URI for expo-image (thumbnails without iCloud download). */
+export function photosLibraryAssetUri(assetId: string): string {
+  return `ph://${assetId}`;
+}
