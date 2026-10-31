@@ -34,6 +34,8 @@ import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShow } from '../hooks/useShow';
 import { getShowPhase } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
+import { ShowMemoryBlock } from '@/modules/memory/components/ShowMemoryBlock';
+
 import { ShowNightSection } from './ShowNightSection';
 import { ShowStatusButtons } from './ShowStatusButtons';
 
@@ -266,7 +268,12 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
           <ShowStatusButtons appearance="showDetail" show={show} showId={show.id} />
 
-          {userShowStatus === 'fui' ? <ShowNightSection show={show} /> : null}
+          {userShowStatus === 'fui' ? (
+            <>
+              <ShowMemoryBlock showId={show.id} />
+              <ShowNightSection show={show} />
+            </>
+          ) : null}
 
           {packRecord && packRecord.status !== 'idle' ? (
             <View style={[styles.packCard, { backgroundColor: tokens.surface }]}>

@@ -15,4 +15,5 @@ export const queryKeys = {
   explorePopular: () => ['explore', 'popular-artists'] as const,
   myMap: (userId: string) => ['myMap', userId] as const,
   showMedia: (showId: string, userId: string) => ['showMedia', showId, userId] as const,
+  memory: (showId: string, userId: string) => ['memory', showId, userId] as const,
 };

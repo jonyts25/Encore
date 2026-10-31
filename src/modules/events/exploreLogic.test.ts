@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { buildArtistShowSections } from './artistShowSectionsLogic';
+import { computePredictionAccuracy } from '@/modules/memory/predictionAccuracyLogic';
+import { resolveSetlistPrefill } from '@/modules/memory/setlistPrefillLogic';
+
 import { formatVenueNearbySubtitle } from './venueSearchFormat';
 import {
   collectExploreCities,
@@ -124,6 +127,22 @@ describe('exploreLogic', () => {
       ['future']
     );
     assert.equal(showsThisWeekInCity(shows, 'Guadalajara', now).length, 0);
+  });
+});
+
+describe('memory setlist logic', () => {
+  it('prefers show_songs over prediction', () => {
+    const draft = resolveSetlistPrefill(
+      [{ song_id: 'a', title: 'A', position: 1, is_encore: false }],
+      [{ song_id: 'b', title: 'B', confidence: 1, frequency_pct: 1, avg_position: 1, is_wildcard: false, appeared_in_shows: 1, total_shows: 1 }]
+    );
+    assert.equal(draft.length, 1);
+    assert.equal(draft[0]?.songId, 'a');
+  });
+
+  it('scores prediction hits', () => {
+    const score = computePredictionAccuracy(['a', 'b', 'c'], ['b', 'd']);
+    assert.deepEqual(score, { hits: 1, total: 3 });
   });
 });
 

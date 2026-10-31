@@ -259,6 +259,36 @@
       "daysAgo": "{{count}} d ago"
     }
   },
+  "memory": {
+    "summary": {
+      "title": "Your show memory",
+      "rating": "Rating: {{rating}}/5",
+      "songCount": "{{count}} confirmed songs",
+      "viewSetlist": "View setlist",
+      "whatTheyPlayed": "What did they play?"
+    },
+    "setlist": {
+      "title": "What did they play?",
+      "subtitle": "Confirm {{artist}}'s setlist and rate the night.",
+      "ratingTitle": "Rating",
+      "star": "{{value}} stars",
+      "notePlaceholder": "Optional note about the concert…",
+      "songsTitle": "Setlist",
+      "empty": "Add the songs they actually played.",
+      "togglePlayed": "Mark as played",
+      "toggleHighlight": "Highlight of the night",
+      "encoreStartsHere": "Encore starts here",
+      "markEncoreStart": "Mark encore start",
+      "addSong": "Add song",
+      "addSongError": "We couldn't add that song.",
+      "save": "Save",
+      "saveError": "We couldn't save your memory. Try again.",
+      "savedTitle": "Memory saved",
+      "savedBody": "Your setlist and rating were saved.",
+      "predictionScore": "We got {{hits}} of {{total}} songs right",
+      "requiresAttended": "Mark the show as attended before confirming the setlist."
+    }
+  },
   "showNight": {
     "title": "Your night",
     "searchLibrary": "Find photos from that night",

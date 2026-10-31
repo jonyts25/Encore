@@ -259,6 +259,36 @@
       "daysAgo": "hace {{count}} d"
     }
   },
+  "memory": {
+    "summary": {
+      "title": "Tu memoria del show",
+      "rating": "Calificación: {{rating}}/5",
+      "songCount": "{{count}} canciones confirmadas",
+      "viewSetlist": "Ver setlist",
+      "whatTheyPlayed": "¿Qué tocaron?"
+    },
+    "setlist": {
+      "title": "¿Qué tocaron?",
+      "subtitle": "Confirma el setlist de {{artist}} y califica la noche.",
+      "ratingTitle": "Calificación",
+      "star": "{{value}} estrellas",
+      "notePlaceholder": "Nota opcional sobre el concierto…",
+      "songsTitle": "Setlist",
+      "empty": "Agrega las canciones que sí tocaron.",
+      "togglePlayed": "Marcar si la tocaron",
+      "toggleHighlight": "Favorita de la noche",
+      "encoreStartsHere": "Empieza el encore",
+      "markEncoreStart": "Marcar inicio de encore",
+      "addSong": "Agregar canción",
+      "addSongError": "No pudimos agregar la canción.",
+      "save": "Guardar",
+      "saveError": "No pudimos guardar tu memoria. Inténtalo de nuevo.",
+      "savedTitle": "Memoria guardada",
+      "savedBody": "Tu setlist y calificación quedaron guardados.",
+      "predictionScore": "Acertamos {{hits}} de {{total}} canciones",
+      "requiresAttended": "Marca el show como «Fui» para confirmar el setlist."
+    }
+  },
   "showNight": {
     "title": "Tu noche",
     "searchLibrary": "Buscar fotos de esa noche",
