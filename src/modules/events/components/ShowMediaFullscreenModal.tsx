@@ -1,15 +1,20 @@
+import { useEventListener } from 'expo';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
-import { GlassIconButton } from '@/core/ui';
+import { GlassIconButton, PillButton } from '@/core/ui';
 import { typography } from '@/core/ui/theme/typography';
 
-import { photosLibraryAssetUri } from '../showNightLogic';
+import {
+  PHOTOS_APP_REDIRECT_URI,
+  photosLibraryAssetUri,
+  pickPlayableVideoFileUri,
+} from '../showNightLogic';
 import type { ShowMediaType } from '../showMediaTypes';
 
 type ShowMediaFullscreenModalProps = {
@@ -19,9 +24,20 @@ type ShowMediaFullscreenModalProps = {
   onClose: () => void;
 };
 
-function ShowNightVideoPlayer({ localUri }: { localUri: string }) {
+type ShowNightVideoPlayerProps = {
+  localUri: string;
+  onPlaybackError: () => void;
+};
+
+function ShowNightVideoPlayer({ localUri, onPlaybackError }: ShowNightVideoPlayerProps) {
   const player = useVideoPlayer(localUri, (instance) => {
     instance.loop = false;
+  });
+
+  useEventListener(player, 'statusChange', ({ status }) => {
+    if (status === 'error') {
+      onPlaybackError();
+    }
   });
 
   return (
@@ -48,12 +64,14 @@ export function ShowMediaFullscreenModal({
   const [videoLocalUri, setVideoLocalUri] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoICloud, setVideoICloud] = useState(false);
+  const [videoPlaybackError, setVideoPlaybackError] = useState(false);
 
   useEffect(() => {
     if (!visible || !assetId || mediaType !== 'video' || Platform.OS === 'web') {
       setVideoLocalUri(null);
       setVideoLoading(false);
       setVideoICloud(false);
+      setVideoPlaybackError(false);
       return;
     }
 
@@ -61,26 +79,34 @@ export function ShowMediaFullscreenModal({
     setVideoLoading(true);
     setVideoLocalUri(null);
     setVideoICloud(false);
+    setVideoPlaybackError(false);
 
     void (async () => {
       try {
-        const peek = await MediaLibrary.getAssetInfoAsync(assetId, {
-          shouldDownloadFromNetwork: false,
+        if (Platform.OS === 'ios') {
+          const peek = await MediaLibrary.getAssetInfoAsync(assetId, {
+            shouldDownloadFromNetwork: false,
+          });
+          if (cancelled) return;
+          if ((peek as { isNetworkAsset?: boolean }).isNetworkAsset) {
+            setVideoICloud(true);
+          }
+        }
+
+        const resolved = await MediaLibrary.getAssetInfoAsync(assetId, {
+          shouldDownloadFromNetwork: true,
         });
         if (cancelled) return;
 
-        const networkAsset =
-          Platform.OS === 'ios' &&
-          Boolean((peek as { isNetworkAsset?: boolean }).isNetworkAsset);
-
-        if (networkAsset) {
-          setVideoICloud(true);
+        if (__DEV__) {
+          console.log('[ShowMediaFullscreenModal] getAssetInfoAsync', {
+            assetId,
+            uri: resolved.uri,
+            localUri: resolved.localUri,
+          });
         }
 
-        const resolved = await MediaLibrary.getAssetInfoAsync(assetId);
-        if (cancelled) return;
-
-        const playable = resolved.localUri ?? resolved.uri;
+        const playable = pickPlayableVideoFileUri(resolved.localUri, resolved.uri);
         setVideoLocalUri(playable);
         setVideoICloud(false);
       } catch {
@@ -99,6 +125,10 @@ export function ShowMediaFullscreenModal({
     };
   }, [assetId, mediaType, visible]);
 
+  const openPhotosApp = () => {
+    void Linking.openURL(PHOTOS_APP_REDIRECT_URI);
+  };
+
   return (
     <Modal animationType="fade" visible={visible} onRequestClose={onClose}>
       <View style={[styles.root, { backgroundColor: '#000' }]}>
@@ -115,18 +145,29 @@ export function ShowMediaFullscreenModal({
             {videoLoading ? (
               <View style={styles.loadingWrap}>
                 <ActivityIndicator color="#fff" size="large" />
-                {videoICloud ? (
-                  <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
-                    {t('showNight.videoDownloadingICloud')}
-                  </Text>
-                ) : null}
+                <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
+                  {videoICloud ? t('showNight.videoDownloadingICloud') : t('common.loading')}
+                </Text>
+              </View>
+            ) : videoPlaybackError ? (
+              <View style={styles.errorWrap}>
+                <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
+                  {t('showNight.videoPlaybackError')}
+                </Text>
+                <PillButton title={t('showNight.openInPhotos')} variant="secondary" onPress={openPhotosApp} />
               </View>
             ) : videoLocalUri ? (
-              <ShowNightVideoPlayer localUri={videoLocalUri} />
+              <ShowNightVideoPlayer
+                localUri={videoLocalUri}
+                onPlaybackError={() => setVideoPlaybackError(true)}
+              />
             ) : (
-              <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
-                {t('showNight.videoLoadError')}
-              </Text>
+              <View style={styles.errorWrap}>
+                <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
+                  {t('showNight.videoLoadError')}
+                </Text>
+                <PillButton title={t('showNight.openInPhotos')} variant="secondary" onPress={openPhotosApp} />
+              </View>
             )}
           </View>
         ) : null}
@@ -155,6 +196,11 @@ const styles = StyleSheet.create({
   loadingWrap: {
     alignItems: 'center',
     gap: 16,
+  },
+  errorWrap: {
+    alignItems: 'center',
+    gap: 16,
+    paddingHorizontal: 24,
   },
   loadingCopy: {
     textAlign: 'center',

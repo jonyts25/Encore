@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { getShowNightSearchWindow, photosLibraryAssetUri } from './showNightLogic';
+import {
+  getShowNightSearchWindow,
+  photosLibraryAssetUri,
+  pickPlayableVideoFileUri,
+  stripVideoPlaybackUriFragment,
+} from './showNightLogic';
 import type { Show } from './types';
 
 function baseShow(overrides: Partial<Show> = {}): Show {
@@ -32,6 +37,34 @@ function baseShow(overrides: Partial<Show> = {}): Show {
     ...overrides,
   };
 }
+
+describe('pickPlayableVideoFileUri', () => {
+  it('prefers localUri and strips hash fragments', () => {
+    assert.equal(
+      pickPlayableVideoFileUri('file:///var/video.mov#fragment', 'ph://asset-id'),
+      'file:///var/video.mov'
+    );
+  });
+
+  it('rejects ph:// URIs for playback', () => {
+    assert.equal(pickPlayableVideoFileUri(null, 'ph://ABC-DEF'), null);
+    assert.equal(pickPlayableVideoFileUri('ph://ABC-DEF', 'file:///ok.mov'), null);
+  });
+
+  it('falls back to file uri when localUri is missing', () => {
+    assert.equal(
+      pickPlayableVideoFileUri(null, 'file:///tmp/export.mov#slowmo'),
+      'file:///tmp/export.mov'
+    );
+  });
+});
+
+describe('stripVideoPlaybackUriFragment', () => {
+  it('removes trailing hash suffix only', () => {
+    assert.equal(stripVideoPlaybackUriFragment('file:///a.mov#foo'), 'file:///a.mov');
+    assert.equal(stripVideoPlaybackUriFragment('file:///a.mov'), 'file:///a.mov');
+  });
+});
 
 describe('photosLibraryAssetUri', () => {
   it('builds ph:// URIs for many assets without async resolution', () => {

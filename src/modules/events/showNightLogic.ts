@@ -133,3 +133,27 @@ export function mapMediaLibraryType(
 export function photosLibraryAssetUri(assetId: string): string {
   return `ph://${assetId}`;
 }
+
+/** Opens the system Photos app (undocumented URL scheme; best-effort fallback). */
+export const PHOTOS_APP_REDIRECT_URI = 'photos-redirect://';
+
+/** Strip `#fragment` suffixes that break expo-video on some iPhone camera / slo-mo exports. */
+export function stripVideoPlaybackUriFragment(uri: string): string {
+  const hashIndex = uri.indexOf('#');
+  return hashIndex === -1 ? uri : uri.slice(0, hashIndex);
+}
+
+/** File URI suitable for expo-video; never returns `ph://` asset references. */
+export function pickPlayableVideoFileUri(
+  localUri: string | null | undefined,
+  uri: string | null | undefined
+): string | null {
+  const local = localUri?.trim();
+  if (local) {
+    if (local.startsWith('ph://')) return null;
+    return stripVideoPlaybackUriFragment(local);
+  }
+  const fallback = uri?.trim();
+  if (!fallback || fallback.startsWith('ph://')) return null;
+  return stripVideoPlaybackUriFragment(fallback);
+}
