@@ -24,7 +24,13 @@ export function SongListenButton({ artistName, songTitle, size = 22 }: SongListe
       accessibilityRole="button"
       hitSlop={8}
       style={({ pressed }) => [styles.hit, pressed && styles.pressed]}
-      onPress={() => openSearch(buildSongSearchQuery(artistName, songTitle))}>
+      onPress={() =>
+        openSearch(buildSongSearchQuery(artistName, songTitle), {
+          intent: 'song',
+          artistName,
+          songTitle,
+        })
+      }>
       <Ionicons color={tokens.textSecondary} name="musical-notes-outline" size={size} />
     </Pressable>
   );

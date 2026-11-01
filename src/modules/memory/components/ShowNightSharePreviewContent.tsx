@@ -3,7 +3,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -32,7 +31,7 @@ export function ShowNightSharePreviewContent() {
   const { tokens } = useEncoreTheme();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
-  const cardRef = useRef<View>(null);
+  const captureRef = useRef<View>(null);
 
   const [visualReady, setVisualReady] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -57,13 +56,15 @@ export function ShowNightSharePreviewContent() {
     return buildShowNightShareCardModel(show, memory, media, prediction, i18n.language);
   }, [show, memory, media, prediction, i18n.language]);
 
-  const previewScale = (windowWidth - 32) / SHARE_CARD_WIDTH;
+  const previewWidth = windowWidth - 32;
+  const previewHeight = (previewWidth * SHARE_CARD_HEIGHT) / SHARE_CARD_WIDTH;
+  const previewScale = previewWidth / SHARE_CARD_WIDTH;
 
   const onShare = useCallback(async () => {
     if (!visualReady || sharing) return;
     setSharing(true);
     try {
-      await captureAndShareShowNightCard(cardRef);
+      await captureAndShareShowNightCard(captureRef);
     } catch {
       Alert.alert(t('showNightShare.shareError'));
     } finally {
@@ -94,27 +95,35 @@ export function ShowNightSharePreviewContent() {
 
   return (
     <View style={[styles.screen, { backgroundColor: tokens.background, paddingBottom: insets.bottom + 12 }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.content}>
         <Text style={[typography.body, styles.hint, { color: tokens.textSecondary }]}>
           {t('showNightShare.previewHint')}
         </Text>
-        <View
-          style={{
-            width: windowWidth - 32,
-            height: SHARE_CARD_HEIGHT * previewScale,
-            alignItems: 'center',
-          }}>
+
+        <View style={[styles.previewFrame, { width: previewWidth, height: previewHeight }]}>
           <View
-            ref={cardRef}
-            collapsable={false}
-            style={{ transform: [{ scale: previewScale }] }}>
-            <ShowNightShareCard model={model} onVisualReady={() => setVisualReady(true)} />
+            style={{
+              width: SHARE_CARD_WIDTH,
+              height: SHARE_CARD_HEIGHT,
+              transform: [{ scale: previewScale }],
+              transformOrigin: 'top left',
+            }}>
+            <ShowNightShareCard model={model} />
           </View>
         </View>
+
         {!visualReady ? (
           <ActivityIndicator color={tokens.accent} style={styles.loader} />
         ) : null}
-      </ScrollView>
+      </View>
+
+      <View
+        ref={captureRef}
+        collapsable={false}
+        pointerEvents="none"
+        style={styles.offscreenCapture}>
+        <ShowNightShareCard model={model} onVisualReady={() => setVisualReady(true)} />
+      </View>
 
       <View style={[styles.actions, { paddingHorizontal: 16 }]}>
         <PillButton title={t('common.back')} variant="secondary" onPress={() => router.back()} />
@@ -133,15 +142,26 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  scrollContent: {
+  content: {
     alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 24,
   },
   hint: {
     marginBottom: 16,
     textAlign: 'center',
+  },
+  previewFrame: {
+    overflow: 'hidden',
+  },
+  offscreenCapture: {
+    height: SHARE_CARD_HEIGHT,
+    left: -10000,
+    position: 'absolute',
+    top: 0,
+    width: SHARE_CARD_WIDTH,
   },
   loader: {
     marginTop: 12,

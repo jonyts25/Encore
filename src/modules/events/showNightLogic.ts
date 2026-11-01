@@ -143,6 +143,14 @@ export function stripVideoPlaybackUriFragment(uri: string): string {
   return hashIndex === -1 ? uri : uri.slice(0, hashIndex);
 }
 
+/** Guess file extension when copying library videos into app cache. */
+export function guessShowNightVideoExtension(sourceUri: string): string {
+  const withoutQuery = sourceUri.split('?')[0]?.split('#')[0] ?? sourceUri;
+  const match = withoutQuery.match(/\.(mov|mp4|m4v|3gp|3g2)$/i);
+  if (match?.[1]) return `.${match[1].toLowerCase()}`;
+  return '.mov';
+}
+
 /** File URI suitable for expo-video; never returns `ph://` asset references. */
 export function pickPlayableVideoFileUri(
   localUri: string | null | undefined,

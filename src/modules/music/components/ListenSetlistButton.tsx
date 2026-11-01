@@ -17,7 +17,11 @@ export function ListenSetlistButton({ artistName }: ListenSetlistButtonProps) {
       title={t('musicStreaming.listenSetlist')}
       variant="secondary"
       onPress={() =>
-        openSearch(buildSetlistSearchQuery(artistName), t('musicStreaming.listenSetlist'))
+        openSearch(buildSetlistSearchQuery(artistName), {
+          dialogTitle: t('musicStreaming.listenSetlist'),
+          intent: 'setlist',
+          artistName,
+        })
       }
     />
   );
