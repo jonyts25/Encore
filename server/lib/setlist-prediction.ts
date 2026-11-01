@@ -1,4 +1,12 @@
 import { createSupabaseAdminClient } from './supabase';
+import {
+  isEncoreMajority,
+  orderSetlistEntriesByMajority,
+  PREDICTION_VERSION,
+} from './setlist-prediction-order';
+import type { SongAggregate } from './setlist-prediction-types';
+
+export { PREDICTION_VERSION } from './setlist-prediction-order';
 
 const WILDCARD_FREQUENCY_PCT = 70;
 const FIXED_SONG_THRESHOLD = 0.9;
@@ -55,6 +63,7 @@ export type SetlistPrediction = {
   };
   reference_shows?: PredictionReferenceShow[];
   enrichment_notice?: 'new_tour_from_recent_shows' | null;
+  prediction_version?: number;
 };
 
 export type ActualSetlistSong = {
@@ -91,19 +100,18 @@ type ShowSongRow = {
   song: { id: string; title: string } | null;
 };
 
-type SongAggregate = {
-  normalizedKey: string;
-  titleCounts: Map<string, number>;
-  songIdCounts: Map<string, number>;
-  appearances: Array<{
-    showId: string;
-    showDate: string;
-    position: number;
-    isEncore: boolean;
-  }>;
-};
-
 const NON_SONG_MARKERS = new Set(['intro', 'outro']);
+
+export async function getShowPrediction(
+  showId: string,
+  sampleSize = 10
+): Promise<SetlistPrediction | null> {
+  const cached = await readCachedPrediction(showId);
+  if (cached && (cached.prediction_version ?? 1) >= PREDICTION_VERSION) {
+    return cached;
+  }
+  return generateShowPrediction(showId, sampleSize);
+}
 
 export async function generateShowPrediction(
   showId: string,
@@ -204,6 +212,7 @@ async function buildStatisticalPrediction(
     },
     reference_shows: buildReferenceShows(priorShows, showSongs),
     generated_at: new Date().toISOString(),
+    prediction_version: PREDICTION_VERSION,
   };
 }
 
@@ -242,6 +251,7 @@ async function buildReferenceSetlist(
     reference_shows: buildReferenceShows(priorShows, allShowSongs),
     songs,
     generated_at: new Date().toISOString(),
+    prediction_version: PREDICTION_VERSION,
   };
 }
 
@@ -283,6 +293,7 @@ async function buildFallbackPrediction(
     structure: 'insufficient_data',
     songs: [],
     generated_at: new Date().toISOString(),
+    prediction_version: PREDICTION_VERSION,
   };
 }
 
@@ -298,18 +309,30 @@ function buildReconstructedSetlist(
   const showDateById = new Map(priorShows.map((row) => [row.id, row.show_date]));
   const songsByShow = groupSongsByShow(showSongs);
 
-  const showLengths = priorShows.map((show) => countSetlistSongs(songsByShow.get(show.id) ?? []));
-  const showLengthMedian = median(showLengths);
+  const showLengthList = priorShows.map((show) => countSetlistSongs(songsByShow.get(show.id) ?? []));
+  const showLengthMedian = median(showLengthList);
   const k = Math.max(1, showLengthMedian);
 
   const aggregates = aggregateByNormalizedTitle(priorShows, songsByShow, showDateById);
   const ranked = [...aggregates].sort(compareCandidates);
   const topKeys = new Set(ranked.slice(0, k).map((entry) => entry.normalizedKey));
-  const topEntries = ranked
-    .filter((entry) => topKeys.has(entry.normalizedKey))
-    .sort((a, b) => a.avgPosition - b.avgPosition);
+  const topEntriesUnordered = ranked.filter((entry) => topKeys.has(entry.normalizedKey));
+  const showLengthByShowId = new Map(
+    priorShows.map((show) => [
+      show.id,
+      countSetlistSongs(songsByShow.get(show.id) ?? []),
+    ])
+  );
+  const orderedEntries = orderSetlistEntriesByMajority(
+    topEntriesUnordered,
+    priorShows.map((show) => show.id),
+    songsByShow,
+    showLengthByShowId,
+    normalizeTitle,
+    isNonSongMarker
+  );
 
-  const songs: PredictedSong[] = topEntries.map((entry, index) => {
+  const songs: PredictedSong[] = orderedEntries.map((entry, index) => {
     const title = pickDisplayTitle(entry);
     const songId = pickPrimarySongId(entry, title);
     const appearedInShows = entry.appearances.length;
@@ -317,8 +340,6 @@ function buildReconstructedSetlist(
       sampleSize > 0 ? Number((appearedInShows / sampleSize).toFixed(2)) : 0;
     const frequencyPct =
       sampleSize > 0 ? Math.round((appearedInShows / sampleSize) * 100) : 0;
-    const encoreShows = entry.appearances.filter((appearance) => appearance.isEncore).length;
-
     return {
       song_id: songId,
       title,
@@ -329,7 +350,7 @@ function buildReconstructedSetlist(
       appeared_in_shows: appearedInShows,
       total_shows: sampleSize,
       position: index + 1,
-      is_encore: encoreShows > appearedInShows / 2,
+      is_encore: isEncoreMajority(entry),
       is_medley: isMedley(title),
     };
   });
@@ -614,6 +635,18 @@ async function listShowSongs(showIds: string[]): Promise<ShowSongRow[]> {
 
   if (error) throw error;
   return (data ?? []) as unknown as ShowSongRow[];
+}
+
+async function readCachedPrediction(showId: string): Promise<SetlistPrediction | null> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from('setlist_predictions')
+    .select('payload_json')
+    .eq('show_id', showId)
+    .maybeSingle();
+
+  if (error || !data?.payload_json) return null;
+  return data.payload_json as SetlistPrediction;
 }
 
 async function cachePrediction(prediction: SetlistPrediction): Promise<void> {

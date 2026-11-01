@@ -14,10 +14,11 @@ import { useShowPrediction } from '../hooks/useShowPrediction';
 import {
   getPredictionDisclaimerKey,
   getPredictionDisclaimerParams,
+  predictedSongConfidencePct,
   predictionShowsConfidence,
   sortPredictedSongsForDisplay,
 } from '../predictionDisplay';
-import type { SetlistPrediction } from '../types';
+import type { PredictedSong, SetlistPrediction } from '../types';
 
 type SetlistPredictionPanelProps = {
   showId: string;
@@ -29,8 +30,30 @@ type SetlistPredictionPanelProps = {
   isEnriching?: boolean;
 };
 
-function formatConfidence(confidence: number): string {
-  return `${Math.round(confidence * 100)}%`;
+type PredictionListItem =
+  | { kind: 'encore-divider' }
+  | { kind: 'song'; song: PredictedSong; rank: number };
+
+function buildPredictionListItems(songs: PredictedSong[]): PredictionListItem[] {
+  const items: PredictionListItem[] = [];
+  let encoreDividerShown = false;
+  let rank = 0;
+
+  for (const song of songs) {
+    if (song.is_encore && !encoreDividerShown) {
+      items.push({ kind: 'encore-divider' });
+      encoreDividerShown = true;
+    }
+    rank += 1;
+    items.push({ kind: 'song', song, rank });
+  }
+
+  return items;
+}
+
+function formatSongPct(song: PredictedSong): string | null {
+  const pct = predictedSongConfidencePct(song);
+  return pct != null ? `${pct}%` : null;
 }
 
 export function SetlistPredictionPanel({
@@ -66,6 +89,7 @@ export function SetlistPredictionPanel({
   const disclaimerKey = prediction ? getPredictionDisclaimerKey(prediction.structure) : null;
   const disclaimerParams = prediction ? getPredictionDisclaimerParams(prediction, locale) : undefined;
   const sortedSongs = prediction ? sortPredictedSongsForDisplay(prediction) : [];
+  const listItems = buildPredictionListItems(sortedSongs);
   const rotationSongs = prediction?.others ?? [];
   const [rotationExpanded, setRotationExpanded] = useState(false);
 
@@ -140,43 +164,46 @@ export function SetlistPredictionPanel({
               isCompact && styles.listCompact,
               isCompact && { backgroundColor: tokens.surface },
             ]}>
-            {sortedSongs.map((song, index) =>
-              isCompact ? (
+            {listItems.map((item, index) => {
+              if (item.kind === 'encore-divider') {
+                return (
+                  <ThemedText key={`encore-${index}`} style={styles.encoreDivider}>
+                    {t('memory.setlist.encoreDivider')}
+                  </ThemedText>
+                );
+              }
+
+              const { song, rank } = item;
+              const pctLabel = formatSongPct(song);
+
+              return isCompact ? (
                 <Pressable
                   key={song.song_id}
                   accessibilityRole="button"
                   onPress={() => openLyrics(song.title)}
                   style={({ pressed }) => [
                     styles.compactRow,
-                    index < sortedSongs.length - 1 && {
+                    index < listItems.length - 1 && {
                       borderBottomColor: tokens.separator,
                       borderBottomWidth: StyleSheet.hairlineWidth,
                     },
                     pressed && styles.compactRowPressed,
                   ]}>
-                  <Text style={[styles.compactRank, { color: tokens.tabIconDefault }]}>{index + 1}</Text>
+                  <Text style={[styles.compactRank, { color: tokens.tabIconDefault }]}>{rank}</Text>
                   <Text numberOfLines={1} style={[styles.compactTitle, { color: tokens.text }]}>
                     {song.title}
                   </Text>
                   <SongListenButton artistName={artistName} songTitle={song.title} size={20} />
-                  {showConfidence && song.confidence != null ? (
-                    <Text style={[styles.compactPct, { color: tokens.textSecondary }]}>
-                      {formatConfidence(song.confidence)}
-                    </Text>
+                  {pctLabel ? (
+                    <Text style={[styles.compactPct, { color: tokens.textSecondary }]}>{pctLabel}</Text>
                   ) : null}
                 </Pressable>
               ) : (
                 <ThemedView key={song.song_id} style={styles.row}>
                   <View style={styles.rowMain}>
-                    <ThemedText style={styles.rank}>{index + 1}</ThemedText>
-                    <View style={styles.rowText}>
-                      <ThemedText style={styles.songTitle}>{song.title}</ThemedText>
-                      {showConfidence && song.confidence != null ? (
-                        <ThemedText style={styles.confidence}>
-                          {t('setlist.confidence', { pct: formatConfidence(song.confidence) })}
-                        </ThemedText>
-                      ) : null}
-                    </View>
+                    <ThemedText style={styles.rank}>{rank}</ThemedText>
+                    <ThemedText style={styles.songTitle}>{song.title}</ThemedText>
+                    {pctLabel ? <ThemedText style={styles.confidenceRight}>{pctLabel}</ThemedText> : null}
                   </View>
                   <View style={styles.rowActions}>
                     <View style={styles.lyricsButtonWrap}>
@@ -196,8 +223,8 @@ export function SetlistPredictionPanel({
                     </Pressable>
                   </View>
                 </ThemedView>
-              )
-            )}
+              );
+            })}
           </View>
 
           {!isCompact && rotationSongs.length > 0 ? (
@@ -280,6 +307,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
   },
+  confidenceRight: {
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+    marginLeft: 'auto',
+    opacity: 0.7,
+  },
+  encoreDivider: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    opacity: 0.75,
+    paddingVertical: 4,
+    textAlign: 'center',
+  },
   container: {
     gap: 8,
     marginTop: 8,
@@ -354,13 +394,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   rowMain: {
-    alignItems: 'flex-start',
+    alignItems: 'center',
     flexDirection: 'row',
     gap: 8,
-  },
-  rowText: {
-    flex: 1,
-    gap: 2,
   },
   sectionLabel: {
     fontSize: 13,
@@ -369,6 +405,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   songTitle: {
+    flex: 1,
     fontSize: 16,
     fontWeight: '600',
   },

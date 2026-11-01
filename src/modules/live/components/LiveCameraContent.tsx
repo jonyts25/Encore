@@ -40,7 +40,8 @@ import { Button, ThemedText } from '@/core/ui/Themed';
 import { useSession } from '@/modules/identity';
 import { useLyrics } from '@/modules/lyrics';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
-import type { PredictedSong, SetlistPredictionStructure } from '@/modules/setlist/types';
+import { sortPredictedSongsByPosition } from '@/modules/setlist/predictionDisplay';
+import type { PredictedSong } from '@/modules/setlist/types';
 
 import { formatLiveError } from '../liveErrors';
 import { liveLyricsScrollMaxHeight } from '../liveLyricsLayout';
@@ -77,12 +78,6 @@ type LiveCameraContentProps = {
 const TOP_BAR_CONTENT_HEIGHT = 44;
 const MIN_FREE_STORAGE_BYTES = 1024 ** 3;
 
-const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
-  'mostly_fixed',
-  'rotating',
-  'no_tour_data_fallback',
-];
-
 const EXPO_ZOOM_FACTORS = [0.5, 1, 2, 4];
 const EXPO_MIN_ZOOM_FACTOR = 1;
 const EXPO_MAX_ZOOM_FACTOR = 5;
@@ -103,14 +98,6 @@ function expoNormalizedToFactor(normalized: number): number {
   const logMax = Math.log(safeMax);
   const t = Math.min(1, Math.max(0, normalized));
   return Math.exp(logMin + t * (logMax - logMin));
-}
-
-function sortSongsForPicker(songs: PredictedSong[]) {
-  return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-}
-
-function sortSongsBySetlistOrder(songs: PredictedSong[]) {
-  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
 }
 
 function buildNativeZoomFactors(state: EncoreCameraState): number[] {
@@ -194,10 +181,7 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
 
   const pickerSongs = useMemo(() => {
     if (!prediction?.songs) return [];
-    const showConfidence = CONFIDENCE_STRUCTURES.includes(prediction.structure);
-    return showConfidence
-      ? sortSongsForPicker(prediction.songs)
-      : sortSongsBySetlistOrder(prediction.songs);
+    return sortPredictedSongsByPosition(prediction.songs);
   }, [prediction]);
 
   const updateNativeZoom = (zoom: number) => {

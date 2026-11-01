@@ -1,5 +1,5 @@
 import { jsonError, jsonOk } from '@/lib/http';
-import { generateShowPrediction } from '@/lib/setlist-prediction';
+import { getShowPrediction } from '@/lib/setlist-prediction';
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -13,7 +13,7 @@ export async function GET(request: Request, context: RouteContext) {
     sampleParam && Number.isFinite(Number(sampleParam)) ? Number(sampleParam) : undefined;
 
   try {
-    const prediction = await generateShowPrediction(id, sampleSize);
+    const prediction = await getShowPrediction(id, sampleSize);
     if (!prediction) {
       return jsonError('Show not found', 404);
     }

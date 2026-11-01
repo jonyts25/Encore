@@ -10,19 +10,32 @@ export function predictionShowsConfidence(structure: SetlistPredictionStructure)
   return CONFIDENCE_STRUCTURES.includes(structure);
 }
 
+export function sortPredictedSongsByPosition(songs: PredictedSong[]): PredictedSong[] {
+  return [...songs].sort((a, b) => {
+    const positionA = a.position ?? a.avg_position ?? Number.MAX_SAFE_INTEGER;
+    const positionB = b.position ?? b.avg_position ?? Number.MAX_SAFE_INTEGER;
+    return positionA - positionB;
+  });
+}
+
+/** @deprecated Prefer sortPredictedSongsByPosition — server order is canonical. */
 export function sortPredictedSongsByConfidence(songs: PredictedSong[]): PredictedSong[] {
   return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
 }
 
+/** @deprecated Prefer sortPredictedSongsByPosition — server order is canonical. */
 export function sortPredictedSongsBySetlistOrder(songs: PredictedSong[]): PredictedSong[] {
-  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
+  return sortPredictedSongsByPosition(songs);
 }
 
 export function sortPredictedSongsForDisplay(prediction: SetlistPrediction): PredictedSong[] {
-  if (predictionShowsConfidence(prediction.structure)) {
-    return sortPredictedSongsByConfidence(prediction.songs);
-  }
-  return sortPredictedSongsBySetlistOrder(prediction.songs);
+  return sortPredictedSongsByPosition(prediction.songs);
+}
+
+export function predictedSongConfidencePct(song: PredictedSong): number | null {
+  if (song.frequency_pct != null) return Math.round(song.frequency_pct);
+  if (song.confidence != null) return Math.round(song.confidence * 100);
+  return null;
 }
 
 function formatReferenceDate(isoDate: string, locale: string): string {

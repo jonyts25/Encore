@@ -31,6 +31,7 @@ import {
   SetlistPredictionPanel,
   useShowPrediction,
 } from '@/modules/setlist';
+import { sortPredictedSongsByPosition } from '@/modules/setlist/predictionDisplay';
 import type { SetlistPredictionStructure } from '@/modules/setlist/types';
 
 import { formatShowDate } from '../api';
@@ -75,15 +76,6 @@ function formatRelativeUpdated(
   return t('events.relative.daysAgo', { count: Math.round(hours / 24) });
 }
 
-function sortSongsForPractice(
-  songs: { title: string; confidence?: number | null; avg_position?: number | null }[],
-  showConfidence: boolean
-) {
-  if (showConfidence) {
-    return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-  }
-  return [...songs].sort((a, b) => (a.avg_position ?? 0) - (b.avg_position ?? 0));
-}
 
 export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { t, i18n } = useTranslation();
@@ -126,9 +118,9 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
   const primarySongTitle = useMemo(() => {
     if (!prediction?.songs.length) return null;
-    const sorted = sortSongsForPractice(prediction.songs, showConfidence);
+    const sorted = sortPredictedSongsByPosition(prediction.songs);
     return sorted[0]?.title ?? null;
-  }, [prediction, showConfidence]);
+  }, [prediction]);
 
   const pageBackground =
     resolvedScheme === 'dark' ? SHOW_DETAIL_CANVAS : tokens.background;

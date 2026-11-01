@@ -13,6 +13,8 @@ export type PredictedSong = {
   avg_position: number | null;
   is_wildcard: boolean;
   is_medley?: boolean;
+  is_encore?: boolean;
+  position?: number;
   appeared_in_shows: number;
   total_shows: number;
 };
@@ -36,4 +38,5 @@ export type SetlistPrediction = {
   generated_at: string;
   others?: PredictionOtherSong[];
   enrichment_notice?: 'new_tour_from_recent_shows' | null;
+  prediction_version?: number;
 };
