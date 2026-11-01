@@ -9,7 +9,6 @@ import {
   decorativeBarcodeBarWidths,
   formatShareCardPosterDate,
   formatShareCardVenueLine,
-  pickShareCardBackgroundUri,
 } from './showNightShareCardLogic';
 import type { ShowMemory } from './types';
 
@@ -46,34 +45,6 @@ describe('showNightShareCardLogic', () => {
 
   it('formats poster date as dd.MM.yy', () => {
     assert.equal(formatShareCardPosterDate('2026-10-30T03:00:00.000Z'), '30.10.26');
-  });
-
-  it('prefers video thumbnail over photo', () => {
-    const uri = pickShareCardBackgroundUri([
-      {
-        id: '1',
-        user_id: 'u',
-        show_id: 's',
-        asset_id: 'photo-id',
-        media_type: 'photo',
-        taken_at: '2026-01-01',
-        song_id: null,
-        source: 'library',
-        created_at: '2026-01-01',
-      },
-      {
-        id: '2',
-        user_id: 'u',
-        show_id: 's',
-        asset_id: 'video-id',
-        media_type: 'video',
-        taken_at: '2026-01-01',
-        song_id: null,
-        source: 'library',
-        created_at: '2026-01-01',
-      },
-    ]);
-    assert.equal(uri, 'ph://video-id');
   });
 
   it('omits zero song count when setlist is confirmed but empty', () => {

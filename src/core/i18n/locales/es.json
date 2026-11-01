@@ -364,8 +364,14 @@
       "cityLabel": "Ciudad",
       "liveCount": "{{count}} canciones en vivo"
     },
+    "changePhoto": "Cambiar foto",
+    "changePhotoTitle": "Elige una foto",
+    "changePhotoEmpty": "Aún no hay fotos en Tu noche para este show.",
+    "videoFrameLabel": "Cuadro del video",
     "setlist": {
-      "encore": "Encore"
+      "encore": "Encore",
+      "encoreMarker": "ENCORE",
+      "highlightHint": "Toca hasta 3 canciones para marcarlas"
     },
     "poster": {
       "liveLabel": "canciones en vivo",

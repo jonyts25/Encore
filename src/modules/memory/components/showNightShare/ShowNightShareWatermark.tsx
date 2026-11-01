@@ -18,8 +18,6 @@ export function ShowNightShareWatermark() {
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    paddingBottom: 56,
-    paddingTop: 24,
   },
   text: {
     color: SHARE_NIGHT.text,

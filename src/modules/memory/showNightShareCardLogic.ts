@@ -1,5 +1,4 @@
 import type { ShowMediaRow } from '@/modules/events/showMediaTypes';
-import { photosLibraryAssetUri } from '@/modules/events/showNightLogic';
 import type { Show } from '@/modules/events/types';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
@@ -11,6 +10,7 @@ export const SHARE_CARD_HEIGHT = 1920;
 export type ShowNightShareTemplateId = 'boleto' | 'setlist' | 'poster';
 
 export type ShowNightShareSongItem = {
+  songId: string;
   title: string;
   position: number;
   is_encore: boolean;
@@ -26,7 +26,6 @@ export type ShowNightShareCardModel = {
   venueCityLine: string;
   posterDateLabel: string;
   ticketDateLabel: string;
-  backgroundUri: string | null;
   fallbackArtistImageUrl: string | null;
   rating: number | null;
   liveSongCount: number | null;
@@ -71,14 +70,6 @@ export function formatShareCardVenueCityLine(show: Show): string {
   return `${show.venue.name} · ${show.venue.city}`;
 }
 
-export function pickShareCardBackgroundUri(media: ShowMediaRow[]): string | null {
-  const video = media.find((row) => row.media_type === 'video');
-  if (video) return photosLibraryAssetUri(video.asset_id);
-  const photo = media.find((row) => row.media_type === 'photo');
-  if (photo) return photosLibraryAssetUri(photo.asset_id);
-  return null;
-}
-
 /** Decorative barcode bar widths (2–5 px at 1080 scale) derived from show id. */
 export function decorativeBarcodeBarWidths(showId: string, barCount = 48): number[] {
   let hash = 2166136261;
@@ -108,7 +99,7 @@ export function availableShowNightShareTemplates(
 export function buildShowNightShareCardModel(
   show: Show,
   memory: ShowMemory | null,
-  media: ShowMediaRow[],
+  _media: ShowMediaRow[],
   _prediction: SetlistPrediction | null,
   locale: string
 ): ShowNightShareCardModel {
@@ -126,6 +117,7 @@ export function buildShowNightShareCardModel(
 
   const confirmedSongs: ShowNightShareSongItem[] = confirmed
     ? sortedSongs.map((song) => ({
+        songId: song.song_id,
         title: song.title,
         position: song.position,
         is_encore: song.is_encore,
@@ -142,7 +134,6 @@ export function buildShowNightShareCardModel(
     venueCityLine: formatShareCardVenueCityLine(show),
     posterDateLabel: formatShareCardPosterDate(show.show_date),
     ticketDateLabel: formatShareCardTicketDate(show.show_date, locale),
-    backgroundUri: pickShareCardBackgroundUri(media),
     fallbackArtistImageUrl: show.artist.image_url,
     rating,
     liveSongCount,

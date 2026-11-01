@@ -364,8 +364,14 @@
       "cityLabel": "City",
       "liveCount": "{{count}} live songs"
     },
+    "changePhoto": "Change photo",
+    "changePhotoTitle": "Choose a photo",
+    "changePhotoEmpty": "No Tu noche photos saved for this show yet.",
+    "videoFrameLabel": "Video frame",
     "setlist": {
-      "encore": "Encore"
+      "encore": "Encore",
+      "encoreMarker": "ENCORE",
+      "highlightHint": "Tap up to 3 songs to mark them"
     },
     "poster": {
       "liveLabel": "live songs",

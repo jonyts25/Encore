@@ -1,5 +1,7 @@
+import * as Haptics from 'expo-haptics';
 import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import type { ImageSource } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,8 +23,10 @@ import { typography } from '@/core/ui/theme/typography';
 import { fetchShowById } from '@/modules/events/api';
 import { useShowMedia } from '@/modules/events/hooks/useShowMedia';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useShareNightVideoThumbnail } from '../hooks/useShareNightVideoThumbnail';
+import { persistShowMemory } from '../memoryApi';
 import { useShowMemory } from '../hooks/useShowMemory';
 import {
   availableShowNightShareTemplates,
@@ -33,6 +37,17 @@ import {
 } from '../showNightShareCardLogic';
 import { useShowNightShareFonts } from '../showNightShareFonts';
 import {
+  defaultShowNightShareFrame,
+  readShowNightShareMediaSelection,
+  writeShowNightShareMediaSelection,
+  type ShowNightShareMediaSelection,
+} from '../showNightShareMediaPreference';
+import {
+  pickDefaultShareNightMedia,
+  shareNightPhUri,
+  type ShowNightShareMediaPick,
+} from '../showNightShareMediaLogic';
+import {
   readLastShowNightShareTemplate,
   writeLastShowNightShareTemplate,
 } from '../showNightShareTemplatePreference';
@@ -42,6 +57,8 @@ import {
   invalidateShowNightShareSessionCapture,
 } from '../shareShowNightImage';
 import { ShowNightShareCard } from './ShowNightShareCard';
+import { ShowNightSharePhotoPickerSheet } from './showNightShare/ShowNightSharePhotoPickerSheet';
+import { ShowNightShareVideoFrameSlider } from './showNightShare/ShowNightShareVideoFrameSlider';
 
 function resolveInitialTemplateIndex(
   templates: ShowNightShareTemplateId[],
@@ -53,6 +70,16 @@ function resolveInitialTemplateIndex(
   return 0;
 }
 
+function buildDefaultSelection(media: ShowNightShareMediaPick | null): ShowNightShareMediaSelection | null {
+  if (!media) return null;
+  return {
+    assetId: media.assetId,
+    mediaType: media.mediaType,
+    videoTimeSec: 0,
+    frame: defaultShowNightShareFrame(),
+  };
+}
+
 export function ShowNightSharePreviewContent() {
   const { id: showId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -62,13 +89,19 @@ export function ShowNightSharePreviewContent() {
   const { width: windowWidth } = useWindowDimensions();
   const captureRef = useRef<View>(null);
   const listRef = useRef<FlatList<ShowNightShareTemplateId>>(null);
+  const queryClient = useQueryClient();
 
   const { loaded: fontsLoaded, error: fontsError } = useShowNightShareFonts();
 
-  const [visualReady, setVisualReady] = useState(false);
+  const [readyByTemplate, setReadyByTemplate] = useState<Partial<Record<ShowNightShareTemplateId, boolean>>>({});
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectionByTemplate, setSelectionByTemplate] = useState<
+    Partial<Record<ShowNightShareTemplateId, ShowNightShareMediaSelection>>
+  >({});
+  const [videoDurationSec, setVideoDurationSec] = useState(30);
 
   const showQuery = useQuery({
     queryKey: ['show', showId],
@@ -76,7 +109,10 @@ export function ShowNightSharePreviewContent() {
     enabled: Boolean(showId),
   });
 
-  const { memory, isLoading: memoryLoading } = useShowMemory(showId ?? '', Boolean(showId));
+  const { memory, isLoading: memoryLoading, refresh: refreshMemory, userId } = useShowMemory(
+    showId ?? '',
+    Boolean(showId)
+  );
   const { media, isLoading: mediaLoading } = useShowMedia(showId ?? '', Boolean(showId));
   const { prediction, isLoading: predictionLoading } = useShowPrediction(showId ?? '', {
     enabled: Boolean(showId),
@@ -100,26 +136,39 @@ export function ShowNightSharePreviewContent() {
   }, [model]);
 
   const activeTemplate = templates[activeIndex] ?? templates[0] ?? 'boleto';
+  const activeSelection = selectionByTemplate[activeTemplate] ?? null;
+
+  useEffect(() => {
+    if (!showId || !model) return;
+    const defaultPick = pickDefaultShareNightMedia(media);
+    const defaultSelection = buildDefaultSelection(defaultPick);
+    const next: Partial<Record<ShowNightShareTemplateId, ShowNightShareMediaSelection>> = {};
+    for (const template of templates) {
+      next[template] =
+        readShowNightShareMediaSelection(showId, template) ??
+        defaultSelection ??
+        undefined;
+    }
+    setSelectionByTemplate(next);
+  }, [media, model, showId, templates.join(',')]);
 
   useEffect(() => {
     if (!model) return;
     const preferred = readLastShowNightShareTemplate();
     const index = resolveInitialTemplateIndex(templates, preferred);
     setActiveIndex(index);
-    setCaptureTemplate(templates[index] ?? 'boleto');
-    setVisualReady(false);
+    setReadyByTemplate({});
     requestAnimationFrame(() => {
       listRef.current?.scrollToOffset({ offset: index * previewWidth, animated: false });
     });
   }, [model?.showId, previewWidth, templates.join(',')]);
 
   useEffect(() => {
-    setCaptureTemplate(activeTemplate);
-    setVisualReady(false);
+    setReadyByTemplate((prev) => ({ ...prev, [activeTemplate]: false }));
     if (showId) {
       invalidateShowNightShareSessionCapture(showId, activeTemplate);
     }
-  }, [activeTemplate, showId]);
+  }, [activeSelection?.assetId, activeSelection?.videoTimeSec, activeSelection?.frame, activeTemplate, showId]);
 
   useEffect(() => {
     if (fontsError) {
@@ -127,9 +176,116 @@ export function ShowNightSharePreviewContent() {
     }
   }, [fontsError]);
 
-  const onVisualReady = useCallback(() => {
-    setVisualReady(true);
+  const { imageSource: videoThumbSource } = useShareNightVideoThumbnail(
+    activeSelection?.mediaType === 'video' ? activeSelection.assetId : null,
+    activeSelection?.videoTimeSec ?? 0,
+    activeSelection?.mediaType === 'video'
+  );
+
+  useEffect(() => {
+    if (activeSelection?.mediaType !== 'video' || !activeSelection.assetId) return;
+    void MediaLibrary.getAssetInfoAsync(activeSelection.assetId).then((info) => {
+      const duration = typeof info.duration === 'number' ? info.duration : 30;
+      setVideoDurationSec(Math.max(1, duration));
+    });
+  }, [activeSelection?.assetId, activeSelection?.mediaType]);
+
+  const mediaSourceForTemplate = useCallback(
+    (template: ShowNightShareTemplateId): ImageSource | null => {
+      if (template === 'setlist') return null;
+      const selection = selectionByTemplate[template];
+      if (!selection) return null;
+      if (selection.mediaType === 'video') {
+        if (template === activeTemplate) return videoThumbSource;
+        return shareNightPhUri(selection.assetId);
+      }
+      return shareNightPhUri(selection.assetId);
+    },
+    [activeTemplate, selectionByTemplate, videoThumbSource]
+  );
+
+  const markTemplateReady = useCallback((template: ShowNightShareTemplateId) => {
+    setReadyByTemplate((prev) => ({ ...prev, [template]: true }));
   }, []);
+
+  const visualReady = Boolean(readyByTemplate[activeTemplate]);
+
+  const persistSelection = useCallback(
+    (template: ShowNightShareTemplateId, selection: ShowNightShareMediaSelection) => {
+      if (!showId) return;
+      setSelectionByTemplate((prev) => ({ ...prev, [template]: selection }));
+      writeShowNightShareMediaSelection(showId, template, selection);
+    },
+    [showId]
+  );
+
+  const onPickMedia = useCallback(
+    (pick: ShowNightShareMediaPick) => {
+      const next: ShowNightShareMediaSelection = {
+        assetId: pick.assetId,
+        mediaType: pick.mediaType,
+        videoTimeSec: 0,
+        frame: defaultShowNightShareFrame(),
+      };
+      persistSelection(activeTemplate, next);
+      setPickerOpen(false);
+    },
+    [activeTemplate, persistSelection]
+  );
+
+  const onFrameChange = useCallback(
+    (frame: ShowNightShareMediaSelection['frame']) => {
+      if (!activeSelection) return;
+      persistSelection(activeTemplate, { ...activeSelection, frame });
+    },
+    [activeSelection, activeTemplate, persistSelection]
+  );
+
+  const onVideoTimeChange = useCallback(
+    (sec: number) => {
+      if (!activeSelection || activeSelection.mediaType !== 'video') return;
+      persistSelection(activeTemplate, { ...activeSelection, videoTimeSec: sec });
+    },
+    [activeSelection, activeTemplate, persistSelection]
+  );
+
+  const onToggleHighlight = useCallback(
+    async (songId: string) => {
+      if (!memory || !userId || !showId) return;
+      const target = memory.songs.find((song) => song.song_id === songId);
+      if (!target) return;
+
+      const highlightCount = memory.songs.filter((song) => song.is_highlight).length;
+      const nextHighlight = !target.is_highlight;
+      if (nextHighlight && highlightCount >= 3) {
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        return;
+      }
+
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      const songs = memory.songs.map((song) => ({
+        song_id: song.song_id,
+        position: song.position,
+        is_encore: song.is_encore,
+        is_highlight: song.song_id === songId ? nextHighlight : song.is_highlight,
+      }));
+
+      await persistShowMemory(userId, {
+        show_id: showId,
+        rating: memory.rating,
+        note: memory.note,
+        setlist_confirmed_at: memory.setlist_confirmed_at,
+        songs,
+      });
+      await refreshMemory();
+      void queryClient.invalidateQueries({ queryKey: ['memory', showId, userId] });
+      if (showId) {
+        invalidateShowNightShareSessionCapture(showId, 'setlist');
+      }
+    },
+    [memory, queryClient, refreshMemory, showId, userId]
+  );
 
   const onMomentumScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -211,12 +367,28 @@ export function ShowNightSharePreviewContent() {
     );
   }
 
+  const captureSelection = selectionByTemplate[activeTemplate];
+  const captureMediaSource: ImageSource | null =
+    activeTemplate === 'setlist'
+      ? null
+      : captureSelection?.mediaType === 'video'
+        ? videoThumbSource
+        : captureSelection
+          ? shareNightPhUri(captureSelection.assetId)
+          : null;
+
   return (
     <View style={[styles.screen, { backgroundColor: tokens.background, paddingBottom: insets.bottom + 12 }]}>
       <View style={styles.content}>
         <Text style={[typography.body, styles.hint, { color: tokens.textSecondary }]}>
           {t('showNightShare.previewHint')}
         </Text>
+
+        {activeTemplate === 'setlist' ? (
+          <Text style={[typography.footnote, styles.setlistHint, { color: tokens.textSecondary }]}>
+            {t('showNightShare.setlist.highlightHint')}
+          </Text>
+        ) : null}
 
         <FlatList
           ref={listRef}
@@ -232,19 +404,36 @@ export function ShowNightSharePreviewContent() {
             index,
           })}
           onMomentumScrollEnd={onMomentumScrollEnd}
-          renderItem={({ item, index }) => (
-            <View style={[styles.previewFrame, { width: previewWidth, height: previewHeight }]}>
-              <View
-                style={{
-                  width: SHARE_CARD_WIDTH,
-                  height: SHARE_CARD_HEIGHT,
-                  transform: [{ scale: previewScale }],
-                  transformOrigin: 'top left',
-                }}>
-                <ShowNightShareCard model={model} template={item} />
+          renderItem={({ item }) => {
+            const selection = selectionByTemplate[item];
+            const mediaSource = mediaSourceForTemplate(item);
+            return (
+              <View style={[styles.previewFrame, { width: previewWidth, height: previewHeight }]}>
+                <View
+                  style={{
+                    width: SHARE_CARD_WIDTH,
+                    height: SHARE_CARD_HEIGHT,
+                    transform: [{ scale: previewScale }],
+                    transformOrigin: 'top left',
+                  }}>
+                  <ShowNightShareCard
+                    mediaSource={mediaSource}
+                    fontsReady={fontsLoaded}
+                    frame={selection?.frame ?? defaultShowNightShareFrame()}
+                    interactive
+                    model={model}
+                    template={item}
+                    onFrameChange={(frame) => {
+                      if (!selection) return;
+                      persistSelection(item, { ...selection, frame });
+                    }}
+                    onToggleHighlight={item === 'setlist' ? (songId) => void onToggleHighlight(songId) : undefined}
+                    onVisualReady={() => markTemplateReady(item)}
+                  />
+                </View>
               </View>
-            </View>
-          )}
+            );
+          }}
         />
 
         <View style={styles.dots}>
@@ -262,6 +451,30 @@ export function ShowNightSharePreviewContent() {
           ))}
         </View>
 
+        {activeTemplate !== 'setlist' ? (
+          <PillButton
+            title={t('showNightShare.changePhoto')}
+            variant="secondary"
+            onPress={() => setPickerOpen(true)}
+          />
+        ) : null}
+
+        {activeSelection?.mediaType === 'video' && activeTemplate !== 'setlist' ? (
+          <ShowNightShareVideoFrameSlider
+            durationSec={videoDurationSec}
+            valueSec={activeSelection.videoTimeSec}
+            onChange={onVideoTimeChange}
+          />
+        ) : null}
+
+        <ShowNightSharePhotoPickerSheet
+          savedMedia={media}
+          show={show}
+          visible={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onPick={onPickMedia}
+        />
+
         {!visualReady ? <ActivityIndicator color={tokens.accent} style={styles.loader} /> : null}
       </View>
 
@@ -270,7 +483,15 @@ export function ShowNightSharePreviewContent() {
         collapsable={false}
         pointerEvents="none"
         style={styles.offscreenCapture}>
-        <ShowNightShareCard model={model} template={captureTemplate} onVisualReady={onVisualReady} />
+        <ShowNightShareCard
+          mediaSource={captureMediaSource}
+          fontsReady={fontsLoaded}
+          frame={captureSelection?.frame ?? defaultShowNightShareFrame()}
+          interactive={false}
+          model={model}
+          template={activeTemplate}
+          onVisualReady={() => markTemplateReady(activeTemplate)}
+        />
       </View>
 
       <View style={[styles.actions, { paddingHorizontal: 16 }]}>
@@ -304,7 +525,11 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   hint: {
-    marginBottom: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  setlistHint: {
+    marginBottom: 12,
     textAlign: 'center',
   },
   previewFrame: {
