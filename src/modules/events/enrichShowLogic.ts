@@ -12,6 +12,13 @@ export function isEnrichCooldownElapsed(
   return now.getTime() - last >= ENRICH_COOLDOWN_MS;
 }
 
+export function isSetlistLinkCooldownElapsed(
+  setlistCheckedAt: string | null | undefined,
+  now: Date = new Date()
+): boolean {
+  return isEnrichCooldownElapsed(setlistCheckedAt, now);
+}
+
 export function shouldRequestBackgroundEnrich(params: {
   isFutureShow: boolean;
   structure: SetlistPredictionStructure | null | undefined;
@@ -27,4 +34,22 @@ export function shouldRequestBackgroundEnrich(params: {
     return false;
   }
   return isEnrichCooldownElapsed(params.enrichedAt, params.now);
+}
+
+export function shouldRequestPastShowSetlistLink(params: {
+  isPastShow: boolean;
+  showSongCount: number;
+  setlistCheckedAt: string | null | undefined;
+  now?: Date;
+}): boolean {
+  if (!params.isPastShow) return false;
+  if (!isSetlistLinkCooldownElapsed(params.setlistCheckedAt, params.now)) return false;
+  return params.showSongCount === 0;
+}
+
+export function shouldRequestSetlistLinkOnConfirm(params: {
+  setlistCheckedAt: string | null | undefined;
+  now?: Date;
+}): boolean {
+  return isSetlistLinkCooldownElapsed(params.setlistCheckedAt, params.now);
 }

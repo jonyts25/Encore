@@ -114,6 +114,21 @@ export class SetlistFmProvider implements SetlistFmAdapter {
     return data.setlist ?? [];
   }
 
+  async getArtistSetlistsOnDate(
+    mbid: string,
+    eventDateDdMmYyyy: string,
+    page = 1
+  ): Promise<SetlistFmSetlist[]> {
+    const params = new URLSearchParams({
+      date: eventDateDdMmYyyy,
+      p: String(page),
+    });
+    const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmSetlist>>(
+      `/1.0/artist/${mbid}/setlists?${params.toString()}`
+    );
+    return data.setlist ?? [];
+  }
+
   async getSetlist(setlistId: string): Promise<SetlistFmSetlist> {
     return setlistFmRequest<SetlistFmSetlist>(`/1.0/setlist/${setlistId}`);
   }

@@ -14,6 +14,7 @@ const SHOW_SELECT = `
   time_confirmed,
   setlistfm_id,
   enriched_at,
+  setlist_checked_at,
   created_at,
   tour:tours (
     id,

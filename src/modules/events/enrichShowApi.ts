@@ -2,6 +2,7 @@ import { apiFetch } from '@/core/api/client';
 
 export type EnrichShowStartResponse = {
   status: 'started' | 'running';
+  show_id?: string;
 };
 
 export async function requestShowEnrich(

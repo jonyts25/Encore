@@ -37,6 +37,7 @@ export type ShowWithRelations = {
   time_confirmed?: boolean;
   setlistfm_id: string | null;
   enriched_at?: string | null;
+  setlist_checked_at?: string | null;
   created_at: string;
   artist: ArtistSummary;
   venue: VenueSummary;

@@ -43,6 +43,7 @@ const SHOW_SELECT = `
   source,
   setlistfm_id,
   enriched_at,
+  setlist_checked_at,
   created_at,
   tour:tours (
     id,

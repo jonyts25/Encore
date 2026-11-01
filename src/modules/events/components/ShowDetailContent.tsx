@@ -87,7 +87,15 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
   const { status: userShowStatus } = useShowStatus(showId);
   const { prediction } = useShowPrediction(showId);
-  const { isEnriching } = useShowEnrichIfNeeded({ show, prediction });
+  const { isEnriching } = useShowEnrichIfNeeded({
+    show,
+    prediction,
+    onResolvedShowId: (resolvedId) => {
+      if (resolvedId !== showId) {
+        router.replace(`/show/${resolvedId}`);
+      }
+    },
+  });
   const {
     record: packRecord,
     label: packLabel,

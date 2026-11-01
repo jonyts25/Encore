@@ -10,6 +10,7 @@ import {
   shouldShowNewTourEnrichmentNotice,
   type SetlistTourCandidate,
 } from './enrich-show-logic';
+import { linkShowToSetlistFm } from './link-show-setlistfm';
 import { generateShowPrediction, type SetlistPrediction } from './setlist-prediction';
 import {
   flattenSetlistSongs,
@@ -32,6 +33,7 @@ export type EnrichShowResult = {
   assigned_tour: boolean;
   setlists_processed: number;
   prediction: SetlistPrediction | null;
+  setlist_linked: boolean;
 };
 
 type ShowEnrichRow = {
@@ -180,10 +182,10 @@ async function cachePredictionWithOptionalNotice(
   return prediction;
 }
 
-export async function enrichShow(showId: string): Promise<EnrichShowResult> {
-  const supabase = createSupabaseAdminClient();
-  const now = new Date();
-
+async function loadShowForEnrich(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  showId: string
+): Promise<ShowEnrichRow> {
   const { data: show, error: showError } = await supabase
     .from('shows')
     .select(
@@ -207,37 +209,49 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
     throw new Error(`Show not found: ${showId}`);
   }
 
-  const showRow = show as unknown as ShowEnrichRow;
-  const artist = Array.isArray(showRow.artist) ? showRow.artist[0] : showRow.artist;
-  if (!artist) throw new Error(`Show ${showId} is missing artist`);
+  return show as unknown as ShowEnrichRow;
+}
 
-  if (
-    !isShowActive({
-      show_date: showRow.show_date,
-      local_date: showRow.local_date,
-      time_confirmed: showRow.time_confirmed,
-      venue: Array.isArray(showRow.venue) ? showRow.venue[0] : showRow.venue,
-    })
-  ) {
+export async function enrichShow(showId: string): Promise<EnrichShowResult> {
+  const supabase = createSupabaseAdminClient();
+  const now = new Date();
+
+  const linkResult = await linkShowToSetlistFm(showId, { now });
+  const effectiveShowId = linkResult.showId;
+
+  const showRow = await loadShowForEnrich(supabase, effectiveShowId);
+  const artist = Array.isArray(showRow.artist) ? showRow.artist[0] : showRow.artist;
+  if (!artist) throw new Error(`Show ${effectiveShowId} is missing artist`);
+
+  const showActive = isShowActive({
+    show_date: showRow.show_date,
+    local_date: showRow.local_date,
+    time_confirmed: showRow.time_confirmed,
+    venue: Array.isArray(showRow.venue) ? showRow.venue[0] : showRow.venue,
+  });
+
+  if (!showActive) {
     return {
-      status: 'skipped_not_active',
-      show_id: showId,
+      status: 'completed',
+      show_id: effectiveShowId,
       enriched_at: showRow.enriched_at,
       assigned_tour: false,
       setlists_processed: 0,
       prediction: null,
+      setlist_linked: linkResult.linked,
     };
   }
 
   if (!shouldRunEnrich(showRow.enriched_at, now)) {
-    const prediction = await generateShowPrediction(showId);
+    const prediction = await generateShowPrediction(effectiveShowId);
     return {
       status: 'skipped_cooldown',
-      show_id: showId,
+      show_id: effectiveShowId,
       enriched_at: showRow.enriched_at,
       assigned_tour: false,
       setlists_processed: 0,
       prediction,
+      setlist_linked: linkResult.linked,
     };
   }
 
@@ -299,10 +313,10 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
           supabase,
           effectiveTourId,
           showRow.show_date,
-          showId
+          effectiveShowId
         );
         if (tourShowCount >= ENRICH_MID_PREDICTION_TOUR_SHOWS) {
-          await cachePredictionWithOptionalNotice(supabase, showId, false);
+          await cachePredictionWithOptionalNotice(supabase, effectiveShowId, false);
           midPredictionGenerated = true;
         }
       }
@@ -336,27 +350,32 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
     const { error: tourUpdateError } = await supabase
       .from('shows')
       .update({ tour_id: newTourId })
-      .eq('id', showId);
+      .eq('id', effectiveShowId);
     if (tourUpdateError) throw tourUpdateError;
     effectiveTourId = newTourId;
     assignedTour = true;
   }
 
-  const prediction = await cachePredictionWithOptionalNotice(supabase, showId, assignedTour);
+  const prediction = await cachePredictionWithOptionalNotice(
+    supabase,
+    effectiveShowId,
+    assignedTour
+  );
 
   const enrichedAt = now.toISOString();
   const { error: enrichedError } = await supabase
     .from('shows')
     .update({ enriched_at: enrichedAt })
-    .eq('id', showId);
+    .eq('id', effectiveShowId);
   if (enrichedError) throw enrichedError;
 
   return {
     status: 'completed',
-    show_id: showId,
+    show_id: effectiveShowId,
     enriched_at: enrichedAt,
     assigned_tour: assignedTour,
     setlists_processed: setlistsProcessed,
     prediction,
+    setlist_linked: linkResult.linked,
   };
 }

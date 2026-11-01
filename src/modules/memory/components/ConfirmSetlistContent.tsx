@@ -22,6 +22,7 @@ import { PillButton } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
 import { addUserSong, fetchArtistSongs } from '@/modules/catalog/api';
+import { useShowEnrichIfNeeded } from '@/modules/events/hooks/useShowEnrichIfNeeded';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowStatus } from '@/modules/events/hooks/useShowStatus';
 import { filterSongsByQuery, normalizeSongSearchQuery } from '@/modules/live/liveSongSearchLogic';
@@ -74,6 +75,17 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
   const { status: userShowStatus } = useShowStatus(showId);
   const { prediction } = useShowPrediction(showId);
   const { memory, refresh: refreshMemory } = useShowMemory(showId, Boolean(userId));
+
+  useShowEnrichIfNeeded({
+    show: show ?? null,
+    prediction,
+    confirmSetlistMode: true,
+    onResolvedShowId: (resolvedId) => {
+      if (resolvedId !== showId) {
+        router.replace(`/show/${resolvedId}/setlist`);
+      }
+    },
+  });
 
   const [rows, setRows] = useState<SetlistListRow[]>([]);
   const [rating, setRating] = useState<number | null>(null);

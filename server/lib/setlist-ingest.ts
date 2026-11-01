@@ -1,5 +1,6 @@
 import { ensureArtistImageUrl } from './artist-photos';
 import { createSupabaseAdminClient } from './supabase';
+import { normalizePlaceName } from './setlistfm-link-logic';
 import {
   flattenSetlistSongs,
   getSetlistFmProvider,
@@ -133,19 +134,8 @@ type ExistingShowRow = {
   setlistfm_id: string | null;
 };
 
-const CITY_ALIASES: Record<string, string> = {
-  'mexico city': 'ciudad de mexico',
-  'ciudad de mexico': 'ciudad de mexico',
-  'ciudad de méxico': 'ciudad de mexico',
-};
-
 function normalizeCityName(city: string): string {
-  const normalized = city
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .trim();
-  return CITY_ALIASES[normalized] ?? normalized;
+  return normalizePlaceName(city);
 }
 
 function hasCustomShowTime(isoDate: string): boolean {
@@ -235,6 +225,106 @@ export async function ingestSetlistEntry(
   return { showUpserted: true, tourLinked: Boolean(tourId), songsUpserted, showSongsInserted };
 }
 
+export async function writeSetlistSongsForShow(
+  supabase: SupabaseAdmin,
+  showId: string,
+  artistId: string,
+  setlist: SetlistFmSetlist
+): Promise<number> {
+  const parsedSongs = flattenSetlistSongs(setlist);
+  await supabase.from('show_songs').delete().eq('show_id', showId);
+
+  if (parsedSongs.length === 0) return 0;
+
+  let inserted = 0;
+  for (const item of parsedSongs) {
+    const songId = await upsertSong(supabase, artistId, item.title);
+    const { error } = await supabase.from('show_songs').insert({
+      show_id: showId,
+      song_id: songId,
+      position: item.position,
+      is_encore: item.is_encore,
+      notes: item.notes,
+    });
+    if (error) throw error;
+    inserted += 1;
+  }
+
+  return inserted;
+}
+
+export async function attachSetlistToShow(
+  supabase: SupabaseAdmin,
+  params: {
+    showId: string;
+    artistId: string;
+    setlist: SetlistFmSetlist;
+    provider: SetlistFmProvider;
+    suppressEnrichHook?: boolean;
+  }
+): Promise<{ showId: string; songsInserted: number }> {
+  const tourName = await resolveTourName(params.setlist, params.provider);
+  const venueId = await upsertVenueFromSetlist(supabase, params.setlist);
+  const tourId = await upsertTour(supabase, params.artistId, tourName, params.setlist.eventDate);
+  const showDate = parseSetlistFmEventDate(params.setlist.eventDate);
+  const localDate = parseSetlistFmLocalDate(params.setlist.eventDate);
+
+  const { data: existingShow, error: showError } = await supabase
+    .from('shows')
+    .select('id, show_date, venue_id, source')
+    .eq('id', params.showId)
+    .maybeSingle();
+
+  if (showError) throw showError;
+  if (!existingShow) throw new Error(`Show not found: ${params.showId}`);
+
+  const previousVenueId = existingShow.venue_id as string | null;
+
+  const updatePayload: Record<string, unknown> = {
+    setlistfm_id: params.setlist.id,
+    tour_id: tourId,
+    venue_id: venueId,
+    local_date: localDate,
+    time_confirmed: false,
+    source: 'setlistfm',
+  };
+
+  if (!hasCustomShowTime(existingShow.show_date as string)) {
+    updatePayload.show_date = showDate;
+  }
+
+  const { error: updateError } = await supabase
+    .from('shows')
+    .update(updatePayload)
+    .eq('id', params.showId);
+
+  if (updateError) throw updateError;
+
+  if (previousVenueId && previousVenueId !== venueId) {
+    const { count, error: countError } = await supabase
+      .from('shows')
+      .select('id', { count: 'exact', head: true })
+      .eq('venue_id', previousVenueId);
+
+    if (!countError && (count ?? 0) <= 1) {
+      await supabase.from('venues').delete().eq('id', previousVenueId);
+    }
+  }
+
+  const songsInserted = await writeSetlistSongsForShow(
+    supabase,
+    params.showId,
+    params.artistId,
+    params.setlist
+  );
+
+  if (!params.suppressEnrichHook) {
+    void scheduleEnrichForIngestedShow(supabase, params.showId);
+  }
+
+  return { showId: params.showId, songsInserted };
+}
+
 async function scheduleEnrichForIngestedShow(
   supabase: SupabaseAdmin,
   showId: string
@@ -276,11 +366,26 @@ async function resolveTourName(
   return full.tour?.name?.trim() || null;
 }
 
-async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): Promise<string> {
+export async function upsertVenueFromSetlist(
+  supabase: SupabaseAdmin,
+  setlist: SetlistFmSetlist
+): Promise<string> {
   const venue = setlist.venue;
   const city = venue.city.name;
   const country = venue.city.country.name;
   const normalizedCity = normalizeCityName(city);
+  const setlistfmVenueId = venue.id?.trim() || null;
+
+  if (setlistfmVenueId) {
+    const { data: bySetlistId, error: byIdError } = await supabase
+      .from('venues')
+      .select('id')
+      .eq('setlistfm_venue_id', setlistfmVenueId)
+      .maybeSingle();
+
+    if (byIdError) throw byIdError;
+    if (bySetlistId?.id) return bySetlistId.id as string;
+  }
 
   const { data: candidates, error: findError } = await supabase
     .from('venues')
@@ -293,7 +398,16 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
   const existing = (candidates ?? []).find(
     (row) => normalizeCityName((row.city as string | null) ?? '') === normalizedCity
   );
-  if (existing?.id) return existing.id as string;
+  if (existing?.id) {
+    if (setlistfmVenueId) {
+      await supabase
+        .from('venues')
+        .update({ setlistfm_venue_id: setlistfmVenueId })
+        .eq('id', existing.id)
+        .is('setlistfm_venue_id', null);
+    }
+    return existing.id as string;
+  }
 
   const lat = venue.city.coords?.lat ?? null;
   const lng = venue.city.coords?.long ?? null;
@@ -314,6 +428,7 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
       lng,
       capacity: null,
       timezone,
+      setlistfm_venue_id: setlistfmVenueId,
     })
     .select('id')
     .single();
@@ -325,6 +440,10 @@ async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): 
   await geocodeVenueById(supabase, venueId).catch(() => undefined);
 
   return venueId;
+}
+
+async function upsertVenue(supabase: SupabaseAdmin, setlist: SetlistFmSetlist): Promise<string> {
+  return upsertVenueFromSetlist(supabase, setlist);
 }
 
 async function upsertTour(

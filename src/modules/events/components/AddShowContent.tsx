@@ -33,6 +33,8 @@ import {
   searchVenuesNearby,
   setShowStatus,
 } from '../api';
+import { importSetlistFromUrl, SetlistFmImportError } from '../setlistfmImportApi';
+import { getShowPhase } from '../visibility';
 import { formatVenueNearbySubtitle } from '../venueSearchFormat';
 import { resolveCityCenterFromVenues, type VenueNearbyResult } from '../venueSearchLogic';
 import { createUserShow, type VenueCandidatePayload } from '../createUserShow';
@@ -94,6 +96,8 @@ export function AddShowContent() {
   const [localTimeInput, setLocalTimeInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setlistUrl, setSetlistUrl] = useState('');
+  const [setlistImportLoading, setSetlistImportLoading] = useState(false);
 
   const loadArtist = useCallback(
     async (artistId: string) => {
@@ -272,6 +276,48 @@ export function AddShowContent() {
     ]
   );
 
+  const onImportSetlistLink = useCallback(async () => {
+    if (!session?.access_token || !user?.id) return;
+    const trimmed = setlistUrl.trim();
+    if (!trimmed) return;
+
+    setSetlistImportLoading(true);
+    setError(null);
+    try {
+      const { show_id: importedShowId } = await importSetlistFromUrl(trimmed, session.access_token);
+      const importedShow = await fetchShowByIdFromSupabase(importedShowId);
+      if (!importedShow) {
+        setError(t('addShow.submitError'));
+        return;
+      }
+
+      const phase = getShowPhase(importedShow);
+      const status = phase === 'past' ? 'fui' : 'voy';
+      await setShowStatus(importedShowId, status, session.access_token, user.id);
+      const show = await fetchShowByIdFromSupabase(importedShowId);
+      if (show) {
+        void prefetchShowPack(show, queryClient, { force: true });
+        void requestShowEnrich(importedShowId, session.access_token);
+      }
+      await queryClient.invalidateQueries({ queryKey: queryKeys.home(user.id) });
+      router.replace(`/show/${importedShowId}`);
+    } catch (err) {
+      if (err instanceof SetlistFmImportError) {
+        if (err.code === 'invalid_url') {
+          setError(t('addShow.setlistLinkInvalid'));
+        } else if (err.code === 'not_found') {
+          setError(t('addShow.setlistLinkNotFound'));
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError(err instanceof Error ? err.message : t('addShow.submitError'));
+      }
+    } finally {
+      setSetlistImportLoading(false);
+    }
+  }, [queryClient, router, session?.access_token, setlistUrl, t, user?.id]);
+
   const canContinueVenue = useMemo(() => {
     if (selectedVenueId) return true;
     return venueName.trim().length > 0 && venueCity.trim().length > 0;
@@ -320,6 +366,24 @@ export function AddShowContent() {
 
       {step === 'artist' ? (
         <View style={styles.section}>
+          <SectionHeader title={t('addShow.setlistLinkLabel')} />
+          <TextInput
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('addShow.setlistLinkPlaceholder')}
+            placeholderTextColor={tokens.textSecondary}
+            style={inputStyle}
+            value={setlistUrl}
+            onChangeText={setSetlistUrl}
+          />
+          <PillButton
+            title={
+              setlistImportLoading ? t('addShow.setlistLinkImporting') : t('addShow.setlistLinkSubmit')
+            }
+            disabled={setlistImportLoading || !setlistUrl.trim()}
+            onPress={() => void onImportSetlistLink()}
+          />
+
           <SectionHeader title={t('addShow.pickArtist')} />
           <Text style={[typography.secondary, { color: tokens.textSecondary }]}>
             {t('addShow.pickArtistHint')}
