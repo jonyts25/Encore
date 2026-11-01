@@ -35,6 +35,7 @@ import type { SetlistPredictionStructure } from '@/modules/setlist/types';
 import { formatShowDate } from '../api';
 import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
+import { useShowEnrichIfNeeded } from '../hooks/useShowEnrichIfNeeded';
 import { useShow } from '../hooks/useShow';
 import { hasConfirmedTime } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
@@ -90,6 +91,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
   const { status: userShowStatus } = useShowStatus(showId);
   const { prediction } = useShowPrediction(showId);
+  useShowEnrichIfNeeded({ show, prediction });
   const {
     record: packRecord,
     label: packLabel,

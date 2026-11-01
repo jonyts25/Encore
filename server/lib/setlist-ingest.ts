@@ -98,7 +98,7 @@ export async function ingestArtistSetlists(
 
   for (const setlist of limitedSetlists) {
     try {
-      const stats = await persistSetlist(supabase, artistRow.id, setlist, provider);
+      const stats = await ingestSetlistEntry(supabase, artistRow.id, setlist, provider);
       showsUpserted += stats.showUpserted ? 1 : 0;
       showsWithTour += stats.tourLinked ? 1 : 0;
       songsUpserted += stats.songsUpserted;
@@ -153,11 +153,16 @@ function hasCustomShowTime(isoDate: string): boolean {
   return !(date.getUTCHours() === 12 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0);
 }
 
-async function persistSetlist(
+export type IngestSetlistEntryOptions = {
+  suppressEnrichHook?: boolean;
+};
+
+export async function ingestSetlistEntry(
   supabase: SupabaseAdmin,
   artistId: string,
   setlist: SetlistFmSetlist,
-  provider: SetlistFmProvider
+  provider: SetlistFmProvider,
+  options: IngestSetlistEntryOptions = {}
 ) {
   const tourName = await resolveTourName(setlist, provider);
   const venueId = await upsertVenue(supabase, setlist);
@@ -172,6 +177,10 @@ async function persistSetlist(
     localDate,
     setlistfmId: setlist.id,
   });
+
+  if (!options.suppressEnrichHook) {
+    void scheduleEnrichForIngestedShow(supabase, showId);
+  }
 
   const parsedSongs = flattenSetlistSongs(setlist);
   if (parsedSongs.length === 0) {
@@ -205,6 +214,37 @@ async function persistSetlist(
   }
 
   return { showUpserted: true, tourLinked: Boolean(tourId), songsUpserted, showSongsInserted };
+}
+
+async function scheduleEnrichForIngestedShow(
+  supabase: SupabaseAdmin,
+  showId: string
+): Promise<void> {
+  const { data, error } = await supabase
+    .from('shows')
+    .select('id, show_date, local_date, time_confirmed, venue:venues ( timezone )')
+    .eq('id', showId)
+    .maybeSingle();
+
+  if (error || !data) return;
+
+  const venue = Array.isArray(data.venue) ? data.venue[0] : data.venue;
+  const { isShowActive } = await import('./visibility');
+  if (
+    !isShowActive({
+      show_date: data.show_date as string,
+      local_date: data.local_date as string | undefined,
+      time_confirmed: data.time_confirmed as boolean | undefined,
+      venue: venue as { timezone?: string | null } | undefined,
+    })
+  ) {
+    return;
+  }
+
+  const { enrichShow } = await import('./enrich-show');
+  void enrichShow(showId).catch((err) => {
+    console.error('enrichShow after ingest failed', showId, err);
+  });
 }
 
 async function resolveTourName(

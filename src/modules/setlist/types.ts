@@ -34,4 +34,5 @@ export type SetlistPrediction = {
   songs: PredictedSong[];
   generated_at: string;
   others?: PredictionOtherSong[];
+  enrichment_notice?: 'new_tour_from_recent_shows' | null;
 };

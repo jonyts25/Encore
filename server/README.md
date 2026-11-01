@@ -49,6 +49,7 @@ npm start
   - Upserts `tours (artist_id, name)` and assigns `shows.tour_id` (null when setlist has no tour)
   - Response includes `shows_with_tour` — how many ingested shows were linked to a tour
 - `GET /api/shows/[id]/prediction` — predicted setlist with per-song confidence (public)
+- `POST /api/shows/[id]/enrich` — setlist.fm backfill + tour link + prediction refresh (auth; 12h cooldown per show)
   - **≥ 3 prior shows on same tour:** statistical prediction with confidence % (`mostly_fixed` / `rotating`)
   - **1–2 prior shows on same tour:** actual setlist from reference show(s), no confidence (`single_show_reference` / `limited_tour_data` + `reference_show_dates`)
   - **0 prior shows on tour:** artist-wide history fallback (`no_tour_data_fallback` + confidence %)

@@ -41,6 +41,7 @@ const SHOW_SELECT = `
   time_confirmed,
   source,
   setlistfm_id,
+  enriched_at,
   created_at,
   artist:artists (
     id,

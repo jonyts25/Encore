@@ -13,6 +13,7 @@ const SHOW_SELECT = `
   local_date,
   time_confirmed,
   setlistfm_id,
+  enriched_at,
   created_at,
   artist:artists (
     id,

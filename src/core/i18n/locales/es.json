@@ -447,6 +447,7 @@
     "referenceSingleShow": "Basado en el show anterior de esta gira ({{date}}) — el setlist real puede variar.",
     "referenceLimitedTour": "Basado en shows anteriores de esta gira ({{dates}}) — el setlist real puede variar.",
     "fallbackNoTour": "Aún no hay shows registrados de esta gira — esto es su repertorio general, podría no reflejar el show real.",
+    "newTourFromRecentShows": "Gira nueva: basado en sus conciertos más recientes.",
     "sampleSize": "{{count}} shows analizados",
     "structure": {
       "mostly_fixed": "Setlist mayormente fijo",

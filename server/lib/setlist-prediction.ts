@@ -54,6 +54,7 @@ export type SetlistPrediction = {
     show_length_median: number;
   };
   reference_shows?: PredictionReferenceShow[];
+  enrichment_notice?: 'new_tour_from_recent_shows' | null;
 };
 
 export type ActualSetlistSong = {

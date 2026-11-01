@@ -34,6 +34,7 @@ import {
 import { formatVenueNearbySubtitle } from '../venueSearchFormat';
 import { resolveCityCenterFromVenues, type VenueNearbyResult } from '../venueSearchLogic';
 import { createUserShow, type VenueCandidatePayload } from '../createUserShow';
+import { requestShowEnrich } from '../enrichShowApi';
 import { parseLocalDateInput, parseLocalTimeInput } from '../createUserShowLogic';
 import { isShowActive } from '../visibility';
 import { prefetchShowPack } from '../showPack';
@@ -170,6 +171,12 @@ export function AddShowContent() {
         void prefetchShowPack(show, queryClient, { force: true });
         if (session?.access_token) {
           void requestVenueGeocode(show.venue_id, session.access_token);
+          void requestShowEnrich(showId).then((result) => {
+            if (result.prediction) {
+              queryClient.setQueryData(queryKeys.prediction(showId), result.prediction);
+            }
+            void prefetchShowPack(show, queryClient, { force: true });
+          });
         }
       }
       if (user?.id) {

@@ -447,6 +447,7 @@
     "referenceSingleShow": "Based on the previous show on this tour ({{date}}) — the actual setlist may vary.",
     "referenceLimitedTour": "Based on previous shows on this tour ({{dates}}) — the actual setlist may vary.",
     "fallbackNoTour": "No shows from this tour are recorded yet — this is the artist's general repertoire and may not reflect the actual show.",
+    "newTourFromRecentShows": "New tour: based on their most recent concerts.",
     "sampleSize": "{{count}} shows analyzed",
     "structure": {
       "mostly_fixed": "Mostly fixed setlist",

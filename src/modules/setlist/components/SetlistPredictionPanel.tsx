@@ -93,6 +93,12 @@ export function SetlistPredictionPanel({
         <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
       ) : null}
 
+      {!isLoading && prediction?.enrichment_notice === 'new_tour_from_recent_shows' ? (
+        <ThemedText style={[styles.disclaimer, { color: tokens.textSecondary }]}>
+          {t('setlist.newTourFromRecentShows')}
+        </ThemedText>
+      ) : null}
+
       <ListenSetlistButton artistId={artistId} artistName={artistName} tourId={tourId} />
       {includeCommunityPlaylists ? (
         <CommunityPlaylistsSection artistId={artistId} tourId={tourId} />
