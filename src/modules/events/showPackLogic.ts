@@ -125,6 +125,24 @@ export function isShowWithinPackAttentionWindow(showDate: string, now = new Date
   return nowTime - showTime <= SHOW_PACK_ATTENTION_HORIZON_MS;
 }
 
+export function predictionTitleKeys(prediction: SetlistPrediction | null): string[] {
+  if (!prediction?.songs.length) return [];
+  return [...prediction.songs.map((song) => normalizeSongTitle(song.title))].sort();
+}
+
+export function showPackPredictionTitlesMismatch(
+  record: Pick<ShowPackPrefetchRecord, 'prediction' | 'status'>,
+  currentPrediction: SetlistPrediction | null
+): boolean {
+  if (record.status !== 'ready') return false;
+  const currentKeys = predictionTitleKeys(currentPrediction);
+  if (currentKeys.length === 0) return false;
+  const packedKeys = predictionTitleKeys(record.prediction);
+  if (packedKeys.length === 0) return true;
+  if (packedKeys.length !== currentKeys.length) return true;
+  return packedKeys.some((key, index) => key !== currentKeys[index]);
+}
+
 export function shouldPrefetchShowPackRecord(
   record: ShowPackPrefetchRecord | null,
   showDate: string,
@@ -132,6 +150,7 @@ export function shouldPrefetchShowPackRecord(
     force?: boolean;
     now?: Date;
     show?: Pick<Show, 'show_date' | 'local_date' | 'venue'>;
+    currentPrediction?: SetlistPrediction | null;
   }
 ): boolean {
   const now = options?.now ?? new Date();
@@ -148,6 +167,12 @@ export function shouldPrefetchShowPackRecord(
 
   if (record.status === 'ready') {
     if (record.lyricsMissingTitles.length > 0 || record.lyricsFailed > 0) return true;
+    if (
+      options?.currentPrediction &&
+      showPackPredictionTitlesMismatch(record, options.currentPrediction)
+    ) {
+      return true;
+    }
     if (isShowPackPredictionStale(record.prediction)) return true;
 
     if (

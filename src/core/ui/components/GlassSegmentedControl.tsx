@@ -22,9 +22,11 @@ type GlassSegmentedControlProps<T extends string> = {
   value: T | null;
   onChange: (value: T) => void;
   disabled?: boolean;
+  segmentLayout?: 'inline' | 'stacked';
 };
 
 const TRACK_HEIGHT = 40;
+const TRACK_HEIGHT_STACKED = 52;
 const THUMB_SPRING = { damping: 18, stiffness: 220, mass: 0.7 };
 
 export function GlassSegmentedControl<T extends string>({
@@ -32,7 +34,10 @@ export function GlassSegmentedControl<T extends string>({
   value,
   onChange,
   disabled,
+  segmentLayout = 'inline',
 }: GlassSegmentedControlProps<T>) {
+  const stacked = segmentLayout === 'stacked';
+  const trackHeight = stacked ? TRACK_HEIGHT_STACKED : TRACK_HEIGHT;
   const { tokens, resolvedScheme } = useEncoreTheme();
   const [trackWidth, setTrackWidth] = useState(0);
   const segmentWidth = trackWidth > 0 ? (trackWidth - 6) / options.length : 0;
@@ -82,12 +87,12 @@ export function GlassSegmentedControl<T extends string>({
                 hapticSelection();
                 onChange(option.value);
               }}
-              style={styles.segment}>
+              style={[styles.segment, stacked && styles.segmentStacked]}>
               {option.icon ? (
                 <Ionicons
                   color={selected ? tokens.accent : tokens.textSecondary}
                   name={option.icon}
-                  size={14}
+                  size={stacked ? 16 : 14}
                 />
               ) : null}
               <Text
@@ -95,7 +100,7 @@ export function GlassSegmentedControl<T extends string>({
                   typography.footnoteSemibold,
                   { color: selected ? tokens.accent : tokens.textSecondary },
                 ]}
-                numberOfLines={1}>
+                numberOfLines={stacked ? 2 : 1}>
                 {option.label}
               </Text>
             </Pressable>
@@ -111,7 +116,7 @@ export function GlassSegmentedControl<T extends string>({
         <GlassView
           glassEffectStyle="regular"
           colorScheme={resolvedScheme === 'dark' ? 'dark' : 'light'}
-          style={styles.glassTrack}>
+          style={[styles.glassTrack, { height: trackHeight }]}>
           {trackBody}
         </GlassView>
       </View>
@@ -120,7 +125,10 @@ export function GlassSegmentedControl<T extends string>({
 
   return (
     <View onLayout={onTrackLayout}>
-      <Glass style={[styles.glassTrack, { backgroundColor: tokens.glassFallback }]}>{trackBody}</Glass>
+      <Glass
+        style={[styles.glassTrack, { backgroundColor: tokens.glassFallback, height: trackHeight }]}>
+        {trackBody}
+      </Glass>
     </View>
   );
 }
@@ -128,7 +136,6 @@ export function GlassSegmentedControl<T extends string>({
 const styles = StyleSheet.create({
   glassTrack: {
     borderRadius: radii.pill,
-    height: TRACK_HEIGHT,
     overflow: 'hidden',
     padding: 3,
   },
@@ -140,6 +147,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 34,
     paddingHorizontal: spacing.xs,
+  },
+  segmentStacked: {
+    flexDirection: 'column',
+    gap: 2,
+    paddingHorizontal: spacing.sm,
   },
   segmentsRow: {
     flexDirection: 'row',

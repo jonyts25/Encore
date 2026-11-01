@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
 import { useEncoreTheme } from '@/core/ui/theme';
@@ -25,6 +25,7 @@ type SetlistPredictionPanelProps = {
   tourId: string | null;
   variant?: 'default' | 'compact';
   includeCommunityPlaylists?: boolean;
+  isEnriching?: boolean;
 };
 
 function formatConfidence(confidence: number): string {
@@ -38,6 +39,7 @@ export function SetlistPredictionPanel({
   tourId,
   variant = 'default',
   includeCommunityPlaylists = true,
+  isEnriching = false,
 }: SetlistPredictionPanelProps) {
   const { t, i18n } = useTranslation();
   const { tokens } = useEncoreTheme();
@@ -89,7 +91,22 @@ export function SetlistPredictionPanel({
 
       {!isLoading && error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
 
-      {!isLoading && !error && prediction?.structure === 'insufficient_data' ? (
+      {!isLoading &&
+      !error &&
+      isEnriching &&
+      (prediction?.structure === 'insufficient_data' || (prediction?.songs.length ?? 0) === 0) ? (
+        <View style={styles.enrichingRow}>
+          <ActivityIndicator color={tokens.accent} size="small" />
+          <ThemedText style={[styles.empty, { color: tokens.textSecondary }]}>
+            {t('setlist.enrichingTourSetlists')}
+          </ThemedText>
+        </View>
+      ) : null}
+
+      {!isLoading &&
+      !error &&
+      !isEnriching &&
+      prediction?.structure === 'insufficient_data' ? (
         <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
       ) : null}
 
@@ -248,6 +265,11 @@ const styles = StyleSheet.create({
   },
   empty: {
     opacity: 0.75,
+  },
+  enrichingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 10,
   },
   error: {
     color: '#D64545',

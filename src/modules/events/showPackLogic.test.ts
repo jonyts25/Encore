@@ -7,6 +7,8 @@ import { normalizeSongTitle } from '../catalog/songTitleNormalize';
 import {
   addLyricsBusyTitle,
   collectShowPackSongTitles,
+  predictionTitleKeys,
+  showPackPredictionTitlesMismatch,
   isShowPackComplete,
   isShowPackExpired,
   mergePracticeSong,
@@ -150,6 +152,30 @@ describe('showPackLogic', () => {
       ),
       true
     );
+  });
+
+  it('detects prediction title mismatch on ready pack', () => {
+    const record = {
+      status: 'ready' as const,
+      prediction: {
+        structure: 'mostly_fixed' as const,
+        songs: [{ song_id: '1', title: 'Old Song' }],
+      } as never,
+    };
+    const current = {
+      structure: 'mostly_fixed' as const,
+      songs: [
+        { song_id: '1', title: 'Old Song' },
+        { song_id: '2', title: 'New Song' },
+      ],
+    } as never;
+    assert.equal(showPackPredictionTitlesMismatch(record, current), true);
+    const sameTitles = {
+      structure: 'mostly_fixed' as const,
+      songs: [{ song_id: '1', title: 'Old Song' }],
+    } as never;
+    assert.equal(showPackPredictionTitlesMismatch(record, sameTitles), false);
+    assert.deepEqual(predictionTitleKeys(current), ['new song', 'old song']);
   });
 
   it('tracks busy titles separately from failed lyrics', () => {

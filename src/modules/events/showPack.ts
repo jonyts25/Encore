@@ -111,10 +111,23 @@ export function isShowEligibleForShowPack(showDate: string, now = new Date()): b
 
 async function shouldPrefetchShowPack(
   show: Show,
+  queryClient: QueryClient,
   options?: { force?: boolean }
 ): Promise<boolean> {
   const record = await getShowPackRecord(show.id);
-  return shouldPrefetchShowPackRecord(record, show.show_date, { ...options, show });
+  let currentPrediction: SetlistPrediction | null = record?.prediction ?? null;
+  if (!options?.force) {
+    try {
+      currentPrediction = await fetchShowPrediction(show.id);
+    } catch {
+      // Keep cached prediction for the stale check.
+    }
+  }
+  return shouldPrefetchShowPackRecord(record, show.show_date, {
+    ...options,
+    show,
+    currentPrediction,
+  });
 }
 
 export async function prefetchShowPack(
@@ -123,7 +136,7 @@ export async function prefetchShowPack(
   options?: { force?: boolean }
 ): Promise<void> {
   await withShowPackPrefetchLock(show.id, async () => {
-    const shouldRun = await shouldPrefetchShowPack(show, options);
+    const shouldRun = await shouldPrefetchShowPack(show, queryClient, options);
     if (!shouldRun) return;
 
     const showId = show.id;
@@ -418,7 +431,7 @@ export async function prefetchGoingShowPacks(
   );
 
   for (const show of eligible) {
-    const shouldRun = await shouldPrefetchShowPack(show);
+    const shouldRun = await shouldPrefetchShowPack(show, queryClient);
     if (!shouldRun) continue;
     void prefetchShowPack(show, queryClient);
   }

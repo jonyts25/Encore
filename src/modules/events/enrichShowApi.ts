@@ -1,20 +1,14 @@
 import { apiFetch } from '@/core/api/client';
-import type { SetlistPrediction } from '@/modules/setlist/types';
 
-export type EnrichShowResponse = {
-  status: 'completed' | 'skipped_cooldown' | 'skipped_not_active';
-  show_id: string;
-  enriched_at: string | null;
-  assigned_tour: boolean;
-  setlists_processed: number;
-  prediction: SetlistPrediction | null;
+export type EnrichShowStartResponse = {
+  status: 'started' | 'running';
 };
 
 export async function requestShowEnrich(
   showId: string,
   accessToken: string
-): Promise<EnrichShowResponse> {
-  return apiFetch<EnrichShowResponse>(`/api/shows/${showId}/enrich`, {
+): Promise<EnrichShowStartResponse> {
+  return apiFetch<EnrichShowStartResponse>(`/api/shows/${showId}/enrich`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
   });

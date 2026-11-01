@@ -15,6 +15,10 @@ const SHOW_SELECT = `
   setlistfm_id,
   enriched_at,
   created_at,
+  tour:tours (
+    id,
+    name
+  ),
   artist:artists (
     id,
     name,
@@ -210,8 +214,13 @@ export async function getShowById(showId: string): Promise<ShowWithRelations | n
     .maybeSingle();
 
   if (error) throw error;
-  const show = (data as unknown as ShowWithRelations | null) ?? null;
+  let show = (data as unknown as ShowWithRelations | null) ?? null;
   if (!show) return null;
+
+  const tourRaw = show.tour as ShowWithRelations['tour'] | ShowWithRelations['tour'][] | null;
+  if (Array.isArray(tourRaw)) {
+    show = { ...show, tour: tourRaw[0] ?? null };
+  }
 
   const [{ ensureVenuePhotoUrl }, { ensureArtistImageUrl }] = await Promise.all([
     import('./venue-photos'),

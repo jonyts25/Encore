@@ -171,12 +171,7 @@ export function AddShowContent() {
         void prefetchShowPack(show, queryClient, { force: true });
         if (session?.access_token) {
           void requestVenueGeocode(show.venue_id, session.access_token);
-          void requestShowEnrich(showId, session.access_token).then((result) => {
-            if (result.prediction) {
-              queryClient.setQueryData(queryKeys.prediction(showId), result.prediction);
-            }
-            void prefetchShowPack(show, queryClient, { force: true });
-          });
+          void requestShowEnrich(showId, session.access_token);
         }
       }
       if (user?.id) {

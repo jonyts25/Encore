@@ -21,10 +21,16 @@ export type VenueSummary = {
   timezone?: string | null;
 };
 
+export type TourSummary = {
+  id: string;
+  name: string;
+};
+
 export type ShowWithRelations = {
   id: string;
   artist_id: string;
   tour_id: string | null;
+  tour?: TourSummary | null;
   venue_id: string;
   show_date: string;
   local_date?: string;

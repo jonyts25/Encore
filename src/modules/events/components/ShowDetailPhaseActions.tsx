@@ -183,22 +183,18 @@ export function ShowDetailPhaseActions({
 
   return (
     <View style={styles.block}>
-      <View style={styles.row}>
-        <View style={styles.statusSlot}>
-          <GlassSegmentedControl
-            disabled={isLoading || isMutating}
-            options={options}
-            value={controlValue}
-            onChange={(value) => handleSegmentChange(value)}
-          />
-        </View>
-        <PillButton
-          style={pillHalf}
-          title={t('events.practiceLyrics')}
-          variant="glass"
-          onPress={onOpenLyrics}
-        />
-      </View>
+      <GlassSegmentedControl
+        disabled={isLoading || isMutating}
+        options={options}
+        segmentLayout="stacked"
+        value={controlValue}
+        onChange={(value) => handleSegmentChange(value)}
+      />
+      <PillButton
+        title={t('events.practiceLyrics')}
+        variant="glass"
+        onPress={onOpenLyrics}
+      />
       {error ? <ThemedText style={[styles.error, { color: tokens.recording }]}>{error}</ThemedText> : null}
     </View>
   );
@@ -215,9 +211,5 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 10,
-  },
-  statusSlot: {
-    flex: 1,
-    minWidth: 0,
   },
 });

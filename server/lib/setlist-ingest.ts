@@ -155,6 +155,7 @@ function hasCustomShowTime(isoDate: string): boolean {
 
 export type IngestSetlistEntryOptions = {
   suppressEnrichHook?: boolean;
+  logTimings?: boolean;
 };
 
 export async function ingestSetlistEntry(
@@ -164,7 +165,11 @@ export async function ingestSetlistEntry(
   provider: SetlistFmProvider,
   options: IngestSetlistEntryOptions = {}
 ) {
+  let stepStart = Date.now();
   const tourName = await resolveTourName(setlist, provider);
+  const setlistFmMs = Date.now() - stepStart;
+
+  stepStart = Date.now();
   const venueId = await upsertVenue(supabase, setlist);
   const tourId = await upsertTour(supabase, artistId, tourName, setlist.eventDate);
   const showDate = parseSetlistFmEventDate(setlist.eventDate);
@@ -177,6 +182,7 @@ export async function ingestSetlistEntry(
     localDate,
     setlistfmId: setlist.id,
   });
+  const venueMs = Date.now() - stepStart;
 
   if (!options.suppressEnrichHook) {
     void scheduleEnrichForIngestedShow(supabase, showId);
@@ -184,6 +190,11 @@ export async function ingestSetlistEntry(
 
   const parsedSongs = flattenSetlistSongs(setlist);
   if (parsedSongs.length === 0) {
+    if (options.logTimings) {
+      console.info(
+        `[setlist-ingest] setlist=${setlist.id} setlist.fm=${setlistFmMs}ms venue=${venueMs}ms songs=0ms (no songs)`
+      );
+    }
     return {
       showUpserted: Boolean(showId),
       tourLinked: Boolean(tourId),
@@ -192,6 +203,7 @@ export async function ingestSetlistEntry(
     };
   }
 
+  stepStart = Date.now();
   await supabase.from('show_songs').delete().eq('show_id', showId);
 
   let songsUpserted = 0;
@@ -211,6 +223,13 @@ export async function ingestSetlistEntry(
 
     if (error) throw error;
     showSongsInserted += 1;
+  }
+
+  const songsMs = Date.now() - stepStart;
+  if (options.logTimings) {
+    console.info(
+      `[setlist-ingest] setlist=${setlist.id} setlist.fm=${setlistFmMs}ms venue=${venueMs}ms songs=${songsMs}ms`
+    );
   }
 
   return { showUpserted: true, tourLinked: Boolean(tourId), songsUpserted, showSongsInserted };
@@ -241,10 +260,8 @@ async function scheduleEnrichForIngestedShow(
     return;
   }
 
-  const { enrichShow } = await import('./enrich-show');
-  void enrichShow(showId).catch((err) => {
-    console.error('enrichShow after ingest failed', showId, err);
-  });
+  const { startEnrichShowInBackground } = await import('./enrich-show-runner');
+  startEnrichShowInBackground(showId);
 }
 
 async function resolveTourName(

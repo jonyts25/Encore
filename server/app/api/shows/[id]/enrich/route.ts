@@ -1,6 +1,6 @@
 import { jsonError, jsonOk } from '@/lib/http';
 import { requireAuthenticatedUser } from '@/lib/auth';
-import { enrichShow } from '@/lib/enrich-show';
+import { startEnrichShowInBackground } from '@/lib/enrich-show-runner';
 import { getShowById } from '@/lib/shows';
 
 type RouteContext = {
@@ -26,8 +26,8 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonError('Show not found', 404);
     }
 
-    const result = await enrichShow(showId);
-    return jsonOk(result);
+    const slot = startEnrichShowInBackground(showId);
+    return jsonOk({ status: slot }, { status: slot === 'started' ? 202 : 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to enrich show';
     return jsonError(message, 500, error);

@@ -14,12 +14,16 @@ import { generateShowPrediction, type SetlistPrediction } from './setlist-predic
 import {
   flattenSetlistSongs,
   getSetlistFmProvider,
+  parseSetlistFmEventDate,
   resolveArtistMbid,
   type SetlistFmSetlist,
 } from './providers/setlistfm';
 import { ingestSetlistEntry } from './setlist-ingest';
 import { createSupabaseAdminClient } from './supabase';
 import { isShowActive } from './visibility';
+
+export const ENRICH_MAX_RECENT_SETLISTS = 20;
+const ENRICH_MID_PREDICTION_TOUR_SHOWS = 5;
 
 export type EnrichShowResult = {
   status: 'completed' | 'skipped_cooldown' | 'skipped_not_active';
@@ -109,6 +113,73 @@ async function buildTourCandidates(
   return candidates;
 }
 
+function setlistEventTime(eventDate: string): number {
+  return new Date(parseSetlistFmEventDate(eventDate)).getTime();
+}
+
+async function countTourShowsWithSongs(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  tourId: string | null,
+  beforeShowDate: string,
+  excludeShowId: string
+): Promise<number> {
+  if (!tourId) return 0;
+
+  const { data: shows, error } = await supabase
+    .from('shows')
+    .select('id')
+    .eq('tour_id', tourId)
+    .lt('show_date', beforeShowDate)
+    .neq('id', excludeShowId);
+
+  if (error) throw error;
+  const showIds = (shows ?? []).map((row) => row.id as string);
+  if (showIds.length === 0) return 0;
+
+  const { data: songRows, error: songsError } = await supabase
+    .from('show_songs')
+    .select('show_id')
+    .in('show_id', showIds);
+
+  if (songsError) throw songsError;
+  return new Set((songRows ?? []).map((row) => row.show_id as string)).size;
+}
+
+async function cachePredictionWithOptionalNotice(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  showId: string,
+  assignedTourThisRun: boolean
+): Promise<SetlistPrediction | null> {
+  let prediction = await generateShowPrediction(showId);
+  if (
+    prediction &&
+    shouldShowNewTourEnrichmentNotice({
+      assignedTourThisRun,
+      structure: prediction.structure,
+    })
+  ) {
+    prediction = {
+      ...prediction,
+      enrichment_notice: 'new_tour_from_recent_shows',
+    };
+    const confidence =
+      prediction.songs.length > 0
+        ? prediction.songs.reduce((sum, song) => sum + (song.confidence ?? 0), 0) /
+          prediction.songs.length
+        : null;
+    await supabase.from('setlist_predictions').upsert(
+      {
+        show_id: prediction.show_id,
+        payload_json: prediction,
+        confidence,
+        generated_at: prediction.generated_at,
+      },
+      { onConflict: 'show_id' }
+    );
+  }
+  return prediction;
+}
+
 export async function enrichShow(showId: string): Promise<EnrichShowResult> {
   const supabase = createSupabaseAdminClient();
   const now = new Date();
@@ -194,11 +265,14 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
     fetched.push(...batch);
   }
 
-  const recentSetlists = fetched.filter(
-    (setlist) =>
-      isSetlistWithinMonths(setlist.eventDate, ENRICH_LOOKBACK_MONTHS, now) &&
-      flattenSetlistSongs(setlist).length > 0
-  );
+  const recentSetlists = fetched
+    .filter(
+      (setlist) =>
+        isSetlistWithinMonths(setlist.eventDate, ENRICH_LOOKBACK_MONTHS, now) &&
+        flattenSetlistSongs(setlist).length > 0
+    )
+    .sort((a, b) => setlistEventTime(b.eventDate) - setlistEventTime(a.eventDate))
+    .slice(0, ENRICH_MAX_RECENT_SETLISTS);
 
   const tourCandidates = await buildTourCandidates(recentSetlists, provider);
   const recentCandidates = filterRecentSetlistsWithSongs(
@@ -208,13 +282,30 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
   );
 
   let setlistsProcessed = 0;
+  let effectiveTourId = showRow.tour_id;
+  let midPredictionGenerated = false;
+
   for (const setlist of recentSetlists) {
     if (flattenSetlistSongs(setlist).length === 0) continue;
     try {
       await ingestSetlistEntry(supabase, artist.id, setlist, provider, {
         suppressEnrichHook: true,
+        logTimings: true,
       });
       setlistsProcessed += 1;
+
+      if (!midPredictionGenerated && effectiveTourId) {
+        const tourShowCount = await countTourShowsWithSongs(
+          supabase,
+          effectiveTourId,
+          showRow.show_date,
+          showId
+        );
+        if (tourShowCount >= ENRICH_MID_PREDICTION_TOUR_SHOWS) {
+          await cachePredictionWithOptionalNotice(supabase, showId, false);
+          midPredictionGenerated = true;
+        }
+      }
     } catch {
       // Continue with other setlists.
     }
@@ -222,7 +313,6 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
 
   const currentTourName = detectCurrentTourName(recentCandidates);
   let assignedTour = false;
-  let tourId = showRow.tour_id;
 
   if (
     shouldAssignTourToShow({
@@ -248,39 +338,11 @@ export async function enrichShow(showId: string): Promise<EnrichShowResult> {
       .update({ tour_id: newTourId })
       .eq('id', showId);
     if (tourUpdateError) throw tourUpdateError;
-    tourId = newTourId;
+    effectiveTourId = newTourId;
     assignedTour = true;
   }
 
-  void tourId;
-
-  let prediction = await generateShowPrediction(showId);
-  if (
-    prediction &&
-    shouldShowNewTourEnrichmentNotice({
-      assignedTourThisRun: assignedTour,
-      structure: prediction.structure,
-    })
-  ) {
-    prediction = {
-      ...prediction,
-      enrichment_notice: 'new_tour_from_recent_shows',
-    };
-    const confidence =
-      prediction.songs.length > 0
-        ? prediction.songs.reduce((sum, song) => sum + (song.confidence ?? 0), 0) /
-          prediction.songs.length
-        : null;
-    await supabase.from('setlist_predictions').upsert(
-      {
-        show_id: prediction.show_id,
-        payload_json: prediction,
-        confidence,
-        generated_at: prediction.generated_at,
-      },
-      { onConflict: 'show_id' }
-    );
-  }
+  const prediction = await cachePredictionWithOptionalNotice(supabase, showId, assignedTour);
 
   const enrichedAt = now.toISOString();
   const { error: enrichedError } = await supabase

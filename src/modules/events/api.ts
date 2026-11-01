@@ -8,6 +8,7 @@ import type {
   HomeShowSections,
   Show,
   ShowStatus,
+  TourSummary,
   UserShow,
   VenueSummary,
 } from './types';
@@ -43,6 +44,10 @@ const SHOW_SELECT = `
   setlistfm_id,
   enriched_at,
   created_at,
+  tour:tours (
+    id,
+    name
+  ),
   artist:artists (
     id,
     name,
@@ -61,18 +66,21 @@ const SHOW_SELECT = `
   )
 `;
 
-type ShowRowFromSupabase = Omit<Show, 'artist' | 'venue'> & {
+type ShowRowFromSupabase = Omit<Show, 'artist' | 'venue' | 'tour'> & {
   artist: ArtistSummary | ArtistSummary[] | null;
   venue: VenueSummary | VenueSummary[] | null;
+  tour: TourSummary | TourSummary[] | null;
 };
 
 function normalizeShowRow(row: ShowRowFromSupabase): Show {
   const artist = Array.isArray(row.artist) ? row.artist[0] : row.artist;
   const venue = Array.isArray(row.venue) ? row.venue[0] : row.venue;
+  const tourRaw = row.tour;
+  const tour = Array.isArray(tourRaw) ? (tourRaw[0] ?? null) : tourRaw;
   if (!artist || !venue) {
     throw new Error(`Show ${row.id} is missing artist or venue relation`);
   }
-  return { ...row, artist, venue };
+  return { ...row, artist, venue, tour };
 }
 
 async function listShowsByIdsFromSupabase(

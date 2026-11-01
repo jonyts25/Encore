@@ -4,7 +4,7 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Linking as RNLinking,
   Pressable,
@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTranslation } from '@/core/i18n';
+import { useQueryClient } from '@tanstack/react-query';
 import { useIsOffline } from '@/core/network/useIsOffline';
 import { OfflineBanner } from '@/core/ui/OfflineBanner';
 import { GlassIconButton, PillButton } from '@/core/ui';
@@ -37,6 +38,7 @@ import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShowEnrichIfNeeded } from '../hooks/useShowEnrichIfNeeded';
 import { useShow } from '../hooks/useShow';
+import { prefetchShowPack } from '../showPack';
 import { hasConfirmedTime } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
 import { buildAppleMapsUrl } from '../showDetailMaps';
@@ -85,19 +87,21 @@ function sortSongsForPractice(
 export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const { tokens, resolvedScheme } = useEncoreTheme();
   const isOffline = useIsOffline();
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
   const { status: userShowStatus } = useShowStatus(showId);
   const { prediction } = useShowPrediction(showId);
-  useShowEnrichIfNeeded({ show, prediction });
+  const { isEnriching } = useShowEnrichIfNeeded({ show, prediction });
   const {
     record: packRecord,
     label: packLabel,
     missingTitlesLine,
     canRetry,
     retry,
+    packUpdatedAt,
   } = useShowPackStatus(show, Boolean(show));
 
   const [fontsLoaded] = useFonts({
@@ -111,7 +115,12 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     ? getSetlistPredictionMetaLine(prediction, t, showConfidence)
     : null;
 
-  const tourSubtitle = show?.tour_id ? t('events.showDetail.onTour') : null;
+  const tourSubtitle = show?.tour?.name?.trim() ?? null;
+
+  useEffect(() => {
+    if (!show || !prediction) return;
+    void prefetchShowPack(show, queryClient);
+  }, [prediction, queryClient, show]);
 
   const primarySongTitle = useMemo(() => {
     if (!prediction?.songs.length) return null;
@@ -125,30 +134,23 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     resolvedScheme === 'dark' ? SHOW_DETAIL_SURFACE : tokens.surface;
   const headerFadeColor = pageBackground;
 
-  const packCardTitle = useMemo(() => {
-    if (!packRecord || packRecord.status === 'idle') return null;
-    if (packRecord.status === 'ready') return t('events.showPackReadyForShow');
-    return packLabel ?? t('offline.showPackDownloading');
-  }, [packLabel, packRecord, t]);
+  const packCardTitle = packLabel;
 
   const packSubtitle = useMemo(() => {
-    if (!packRecord || packRecord.status === 'idle') return packLabel;
+    if (!packRecord || packRecord.status === 'idle') return null;
     const lines: string[] = [];
-    if (packLabel && packRecord.status !== 'ready') {
-      lines.push(packLabel);
-    }
     if (missingTitlesLine) {
       lines.push(missingTitlesLine);
     }
-    if (packRecord.statusUpdatedAt > 0) {
+    if (packUpdatedAt > 0 && packRecord.lyricsCached > 0) {
       lines.push(
         t('events.packUpdated', {
-          relative: formatRelativeUpdated(packRecord.statusUpdatedAt, t),
+          relative: formatRelativeUpdated(packUpdatedAt, t),
         })
       );
     }
     return lines.length > 0 ? lines.join('\n') : null;
-  }, [missingTitlesLine, packLabel, packRecord, t]);
+  }, [missingTitlesLine, packRecord, packUpdatedAt, t]);
 
   const handleShare = () => {
     if (!show) return;
@@ -379,6 +381,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             artistId={show.artist_id}
             artistName={show.artist.name}
             includeCommunityPlaylists={false}
+            isEnriching={isEnriching}
             showId={show.id}
             tourId={show.tour_id}
             variant="compact"
