@@ -102,12 +102,13 @@
       "expo-video",
       "expo-sharing",
       [
-        "expo-notifications",
+        "./plugins/expoNotificationsLocalOnly.js",
         {
           "icon": "./assets/images/icon.png",
           "color": "#ffffff"
         }
-      ]
+      ],
+      "./plugins/withoutPushEntitlement.js"
     ],
     "experiments": {
       "typedRoutes": true
