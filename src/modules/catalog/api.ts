@@ -1,4 +1,6 @@
 import { apiFetch } from '@/core/api/client';
+
+import { ARTIST_REMOTE_SEARCH_TIMEOUT_MS } from './artistCatalogSearchLogic';
 import { supabase } from '@/core/api/supabase';
 
 import {
@@ -162,7 +164,9 @@ export async function fetchArtistSearch(query: string): Promise<ArtistSearchResp
     return { artists: [], candidates: [], source: 'none', query: '' };
   }
 
-  return apiFetch<ArtistSearchResponse>(`/api/artists/search?q=${encodeURIComponent(normalized)}`);
+  return apiFetch<ArtistSearchResponse>(`/api/artists/search?q=${encodeURIComponent(normalized)}`, {
+    timeoutMs: ARTIST_REMOTE_SEARCH_TIMEOUT_MS,
+  });
 }
 
 export async function confirmArtistResolution(mbid: string): Promise<Artist> {

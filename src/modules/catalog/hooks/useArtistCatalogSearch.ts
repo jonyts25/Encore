@@ -1,12 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useTranslation } from '@/core/i18n';
 
 import {
+  ARTIST_CATALOG_SEARCH_DEBOUNCE_MS,
+  isStaleRequest,
+  mergeArtistLists,
+  shouldAutoFetchRemote,
+  shouldOfferWorldwideSearch,
+} from '../artistCatalogSearchLogic';
+import {
   confirmArtistResolution,
+  fetchArtistSearch,
   listFollowedArtists,
   listPublicArtists,
-  searchArtistsWithResolution,
   searchFollowedArtists,
   searchLocalArtists,
 } from '../api';
@@ -23,75 +30,122 @@ type UseArtistCatalogSearchOptions = {
 export function useArtistCatalogSearch(options: UseArtistCatalogSearchOptions) {
   const { viewMode, userId, enabled = true } = options;
   const { t } = useTranslation();
-  const [artists, setArtists] = useState<Artist[]>([]);
+  const [localArtists, setLocalArtists] = useState<Artist[]>([]);
+  const [remoteArtists, setRemoteArtists] = useState<Artist[]>([]);
   const [candidates, setCandidates] = useState<ArtistResolutionCandidate[]>([]);
   const [query, setQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isResolving, setIsResolving] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [remoteFetchedForQuery, setRemoteFetchedForQuery] = useState(false);
+
+  const requestGenerationRef = useRef(0);
+  const inFlightQueryRef = useRef<string | null>(null);
+  const forceRemoteRef = useRef(false);
 
   const followedOnly = viewMode === 'followed' && Boolean(userId);
 
-  const load = useCallback(
-    async (searchQuery: string) => {
-      setIsLoading(true);
-      setIsResolving(false);
-      setIsConfirming(false);
+  const artists = useMemo(
+    () => mergeArtistLists(localArtists, remoteArtists),
+    [localArtists, remoteArtists]
+  );
+
+  const runSearch = useCallback(
+    async (searchQuery: string, forceRemote: boolean) => {
+      const trimmedQuery = searchQuery.trim();
+      const flightKey = `${trimmedQuery}|${forceRemote ? 'remote' : 'local'}`;
+
+      if (inFlightQueryRef.current === flightKey) {
+        return;
+      }
+
+      inFlightQueryRef.current = flightKey;
+      const generation = ++requestGenerationRef.current;
+
       setError(null);
       setCandidates([]);
+      setRemoteArtists([]);
+      setRemoteFetchedForQuery(false);
 
       try {
-        const trimmedQuery = searchQuery.trim();
-
         if (followedOnly && userId) {
+          setIsLoading(true);
+          setIsResolving(false);
           const data = trimmedQuery
             ? await searchFollowedArtists(userId, trimmedQuery)
             : await listFollowedArtists(userId);
-          setArtists(data);
+          if (isStaleRequest(generation, requestGenerationRef.current)) return;
+          setLocalArtists(data);
+          setRemoteArtists([]);
           return;
         }
 
-        if (trimmedQuery) {
-          const localMatches = await searchLocalArtists(trimmedQuery);
-          if (localMatches.length > 0) {
-            setArtists(localMatches);
-            return;
-          }
-
-          setIsLoading(false);
-          setIsResolving(true);
-          const result = await searchArtistsWithResolution(trimmedQuery);
-          setArtists(result.artists);
-          setCandidates(result.source === 'ambiguous' ? result.candidates : []);
+        if (!trimmedQuery) {
+          setIsLoading(true);
+          setIsResolving(false);
+          const data = await listPublicArtists();
+          if (isStaleRequest(generation, requestGenerationRef.current)) return;
+          setLocalArtists(data);
+          setRemoteArtists([]);
           return;
         }
 
-        const data = await listPublicArtists();
-        setArtists(data);
+        setIsLoading(true);
+        setIsResolving(false);
+        const localMatches = await searchLocalArtists(trimmedQuery);
+        if (isStaleRequest(generation, requestGenerationRef.current)) return;
+        setLocalArtists(localMatches);
+
+        if (!shouldAutoFetchRemote(localMatches.length, forceRemote)) {
+          return;
+        }
+
+        setIsLoading(false);
+        setIsResolving(true);
+        const result = await fetchArtistSearch(trimmedQuery);
+        if (isStaleRequest(generation, requestGenerationRef.current)) return;
+
+        setRemoteFetchedForQuery(true);
+        setRemoteArtists(result.artists);
+        setCandidates(result.source === 'ambiguous' ? result.candidates : []);
       } catch (err) {
-        setArtists([]);
+        if (isStaleRequest(generation, requestGenerationRef.current)) return;
+        setRemoteArtists([]);
         setCandidates([]);
         setError(err instanceof Error ? err.message : t('catalog.loadError'));
       } finally {
-        setIsLoading(false);
-        setIsResolving(false);
+        if (inFlightQueryRef.current === flightKey) {
+          inFlightQueryRef.current = null;
+        }
+        if (!isStaleRequest(generation, requestGenerationRef.current)) {
+          setIsLoading(false);
+          setIsResolving(false);
+        }
       }
     },
     [followedOnly, t, userId]
   );
 
+  const searchWorldwide = useCallback(() => {
+    forceRemoteRef.current = true;
+    void runSearch(query, true);
+  }, [query, runSearch]);
+
   const confirmCandidate = useCallback(
-    async (mbid: string) => {
+    async (mbid: string): Promise<Artist | null> => {
       setIsConfirming(true);
       setError(null);
 
       try {
         const artist = await confirmArtistResolution(mbid);
-        setArtists([artist]);
+        setRemoteArtists([artist]);
+        setLocalArtists([]);
         setCandidates([]);
+        return artist;
       } catch (err) {
         setError(err instanceof Error ? err.message : t('catalog.loadError'));
+        return null;
       } finally {
         setIsConfirming(false);
       }
@@ -102,26 +156,36 @@ export function useArtistCatalogSearch(options: UseArtistCatalogSearchOptions) {
   useEffect(() => {
     if (!enabled) return;
 
+    forceRemoteRef.current = false;
     const handle = setTimeout(() => {
-      void load(query);
-    }, 250);
+      void runSearch(query, forceRemoteRef.current);
+    }, ARTIST_CATALOG_SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(handle);
-  }, [enabled, load, query]);
+  }, [enabled, query, runSearch]);
 
-  const results = useMemo(() => artists, [artists]);
+  const trimmedQuery = query.trim();
+  const showWorldwideSearchAction = shouldOfferWorldwideSearch(
+    trimmedQuery,
+    localArtists.length,
+    remoteFetchedForQuery,
+    isResolving
+  );
 
   return {
     query,
     setQuery,
-    artists: results,
+    artists,
+    localArtists,
     candidates,
     isLoading,
     isResolving,
     isConfirming,
     error,
     confirmCandidate,
+    searchWorldwide,
+    showWorldwideSearchAction,
     followedOnly,
-    refetch: () => load(query),
+    refetch: () => runSearch(query, forceRemoteRef.current || remoteFetchedForQuery),
   };
 }

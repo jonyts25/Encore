@@ -9,6 +9,7 @@ type ArtistDisambiguationListProps = {
   candidates: ArtistResolutionCandidate[];
   isConfirming: boolean;
   onSelect: (mbid: string) => void;
+  title?: string;
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
@@ -54,12 +55,13 @@ export function ArtistDisambiguationList({
   candidates,
   isConfirming,
   onSelect,
+  title,
 }: ArtistDisambiguationListProps) {
   const { t } = useTranslation();
 
   return (
     <ThemedView style={styles.container}>
-      <ThemedText style={styles.title}>{t('catalog.disambiguationTitle')}</ThemedText>
+      <ThemedText style={styles.title}>{title ?? t('catalog.disambiguationTitle')}</ThemedText>
       {isConfirming ? (
         <ThemedText style={styles.confirming}>{t('catalog.confirmingArtist')}</ThemedText>
       ) : null}

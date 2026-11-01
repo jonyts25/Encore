@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Pressable,
   RefreshControl,
@@ -18,6 +19,7 @@ import { useTranslation } from '@/core/i18n';
 import { Card, PillButton, SectionHeader, StatusPill } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
+import { ArtistDisambiguationList } from '@/modules/catalog/components/ArtistDisambiguationList';
 import { useArtistCatalogSearch } from '@/modules/catalog/hooks/useArtistCatalogSearch';
 import { useSession } from '@/modules/identity';
 
@@ -164,11 +166,36 @@ export function ExploreScreenContent() {
     enabled: Boolean(user) && !sessionLoading,
   });
 
-  const { artists: catalogArtists, query, setQuery } = useArtistCatalogSearch({
+  const {
+    artists: catalogArtists,
+    query,
+    setQuery,
+    candidates,
+    isLoading: artistSearchLoading,
+    isResolving: artistSearchResolving,
+    isConfirming: artistConfirming,
+    error: artistSearchError,
+    confirmCandidate,
+    searchWorldwide,
+    showWorldwideSearchAction,
+    refetch: refetchArtistSearch,
+  } = useArtistCatalogSearch({
     viewMode: 'all',
     userId: user?.id ?? null,
     enabled: !sessionLoading,
   });
+
+  const trimmedArtistQuery = query.trim();
+
+  const onConfirmExploreArtist = useCallback(
+    async (mbid: string) => {
+      const resolved = await confirmCandidate(mbid);
+      if (resolved) {
+        router.push(`/artist/${resolved.id}`);
+      }
+    },
+    [confirmCandidate, router]
+  );
 
   const { artists: popularArtists } = useExplorePopularArtists({
     fallbackShows: shows,
@@ -255,12 +282,65 @@ export function ExploreScreenContent() {
 
         {searchGroups ? (
           <View style={styles.section}>
-            {searchGroups.artists.length > 0 ? (
+            {trimmedArtistQuery ? (
               <>
                 <SectionHeader title={t('explore.searchArtists')} />
-                {searchGroups.artists.slice(0, 8).map((artist) => (
-                  <ListRowLink key={artist.id} label={artist.name} onPress={() => router.push(`/artist/${artist.id}`)} />
-                ))}
+                {artistSearchLoading && !artistSearchResolving ? (
+                  <View style={styles.artistSearchStatus}>
+                    <ActivityIndicator color={tokens.accent} />
+                  </View>
+                ) : null}
+                {artistSearchResolving ? (
+                  <View style={styles.artistSearchStatus}>
+                    <ActivityIndicator color={tokens.accent} />
+                    <Text style={[typography.secondary, { color: tokens.textSecondary }]}>
+                      {t('explore.catalogSearching', { query: trimmedArtistQuery })}
+                    </Text>
+                  </View>
+                ) : null}
+                {!artistSearchResolving && !artistConfirming && artistSearchError ? (
+                  <View style={styles.artistSearchStatus}>
+                    <Text style={[typography.secondary, { color: '#D64545' }]}>
+                      {artistSearchError}
+                    </Text>
+                    <Pressable onPress={() => void refetchArtistSearch()}>
+                      <Text style={[typography.bodySemibold, { color: tokens.accent }]}>
+                        {t('explore.retry')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+                {!artistSearchResolving &&
+                !artistConfirming &&
+                !artistSearchError &&
+                candidates.length > 0 ? (
+                  <ArtistDisambiguationList
+                    candidates={candidates}
+                    isConfirming={artistConfirming}
+                    title={t('explore.disambiguationTitle')}
+                    onSelect={(mbid) => void onConfirmExploreArtist(mbid)}
+                  />
+                ) : null}
+                {!artistSearchResolving &&
+                !artistConfirming &&
+                !artistSearchError &&
+                candidates.length === 0 &&
+                searchGroups.artists.length > 0
+                  ? searchGroups.artists.slice(0, 8).map((artist) => (
+                      <ListRowLink
+                        key={artist.id}
+                        label={artist.name}
+                        onPress={() => router.push(`/artist/${artist.id}`)}
+                      />
+                    ))
+                  : null}
+                {showWorldwideSearchAction ? (
+                  <Pressable onPress={() => searchWorldwide()} style={styles.searchRow}>
+                    <Text style={[typography.bodySemibold, { color: tokens.accent }]}>
+                      {t('explore.worldwideSearch', { query: trimmedArtistQuery })}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </>
             ) : null}
             {searchGroups.shows.length > 0 ? (
@@ -452,6 +532,12 @@ const styles = StyleSheet.create({
     fontSize: 17,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+  },
+  artistSearchStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
   },
   searchRow: {
     paddingVertical: spacing.sm,

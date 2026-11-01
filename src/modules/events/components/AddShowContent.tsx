@@ -19,7 +19,9 @@ import { Card, PillButton, SectionHeader } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { spacing, typography } from '@/core/ui/theme';
 import { Button, ThemedText, ThemedView } from '@/core/ui/Themed';
-import { getArtistById, searchLocalArtists } from '@/modules/catalog';
+import { ArtistDisambiguationList } from '@/modules/catalog/components/ArtistDisambiguationList';
+import { getArtistById } from '@/modules/catalog';
+import { useArtistCatalogSearch } from '@/modules/catalog/hooks/useArtistCatalogSearch';
 import type { Artist } from '@/modules/catalog';
 import { useSession } from '@/modules/identity';
 
@@ -56,9 +58,24 @@ export function AddShowContent() {
 
   const [step, setStep] = useState<Step>(initialArtistId ? 'pickExisting' : 'artist');
   const [artist, setArtist] = useState<Artist | null>(null);
-  const [artistQuery, setArtistQuery] = useState('');
-  const [artistResults, setArtistResults] = useState<Artist[]>([]);
-  const [artistSearchLoading, setArtistSearchLoading] = useState(false);
+  const {
+    query: artistQuery,
+    setQuery: setArtistQuery,
+    artists: artistResults,
+    candidates: artistCandidates,
+    isLoading: artistSearchLoading,
+    isResolving: artistSearchResolving,
+    isConfirming: artistConfirming,
+    error: artistSearchError,
+    confirmCandidate,
+    searchWorldwide,
+    showWorldwideSearchAction,
+    refetch: refetchArtistSearch,
+  } = useArtistCatalogSearch({
+    viewMode: 'all',
+    userId: user?.id ?? null,
+    enabled: !sessionLoading && step === 'artist',
+  });
 
   const [upcomingShows, setUpcomingShows] = useState<Show[]>([]);
   const [upcomingLoading, setUpcomingLoading] = useState(Boolean(initialArtistId));
@@ -110,24 +127,6 @@ export function AddShowContent() {
     if (!initialArtistId || artist) return;
     void loadArtist(initialArtistId).then(() => loadUpcoming(initialArtistId));
   }, [artist, initialArtistId, loadArtist, loadUpcoming]);
-
-  useEffect(() => {
-    if (step !== 'artist') return;
-    const handle = setTimeout(async () => {
-      setArtistSearchLoading(true);
-      setError(null);
-      try {
-        const results = await searchLocalArtists(artistQuery, 40);
-        setArtistResults(results);
-      } catch (err) {
-        setArtistResults([]);
-        setError(err instanceof Error ? err.message : t('catalog.loadError'));
-      } finally {
-        setArtistSearchLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(handle);
-  }, [artistQuery, step, t]);
 
   useEffect(() => {
     if (step !== 'venue') return;
@@ -332,21 +331,76 @@ export function AddShowContent() {
             value={artistQuery}
             onChangeText={setArtistQuery}
           />
-          {artistSearchLoading ? <ActivityIndicator /> : null}
-          {!artistSearchLoading && artistQuery.trim() && artistResults.length === 0 ? (
+          {artistSearchLoading && !artistSearchResolving ? <ActivityIndicator /> : null}
+          {artistSearchResolving ? (
+            <View style={styles.artistSearchStatus}>
+              <ActivityIndicator color={tokens.accent} />
+              <Text style={[typography.secondary, { color: tokens.textSecondary }]}>
+                {t('explore.catalogSearching', { query: artistQuery.trim() })}
+              </Text>
+            </View>
+          ) : null}
+          {!artistSearchResolving && !artistConfirming && artistSearchError ? (
+            <View style={styles.artistSearchStatus}>
+              <Text style={{ color: '#D64545' }}>{artistSearchError}</Text>
+              <Pressable onPress={() => void refetchArtistSearch()}>
+                <Text style={[typography.bodySemibold, { color: tokens.accent }]}>
+                  {t('explore.retry')}
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {!artistSearchResolving &&
+          !artistConfirming &&
+          !artistSearchError &&
+          artistCandidates.length > 0 ? (
+            <ArtistDisambiguationList
+              candidates={artistCandidates}
+              isConfirming={artistConfirming}
+              title={t('explore.disambiguationTitle')}
+              onSelect={(mbid) => {
+                void confirmCandidate(mbid).then((resolved) => {
+                  if (resolved) {
+                    setArtist(resolved);
+                    void loadUpcoming(resolved.id);
+                  }
+                });
+              }}
+            />
+          ) : null}
+          {!artistSearchResolving &&
+          !artistConfirming &&
+          !artistSearchError &&
+          artistCandidates.length === 0
+            ? artistResults.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={styles.listRow}
+                  onPress={() => {
+                    setArtist(item);
+                    void loadUpcoming(item.id);
+                  }}>
+                  <Text style={[typography.bodySemibold, { color: tokens.text }]}>{item.name}</Text>
+                </Pressable>
+              ))
+            : null}
+          {showWorldwideSearchAction ? (
+            <Pressable onPress={() => searchWorldwide()} style={styles.listRow}>
+              <Text style={[typography.bodySemibold, { color: tokens.accent }]}>
+                {t('explore.worldwideSearch', { query: artistQuery.trim() })}
+              </Text>
+            </Pressable>
+          ) : null}
+          {!artistSearchLoading &&
+          !artistSearchResolving &&
+          !artistConfirming &&
+          !artistSearchError &&
+          artistQuery.trim() &&
+          artistResults.length === 0 &&
+          artistCandidates.length === 0 &&
+          !showWorldwideSearchAction ? (
             <Text style={{ color: tokens.textSecondary }}>{t('addShow.noArtists')}</Text>
           ) : null}
-          {artistResults.map((item) => (
-            <Pressable
-              key={item.id}
-              style={styles.listRow}
-              onPress={() => {
-                setArtist(item);
-                void loadUpcoming(item.id);
-              }}>
-              <Text style={[typography.bodySemibold, { color: tokens.text }]}>{item.name}</Text>
-            </Pressable>
-          ))}
         </View>
       ) : null}
 
@@ -501,6 +555,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+  },
+  artistSearchStatus: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   centerText: {
     marginBottom: 16,
