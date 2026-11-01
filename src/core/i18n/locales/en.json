@@ -344,6 +344,7 @@
     "openInPhotos": "Open in Photos",
     "videoDownloadingICloud": "Downloading from iCloud…",
     "videoLoadError": "We couldn't load this video.",
+    "videoPlaybackError": "This video couldn't be played.",
     "shareCta": "Share your night"
   },
   "showNightShare": {

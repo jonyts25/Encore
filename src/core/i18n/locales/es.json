@@ -344,6 +344,7 @@
     "openInPhotos": "Ver en Fotos",
     "videoDownloadingICloud": "Descargando de iCloud…",
     "videoLoadError": "No pudimos cargar este video.",
+    "videoPlaybackError": "No se pudo reproducir este video.",
     "shareCta": "Compartir tu noche"
   },
   "showNightShare": {
