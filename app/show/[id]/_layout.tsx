@@ -1,10 +1,12 @@
 import { Stack } from 'expo-router';
 
 import { useTranslation } from '@/core/i18n';
+import { AppErrorBoundary } from '@/core/ui/AppErrorBoundary';
 
 export default function ShowDetailLayout() {
   const { t } = useTranslation();
   return (
+    <AppErrorBoundary>
     <Stack screenOptions={{ headerBackTitle: t('common.back') }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen
@@ -16,5 +18,6 @@ export default function ShowDetailLayout() {
         options={{ headerShown: true, title: t('showNightShare.screenTitle'), headerBackTitle: t('common.back') }}
       />
     </Stack>
+    </AppErrorBoundary>
   );
 }

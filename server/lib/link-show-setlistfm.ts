@@ -12,9 +12,10 @@ import {
 import {
   parseSetlistFmSetlistIdFromUrl,
   pickBestMatchingSetlist,
+  resolveRequestedSetlistDate,
+  setlistMatchesRequestedShowDate,
   shouldRunSetlistLink,
-  showLocalDateToSetlistFmDate,
-  isoShowDateToSetlistFmDate,
+  venueMatchesForSetlistLink,
 } from './setlistfm-link-logic';
 import { createSupabaseAdminClient } from './supabase';
 
@@ -23,7 +24,7 @@ export type LinkShowToSetlistFmResult = {
   linked: boolean;
   setlistfmId: string | null;
   songsInserted: number;
-  skippedReason: 'cooldown' | 'no_mbid' | 'no_date' | 'not_found' | null;
+  skippedReason: 'cooldown' | 'no_mbid' | 'no_date' | 'not_found' | 'date_mismatch' | 'venue_mismatch' | null;
 };
 
 type ShowLinkRow = {
@@ -64,6 +65,37 @@ async function fetchSetlistsForShowDate(
   return collected;
 }
 
+function isUserCreatedShow(source: string | null): boolean {
+  return source === 'user';
+}
+
+async function attachLinkedSetlist(
+  supabase: ReturnType<typeof createSupabaseAdminClient>,
+  params: {
+    showId: string;
+    artistId: string;
+    setlist: SetlistFmSetlist;
+    provider: ReturnType<typeof getSetlistFmProvider>;
+    userShow: boolean;
+    venueHint: { city: string | null; lat: number | null; lng: number | null };
+  }
+): Promise<{ showId: string; songsInserted: number }> {
+  let linkedVenueId: string | null = null;
+  if (params.userShow && venueMatchesForSetlistLink(params.setlist, params.venueHint)) {
+    linkedVenueId = await upsertVenueFromSetlist(supabase, params.setlist);
+  }
+
+  return attachSetlistToShow(supabase, {
+    showId: params.showId,
+    artistId: params.artistId,
+    setlist: params.setlist,
+    provider: params.provider,
+    suppressEnrichHook: true,
+    mode: params.userShow ? 'user_show' : 'canonical',
+    linkedVenueId,
+  });
+}
+
 export async function linkShowToSetlistFm(
   showId: string,
   options: { now?: Date; force?: boolean } = {}
@@ -96,6 +128,12 @@ export async function linkShowToSetlistFm(
   const row = show as unknown as ShowLinkRow;
   const artist = Array.isArray(row.artist) ? row.artist[0] : row.artist;
   const venue = Array.isArray(row.venue) ? row.venue[0] : row.venue;
+  const userShow = isUserCreatedShow(row.source);
+  const venueHint = {
+    city: venue?.city ?? null,
+    lat: venue?.lat ?? null,
+    lng: venue?.lng ?? null,
+  };
 
   if (!options.force && !shouldRunSetlistLink(row.setlist_checked_at, now)) {
     return {
@@ -142,9 +180,7 @@ export async function linkShowToSetlistFm(
     await supabase.from('artists').update({ mbid: resolvedMbid }).eq('id', artist.id);
   }
 
-  const setlistDate =
-    (row.local_date && showLocalDateToSetlistFmDate(row.local_date)) ||
-    isoShowDateToSetlistFmDate(row.show_date);
+  const setlistDate = resolveRequestedSetlistDate(row.local_date, row.show_date);
 
   if (!setlistDate) {
     await markSetlistChecked(supabase, row.id, now);
@@ -159,12 +195,44 @@ export async function linkShowToSetlistFm(
 
   if (row.setlistfm_id) {
     const full = await provider.getSetlist(row.setlistfm_id);
-    const attached = await attachSetlistToShow(supabase, {
+    if (
+      userShow &&
+      !setlistMatchesRequestedShowDate(full, setlistDate)
+    ) {
+      console.info(
+        `[setlistfm-link] skip refresh show=${row.id}: setlist date ${full.eventDate} != ${setlistDate}`
+      );
+      await markSetlistChecked(supabase, row.id, now);
+      return {
+        showId: row.id,
+        linked: false,
+        setlistfmId: row.setlistfm_id,
+        songsInserted: 0,
+        skippedReason: 'date_mismatch',
+      };
+    }
+
+    if (userShow && !venueMatchesForSetlistLink(full, venueHint)) {
+      console.info(
+        `[setlistfm-link] skip refresh show=${row.id}: venue mismatch setlist city=${full.venue.city.name}`
+      );
+      await markSetlistChecked(supabase, row.id, now);
+      return {
+        showId: row.id,
+        linked: false,
+        setlistfmId: row.setlistfm_id,
+        songsInserted: 0,
+        skippedReason: 'venue_mismatch',
+      };
+    }
+
+    const attached = await attachLinkedSetlist(supabase, {
       showId: row.id,
       artistId: row.artist_id,
       setlist: full,
       provider,
-      suppressEnrichHook: true,
+      userShow,
+      venueHint,
     });
     await markSetlistChecked(supabase, attached.showId, now);
     return {
@@ -177,20 +245,42 @@ export async function linkShowToSetlistFm(
   }
 
   const setlists = await fetchSetlistsForShowDate(provider, resolvedMbid, setlistDate);
-  const picked = pickBestMatchingSetlist(setlists, {
-    city: venue?.city ?? null,
-    lat: venue?.lat ?? null,
-    lng: venue?.lng ?? null,
-  });
+  const picked = pickBestMatchingSetlist(setlists, setlistDate, venueHint);
 
   if (!picked) {
+    const wrongDayOnly =
+      setlists.length > 0 &&
+      setlists.every((item) => !setlistMatchesRequestedShowDate(item, setlistDate));
+    if (wrongDayOnly) {
+      console.info(
+        `[setlistfm-link] skip show=${row.id}: API returned ${setlists.length} setlists but none on ${setlistDate}`
+      );
+    } else if (setlists.length > 0) {
+      console.info(
+        `[setlistfm-link] skip show=${row.id}: no venue match on ${setlistDate} (candidates=${setlists.length})`
+      );
+    }
     await markSetlistChecked(supabase, row.id, now);
     return {
       showId: row.id,
       linked: false,
       setlistfmId: null,
       songsInserted: 0,
-      skippedReason: 'not_found',
+      skippedReason: setlists.length > 0 ? 'venue_mismatch' : 'not_found',
+    };
+  }
+
+  if (userShow && !setlistMatchesRequestedShowDate(picked, setlistDate)) {
+    console.info(
+      `[setlistfm-link] skip show=${row.id}: picked date ${picked.eventDate} != ${setlistDate}`
+    );
+    await markSetlistChecked(supabase, row.id, now);
+    return {
+      showId: row.id,
+      linked: false,
+      setlistfmId: null,
+      songsInserted: 0,
+      skippedReason: 'date_mismatch',
     };
   }
 
@@ -205,22 +295,24 @@ export async function linkShowToSetlistFm(
   let targetShowId = row.id;
 
   if (existingBySetlist?.id && existingBySetlist.id !== row.id) {
-    await attachSetlistToShow(supabase, {
+    await attachLinkedSetlist(supabase, {
       showId: existingBySetlist.id as string,
       artistId: row.artist_id,
       setlist: picked,
       provider,
-      suppressEnrichHook: true,
+      userShow: false,
+      venueHint,
     });
     await mergeShowIntoCanonical(supabase, row.id, existingBySetlist.id as string);
     targetShowId = existingBySetlist.id as string;
   } else {
-    await attachSetlistToShow(supabase, {
+    await attachLinkedSetlist(supabase, {
       showId: row.id,
       artistId: row.artist_id,
       setlist: picked,
       provider,
-      suppressEnrichHook: true,
+      userShow,
+      venueHint,
     });
   }
 
@@ -282,6 +374,7 @@ export async function importSetlistFromUrl(url: string): Promise<{ showId: strin
       setlist,
       provider,
       suppressEnrichHook: true,
+      mode: 'canonical',
     });
     return { showId: existingShow.id as string };
   }

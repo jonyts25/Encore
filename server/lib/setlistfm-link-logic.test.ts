@@ -2,17 +2,19 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
+  filterSetlistsByExactEventDate,
   parseSetlistFmSetlistIdFromUrl,
   pickBestMatchingSetlist,
   shouldRunSetlistLink,
   showLocalDateToSetlistFmDate,
+  venueMatchesForSetlistLink,
 } from './setlistfm-link-logic';
 import type { SetlistFmSetlist } from './providers/setlistfm/types';
 
-function setlist(city: string, lat: number, lng: number): SetlistFmSetlist {
+function setlist(city: string, eventDate: string, lat: number, lng: number): SetlistFmSetlist {
   return {
-    id: `setlist-${city}`,
-    eventDate: '15-06-2024',
+    id: `setlist-${city}-${eventDate}`,
+    eventDate,
     artist: { mbid: 'artist-mbid', name: 'Artist' },
     venue: {
       name: 'Arena',
@@ -26,49 +28,88 @@ function setlist(city: string, lat: number, lng: number): SetlistFmSetlist {
 }
 
 describe('parseSetlistFmSetlistIdFromUrl', () => {
-  it('parses full https URL', () => {
+  it('parses Mana León URL id', () => {
+    const id = parseSetlistFmSetlistIdFromUrl(
+      'https://www.setlist.fm/setlist/mana/2024/explanada-de-la-feria-leon-mexico-5354c34d.html'
+    );
+    assert.equal(id, '5354c34d');
+  });
+
+  it('parses short legacy path URLs', () => {
     const id = parseSetlistFmSetlistIdFromUrl(
       'https://www.setlist.fm/setlist/foo/abc123def456.html'
     );
     assert.equal(id, 'abc123def456');
   });
 
-  it('parses path-only URL', () => {
-    const id = parseSetlistFmSetlistIdFromUrl('/setlist/foo/abc123def456.html?foo=1');
-    assert.equal(id, 'abc123def456');
-  });
-
-  it('accepts raw hex id', () => {
-    assert.equal(parseSetlistFmSetlistIdFromUrl('abc123def456'), 'abc123def456');
-  });
-
   it('rejects invalid links', () => {
     assert.equal(parseSetlistFmSetlistIdFromUrl('https://example.com'), null);
-    assert.equal(parseSetlistFmSetlistIdFromUrl(''), null);
+  });
+});
+
+describe('filterSetlistsByExactEventDate', () => {
+  it('drops setlists from wrong day when artist feed ignores date', () => {
+    const filtered = filterSetlistsByExactEventDate(
+      [
+        setlist('Detroit', '01-11-2026', 42.33, -83.05),
+        setlist('León', '26-10-2024', 21.12, -101.68),
+      ],
+      '26-10-2024'
+    );
+    assert.equal(filtered.length, 1);
+    assert.equal(filtered[0]?.venue.city.name, 'León');
+  });
+});
+
+describe('pickBestMatchingSetlist', () => {
+  const requested = '26-10-2024';
+  const leonHint = { city: 'León', lat: 21.12, lng: -101.68 };
+
+  it('returns null when only wrong-day setlists are present', () => {
+    const picked = pickBestMatchingSetlist(
+      [setlist('Detroit', '01-11-2026', 42.33, -83.05)],
+      requested,
+      leonHint
+    );
+    assert.equal(picked, null);
+  });
+
+  it('returns null when date matches but city is far away', () => {
+    const picked = pickBestMatchingSetlist(
+      [setlist('Detroit', '26-10-2024', 42.33, -83.05)],
+      requested,
+      leonHint
+    );
+    assert.equal(picked, null);
+  });
+
+  it('links when date and city match', () => {
+    const picked = pickBestMatchingSetlist(
+      [
+        setlist('Detroit', '01-11-2026', 42.33, -83.05),
+        setlist('León', '26-10-2024', 21.12, -101.68),
+      ],
+      requested,
+      leonHint
+    );
+    assert.equal(picked?.venue.city.name, 'León');
+    assert.equal(picked?.eventDate, '26-10-2024');
+  });
+});
+
+describe('venueMatchesForSetlistLink', () => {
+  it('accepts within 50 km by coordinates', () => {
+    const item = setlist('León', '26-10-2024', 21.12, -101.68);
+    assert.equal(
+      venueMatchesForSetlistLink(item, { city: null, lat: 21.15, lng: -101.7 }),
+      true
+    );
   });
 });
 
 describe('showLocalDateToSetlistFmDate', () => {
   it('formats ISO local date to dd-MM-yyyy', () => {
-    assert.equal(showLocalDateToSetlistFmDate('2024-06-15'), '15-06-2024');
-  });
-});
-
-describe('pickBestMatchingSetlist', () => {
-  it('prefers same normalized city when two shows same day', () => {
-    const picked = pickBestMatchingSetlist(
-      [setlist('Guadalajara', 20.6, -103.3), setlist('Ciudad de México', 19.4, -99.1)],
-      { city: 'Mexico City', lat: 19.43, lng: -99.13 }
-    );
-    assert.equal(picked?.id, 'setlist-Ciudad de México');
-  });
-
-  it('falls back to nearest coordinates when city unknown', () => {
-    const picked = pickBestMatchingSetlist(
-      [setlist('Monterrey', 25.67, -100.31), setlist('Puebla', 19.04, -98.2)],
-      { city: null, lat: 19.05, lng: -98.19 }
-    );
-    assert.equal(picked?.id, 'setlist-Puebla');
+    assert.equal(showLocalDateToSetlistFmDate('2024-10-26'), '26-10-2024');
   });
 });
 

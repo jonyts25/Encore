@@ -253,6 +253,8 @@ export async function writeSetlistSongsForShow(
   return inserted;
 }
 
+export type AttachSetlistMode = 'canonical' | 'user_show';
+
 export async function attachSetlistToShow(
   supabase: SupabaseAdmin,
   params: {
@@ -261,10 +263,17 @@ export async function attachSetlistToShow(
     setlist: SetlistFmSetlist;
     provider: SetlistFmProvider;
     suppressEnrichHook?: boolean;
+    mode?: AttachSetlistMode;
+    /** When mode=user_show, optional resolved setlist.fm venue to attach. */
+    linkedVenueId?: string | null;
   }
 ): Promise<{ showId: string; songsInserted: number }> {
+  const mode = params.mode ?? 'canonical';
   const tourName = await resolveTourName(params.setlist, params.provider);
-  const venueId = await upsertVenueFromSetlist(supabase, params.setlist);
+  const venueId =
+    mode === 'user_show'
+      ? (params.linkedVenueId ?? null)
+      : await upsertVenueFromSetlist(supabase, params.setlist);
   const tourId = await upsertTour(supabase, params.artistId, tourName, params.setlist.eventDate);
   const showDate = parseSetlistFmEventDate(params.setlist.eventDate);
   const localDate = parseSetlistFmLocalDate(params.setlist.eventDate);
@@ -283,14 +292,18 @@ export async function attachSetlistToShow(
   const updatePayload: Record<string, unknown> = {
     setlistfm_id: params.setlist.id,
     tour_id: tourId,
-    venue_id: venueId,
-    local_date: localDate,
-    time_confirmed: false,
-    source: 'setlistfm',
   };
 
-  if (!hasCustomShowTime(existingShow.show_date as string)) {
-    updatePayload.show_date = showDate;
+  if (mode === 'canonical') {
+    updatePayload.venue_id = venueId;
+    updatePayload.local_date = localDate;
+    updatePayload.time_confirmed = false;
+    updatePayload.source = 'setlistfm';
+    if (!hasCustomShowTime(existingShow.show_date as string)) {
+      updatePayload.show_date = showDate;
+    }
+  } else if (venueId) {
+    updatePayload.venue_id = venueId;
   }
 
   const { error: updateError } = await supabase
@@ -300,7 +313,12 @@ export async function attachSetlistToShow(
 
   if (updateError) throw updateError;
 
-  if (previousVenueId && previousVenueId !== venueId) {
+  if (
+    mode === 'canonical' &&
+    previousVenueId &&
+    venueId &&
+    previousVenueId !== venueId
+  ) {
     const { count, error: countError } = await supabase
       .from('shows')
       .select('id', { count: 'exact', head: true })

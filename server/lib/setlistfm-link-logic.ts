@@ -1,20 +1,20 @@
 import { parseSetlistFmEventDate } from './providers/setlistfm';
 import type { SetlistFmSetlist } from './providers/setlistfm/types';
 
-const SETLIST_FM_URL_RE =
-  /^https?:\/\/(?:www\.)?setlist\.fm\/setlist\/[^/]+\/([0-9a-f]{8,})\.html(?:\?.*)?$/i;
+/** setlist.fm ids are hex before `.html` (slug suffix or final path segment). */
+const SETLIST_FM_ID_SUFFIX_RE = /(?:-|\/)((?:[0-9a-f]{8,}))\.html(?:\?.*)?$/i;
 
-const SETLIST_FM_PATH_RE = /\/setlist\/[^/]+\/([0-9a-f]{8,})\.html(?:\?.*)?$/i;
+export const SETLIST_VENUE_MAX_DISTANCE_KM = 50;
 
 export function parseSetlistFmSetlistIdFromUrl(input: string): string | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
 
-  const direct = trimmed.match(SETLIST_FM_URL_RE);
-  if (direct?.[1]) return direct[1].toLowerCase();
-
-  const pathMatch = trimmed.match(SETLIST_FM_PATH_RE);
-  if (pathMatch?.[1]) return pathMatch[1].toLowerCase();
+  if (trimmed.includes('setlist.fm') || trimmed.includes('/setlist/')) {
+    const suffix = trimmed.match(SETLIST_FM_ID_SUFFIX_RE);
+    if (suffix?.[1]) return suffix[1].toLowerCase();
+    return null;
+  }
 
   if (/^[0-9a-f]{8,}$/i.test(trimmed)) {
     return trimmed.toLowerCase();
@@ -43,6 +43,8 @@ const CITY_ALIASES: Record<string, string> = {
   'mexico city': 'ciudad de mexico',
   'ciudad de mexico': 'ciudad de mexico',
   'ciudad de méxico': 'ciudad de mexico',
+  leon: 'leon',
+  'león': 'leon',
 };
 
 export function normalizePlaceName(value: string): string {
@@ -61,7 +63,7 @@ export type ShowVenueHint = {
   lng: number | null;
 };
 
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
   const dLng = toRad(lng2 - lng1);
@@ -71,23 +73,63 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+export function filterSetlistsByExactEventDate(
+  setlists: SetlistFmSetlist[],
+  requestedDateDdMmYyyy: string
+): SetlistFmSetlist[] {
+  const target = requestedDateDdMmYyyy.trim();
+  return setlists.filter((item) => item.eventDate.trim() === target);
+}
+
+export function setlistMatchesRequestedShowDate(
+  setlist: SetlistFmSetlist,
+  requestedDateDdMmYyyy: string
+): boolean {
+  return setlist.eventDate.trim() === requestedDateDdMmYyyy.trim();
+}
+
+export function venueMatchesForSetlistLink(
+  setlist: SetlistFmSetlist,
+  venueHint: ShowVenueHint,
+  maxDistanceKm = SETLIST_VENUE_MAX_DISTANCE_KM
+): boolean {
+  const targetCity = venueHint.city ? normalizePlaceName(venueHint.city) : null;
+  const setlistCity = normalizePlaceName(setlist.venue.city.name);
+  if (targetCity && setlistCity === targetCity) {
+    return true;
+  }
+
+  const hasUserCoords =
+    venueHint.lat != null &&
+    venueHint.lng != null &&
+    Number.isFinite(venueHint.lat) &&
+    Number.isFinite(venueHint.lng);
+
+  const setlistCoords = setlist.venue.city.coords;
+  if (hasUserCoords && setlistCoords) {
+    const distance = haversineKm(
+      venueHint.lat!,
+      venueHint.lng!,
+      setlistCoords.lat,
+      setlistCoords.long
+    );
+    return distance <= maxDistanceKm;
+  }
+
+  return false;
+}
+
 export function pickBestMatchingSetlist(
   setlists: SetlistFmSetlist[],
+  requestedDateDdMmYyyy: string,
   venueHint: ShowVenueHint
 ): SetlistFmSetlist | null {
-  if (setlists.length === 0) return null;
-  if (setlists.length === 1) return setlists[0] ?? null;
+  const sameDay = filterSetlistsByExactEventDate(setlists, requestedDateDdMmYyyy);
+  if (sameDay.length === 0) return null;
 
-  const targetCity = venueHint.city ? normalizePlaceName(venueHint.city) : null;
-  const cityMatches = targetCity
-    ? setlists.filter(
-        (item) => normalizePlaceName(item.venue.city.name) === targetCity
-      )
-    : [];
-
-  const pool = cityMatches.length > 0 ? cityMatches : setlists;
-
-  if (pool.length === 1) return pool[0] ?? null;
+  const venueMatches = sameDay.filter((item) => venueMatchesForSetlistLink(item, venueHint));
+  if (venueMatches.length === 0) return null;
+  if (venueMatches.length === 1) return venueMatches[0] ?? null;
 
   const hasCoords =
     venueHint.lat != null &&
@@ -96,13 +138,13 @@ export function pickBestMatchingSetlist(
     Number.isFinite(venueHint.lng);
 
   if (!hasCoords) {
-    return pool[0] ?? null;
+    return venueMatches[0] ?? null;
   }
 
-  let best = pool[0]!;
+  let best = venueMatches[0]!;
   let bestDistance = Number.POSITIVE_INFINITY;
 
-  for (const setlist of pool) {
+  for (const setlist of venueMatches) {
     const coords = setlist.venue.city.coords;
     if (!coords) continue;
     const distance = haversineKm(venueHint.lat!, venueHint.lng!, coords.lat, coords.long);
@@ -129,4 +171,14 @@ export function shouldRunSetlistLink(
   const last = new Date(setlistCheckedAt).getTime();
   if (Number.isNaN(last)) return true;
   return now.getTime() - last >= SETLIST_LINK_COOLDOWN_MS;
+}
+
+export function resolveRequestedSetlistDate(
+  localDate: string | null,
+  showDateIso: string
+): string | null {
+  return (
+    (localDate && showLocalDateToSetlistFmDate(localDate)) ||
+    isoShowDateToSetlistFmDate(showDateIso)
+  );
 }

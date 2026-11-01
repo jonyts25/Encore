@@ -114,17 +114,22 @@ export class SetlistFmProvider implements SetlistFmAdapter {
     return data.setlist ?? [];
   }
 
+  /**
+   * Date-filtered setlists must use search/setlists — artist/{mbid}/setlists ignores `date`.
+   * @see https://api.setlist.fm/docs/1.0/resource__search_setlists.html
+   */
   async getArtistSetlistsOnDate(
     mbid: string,
     eventDateDdMmYyyy: string,
     page = 1
   ): Promise<SetlistFmSetlist[]> {
     const params = new URLSearchParams({
+      artistMbid: mbid,
       date: eventDateDdMmYyyy,
       p: String(page),
     });
     const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmSetlist>>(
-      `/1.0/artist/${mbid}/setlists?${params.toString()}`
+      `/1.0/search/setlists?${params.toString()}`
     );
     return data.setlist ?? [];
   }

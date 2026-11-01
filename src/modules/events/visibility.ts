@@ -76,11 +76,23 @@ function addCalendarDays(localDate: string, days: number): string {
   return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
 }
 
-export function resolveShowLocalDate(show: ShowVisibilityInput): string {
-  if (show.local_date) return show.local_date;
+function localDateFromShowDate(show: ShowVisibilityInput): string {
   const tz = resolveVenueTimezone(show.venue);
+  const showTime = new Date(show.show_date).getTime();
+  if (Number.isNaN(showTime)) {
+    return show.local_date?.trim() ?? '1970-01-01';
+  }
   const parts = getZonedDateParts(new Date(show.show_date), tz);
   return formatLocalDateYmd(parts.year, parts.month, parts.day);
+}
+
+/** Prefer show_date when local_date disagrees (bad setlist.fm link must not flip phase). */
+export function resolveShowLocalDate(show: ShowVisibilityInput): string {
+  const fromShowDate = localDateFromShowDate(show);
+  const stored = show.local_date?.trim();
+  if (!stored) return fromShowDate;
+  if (stored === fromShowDate) return stored;
+  return fromShowDate;
 }
 
 /** 10:00 venue-local on the calendar day after the show; null if that moment has passed. */

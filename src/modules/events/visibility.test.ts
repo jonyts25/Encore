@@ -11,6 +11,7 @@ import {
   hasConfirmedTime,
   isShowActive,
   pickPrimaryGoingShow,
+  resolveShowLocalDate,
 } from './visibility';
 
 const cdmxVenue = { timezone: 'America/Mexico_City' } as Show['venue'];
@@ -176,4 +177,14 @@ test('goingReminderTriggerUtc is 10:00 venue-local on the day after the show', (
   assert.equal(get('hour'), '10');
   assert.equal(get('minute'), '00');
   assert.equal(goingReminderTriggerUtc(s, new Date('2026-10-30T17:00:00.000Z')), null);
+});
+
+test('resolveShowLocalDate ignores corrupt local_date that disagrees with show_date', () => {
+  const s = show({
+    show_date: '2024-10-26T18:00:00.000Z',
+    local_date: '2026-11-01',
+    time_confirmed: true,
+  });
+  assert.equal(resolveShowLocalDate(s), '2024-10-26');
+  assert.equal(getShowPhase(s, new Date('2026-10-31T12:00:00.000Z')), 'past');
 });
