@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -21,13 +24,34 @@ import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import { useQuery } from '@tanstack/react-query';
 
 import { useShowMemory } from '../hooks/useShowMemory';
-import { buildShowNightShareCardModel, SHARE_CARD_HEIGHT, SHARE_CARD_WIDTH } from '../showNightShareCardLogic';
+import {
+  availableShowNightShareTemplates,
+  buildShowNightShareCardModel,
+  SHARE_CARD_HEIGHT,
+  SHARE_CARD_WIDTH,
+  type ShowNightShareTemplateId,
+} from '../showNightShareCardLogic';
+import { useShowNightShareFonts } from '../showNightShareFonts';
+import {
+  readLastShowNightShareTemplate,
+  writeLastShowNightShareTemplate,
+} from '../showNightShareTemplatePreference';
 import {
   captureAndShareShowNightCard,
   captureShowNightCardForSave,
-  deleteShowNightShareCache,
+  invalidateShowNightShareSessionCapture,
 } from '../shareShowNightImage';
 import { ShowNightShareCard } from './ShowNightShareCard';
+
+function resolveInitialTemplateIndex(
+  templates: ShowNightShareTemplateId[],
+  preferred: ShowNightShareTemplateId | null
+): number {
+  if (preferred && templates.includes(preferred)) {
+    return templates.indexOf(preferred);
+  }
+  return 0;
+}
 
 export function ShowNightSharePreviewContent() {
   const { id: showId } = useLocalSearchParams<{ id: string }>();
@@ -37,15 +61,14 @@ export function ShowNightSharePreviewContent() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const captureRef = useRef<View>(null);
+  const listRef = useRef<FlatList<ShowNightShareTemplateId>>(null);
+
+  const { loaded: fontsLoaded, error: fontsError } = useShowNightShareFonts();
 
   const [visualReady, setVisualReady] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!showId) return;
-    void deleteShowNightShareCache(showId);
-  }, [showId]);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const showQuery = useQuery({
     queryKey: ['show', showId],
@@ -71,17 +94,82 @@ export function ShowNightSharePreviewContent() {
   const previewHeight = (previewWidth * SHARE_CARD_HEIGHT) / SHARE_CARD_WIDTH;
   const previewScale = previewWidth / SHARE_CARD_WIDTH;
 
+  const templates = useMemo(() => {
+    if (!model) return ['boleto', 'poster'] as ShowNightShareTemplateId[];
+    return availableShowNightShareTemplates(model);
+  }, [model]);
+
+  const activeTemplate = templates[activeIndex] ?? templates[0] ?? 'boleto';
+
+  useEffect(() => {
+    if (!model) return;
+    const preferred = readLastShowNightShareTemplate();
+    const index = resolveInitialTemplateIndex(templates, preferred);
+    setActiveIndex(index);
+    setCaptureTemplate(templates[index] ?? 'boleto');
+    setVisualReady(false);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToOffset({ offset: index * previewWidth, animated: false });
+    });
+  }, [model?.showId, previewWidth, templates.join(',')]);
+
+  useEffect(() => {
+    setCaptureTemplate(activeTemplate);
+    setVisualReady(false);
+    if (showId) {
+      invalidateShowNightShareSessionCapture(showId, activeTemplate);
+    }
+  }, [activeTemplate, showId]);
+
+  useEffect(() => {
+    if (fontsError) {
+      console.error('[ShowNightShare] fonts failed', fontsError);
+    }
+  }, [fontsError]);
+
+  const onVisualReady = useCallback(() => {
+    setVisualReady(true);
+  }, []);
+
+  const onMomentumScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const index = Math.round(event.nativeEvent.contentOffset.x / previewWidth);
+      const clamped = Math.max(0, Math.min(index, templates.length - 1));
+      if (clamped !== activeIndex) {
+        setActiveIndex(clamped);
+        const template = templates[clamped];
+        if (template) {
+          writeLastShowNightShareTemplate(template);
+        }
+      }
+    },
+    [activeIndex, previewWidth, templates]
+  );
+
+  const reportError = useCallback(
+    (error: unknown) => {
+      if (__DEV__) {
+        console.error('[ShowNightShare] action failed', error);
+        const message = error instanceof Error ? error.message : String(error);
+        Alert.alert(t('showNightShare.shareError'), message);
+        return;
+      }
+      Alert.alert(t('showNightShare.shareError'));
+    },
+    [t]
+  );
+
   const onShare = useCallback(async () => {
     if (!visualReady || sharing || !showId) return;
     setSharing(true);
     try {
-      await captureAndShareShowNightCard(captureRef, showId);
-    } catch {
-      Alert.alert(t('showNightShare.shareError'));
+      await captureAndShareShowNightCard(captureRef, showId, activeTemplate);
+    } catch (error) {
+      reportError(error);
     } finally {
       setSharing(false);
     }
-  }, [sharing, showId, t, visualReady]);
+  }, [activeTemplate, reportError, sharing, showId, visualReady]);
 
   const onSaveToPhotos = useCallback(async () => {
     if (!visualReady || saving || !showId) return;
@@ -92,21 +180,21 @@ export function ShowNightSharePreviewContent() {
         Alert.alert(t('showNightShare.savePhotosPermissionDenied'));
         return;
       }
-      const uri = await captureShowNightCardForSave(captureRef, showId);
+      const uri = await captureShowNightCardForSave(captureRef, showId, activeTemplate);
       await MediaLibrary.saveToLibraryAsync(uri);
       Alert.alert(t('showNightShare.savedToPhotos'));
-    } catch {
-      Alert.alert(t('showNightShare.shareError'));
+    } catch (error) {
+      reportError(error);
     } finally {
       setSaving(false);
     }
-  }, [saving, showId, t, visualReady]);
+  }, [activeTemplate, reportError, saving, showId, t, visualReady]);
 
   if (!showId) {
     return null;
   }
 
-  if (loading && !show) {
+  if (!fontsLoaded || (loading && !show)) {
     return (
       <View style={[styles.centered, { backgroundColor: tokens.background }]}>
         <ActivityIndicator color={tokens.accent} />
@@ -130,21 +218,51 @@ export function ShowNightSharePreviewContent() {
           {t('showNightShare.previewHint')}
         </Text>
 
-        <View style={[styles.previewFrame, { width: previewWidth, height: previewHeight }]}>
-          <View
-            style={{
-              width: SHARE_CARD_WIDTH,
-              height: SHARE_CARD_HEIGHT,
-              transform: [{ scale: previewScale }],
-              transformOrigin: 'top left',
-            }}>
-            <ShowNightShareCard model={model} />
-          </View>
+        <FlatList
+          ref={listRef}
+          data={templates}
+          horizontal
+          keyExtractor={(item) => item}
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={{ width: previewWidth }}
+          getItemLayout={(_, index) => ({
+            length: previewWidth,
+            offset: previewWidth * index,
+            index,
+          })}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          renderItem={({ item, index }) => (
+            <View style={[styles.previewFrame, { width: previewWidth, height: previewHeight }]}>
+              <View
+                style={{
+                  width: SHARE_CARD_WIDTH,
+                  height: SHARE_CARD_HEIGHT,
+                  transform: [{ scale: previewScale }],
+                  transformOrigin: 'top left',
+                }}>
+                <ShowNightShareCard model={model} template={item} />
+              </View>
+            </View>
+          )}
+        />
+
+        <View style={styles.dots}>
+          {templates.map((template, index) => (
+            <View
+              key={template}
+              style={[
+                styles.dot,
+                {
+                  backgroundColor: index === activeIndex ? tokens.accent : tokens.textSecondary,
+                  opacity: index === activeIndex ? 1 : 0.35,
+                },
+              ]}
+            />
+          ))}
         </View>
 
-        {!visualReady ? (
-          <ActivityIndicator color={tokens.accent} style={styles.loader} />
-        ) : null}
+        {!visualReady ? <ActivityIndicator color={tokens.accent} style={styles.loader} /> : null}
       </View>
 
       <View
@@ -152,7 +270,7 @@ export function ShowNightSharePreviewContent() {
         collapsable={false}
         pointerEvents="none"
         style={styles.offscreenCapture}>
-        <ShowNightShareCard model={model} onVisualReady={() => setVisualReady(true)} />
+        <ShowNightShareCard model={model} template={captureTemplate} onVisualReady={onVisualReady} />
       </View>
 
       <View style={[styles.actions, { paddingHorizontal: 16 }]}>
@@ -191,6 +309,17 @@ const styles = StyleSheet.create({
   },
   previewFrame: {
     overflow: 'hidden',
+  },
+  dots: {
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginTop: 14,
+  },
+  dot: {
+    borderRadius: 999,
+    height: 8,
+    width: 8,
   },
   offscreenCapture: {
     height: SHARE_CARD_HEIGHT,

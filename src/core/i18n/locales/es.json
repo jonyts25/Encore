@@ -349,16 +349,28 @@
   },
   "showNightShare": {
     "screenTitle": "Comparte tu noche",
-    "previewHint": "Así se verá en tus historias. Cuando la imagen termine de cargar, comparte.",
+    "previewHint": "Desliza para elegir plantilla. Comparte o guarda la que ves.",
     "shareAction": "Compartir",
     "shareError": "No pudimos crear la imagen para compartir.",
     "saveToPhotos": "Guardar en Fotos",
     "savedToPhotos": "Guardada en Fotos",
     "savePhotosPermissionDenied": "Necesitamos permiso para guardar en tu biblioteca de fotos.",
-    "eyebrow": "Fui a ver a",
-    "highlightsTitle": "Mis momentos",
     "liveSongCount": "{{count}} canciones en vivo",
-    "ratingA11y": "Calificación {{rating}} de 5"
+    "ratingA11y": "Calificación {{rating}} de 5",
+    "ticket": {
+      "admitOne": "Admite uno",
+      "dateLabel": "Fecha",
+      "venueLabel": "Recinto",
+      "cityLabel": "Ciudad",
+      "liveCount": "{{count}} canciones en vivo"
+    },
+    "setlist": {
+      "encore": "Encore"
+    },
+    "poster": {
+      "liveLabel": "canciones en vivo",
+      "ratingLabel": "Tu noche"
+    }
   },
   "notifications": {
     "goingReminder": {
@@ -447,6 +459,7 @@
     "listenTitle": "Escuchar en",
     "listenSong": "Escuchar esta canción",
     "listenSetlist": "Escuchar el setlist",
+    "viewOnAppleMusic": "Ver en Apple Music",
     "appleMusic": "Apple Music",
     "spotify": "Spotify",
     "youtubeMusic": "YouTube Music"

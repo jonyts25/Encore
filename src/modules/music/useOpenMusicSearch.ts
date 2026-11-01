@@ -27,6 +27,8 @@ const SERVICE_I18N_KEY: Record<MusicStreamingService, string> = {
 export type OpenMusicSearchOptions = {
   dialogTitle?: string;
   intent?: 'song' | 'setlist';
+  /** When true with setlist intent, Apple Music opens the artist page instead of a playlist. */
+  appleMusicArtistPage?: boolean;
   artistName?: string;
   songTitle?: string;
   artistId?: string | null;
@@ -132,6 +134,11 @@ async function openService(
 ): Promise<void> {
   writePreferredMusicService(service);
   if (options.intent === 'setlist' && service === 'apple_music') {
+    if (options.appleMusicArtistPage) {
+      const artistName = options.artistName?.trim() ?? query.replace(/^Setlist\s+/i, '').trim();
+      await Linking.openURL(await resolveAppleMusicArtistUrl(artistName));
+      return;
+    }
     await openAppleMusicSetlist(options, query);
     return;
   }

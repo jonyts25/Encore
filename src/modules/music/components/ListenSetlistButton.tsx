@@ -20,12 +20,13 @@ export function ListenSetlistButton({ artistName, artistId, tourId }: ListenSetl
   return (
     <PillButton
       disabled={resolving}
-      title={resolving ? t('common.loading') : t('musicStreaming.listenSetlist')}
+      title={resolving ? t('common.loading') : t('musicStreaming.viewOnAppleMusic')}
       variant="secondary"
       onPress={() =>
         openSearch(buildSetlistSearchQuery(artistName), {
-          dialogTitle: t('musicStreaming.listenSetlist'),
+          dialogTitle: t('musicStreaming.viewOnAppleMusic'),
           intent: 'setlist',
+          appleMusicArtistPage: true,
           artistName,
           artistId,
           tourId,

@@ -4,7 +4,10 @@ import { describe, it } from 'node:test';
 import type { Show } from '@/modules/events/types';
 
 import {
+  availableShowNightShareTemplates,
   buildShowNightShareCardModel,
+  decorativeBarcodeBarWidths,
+  formatShareCardPosterDate,
   formatShareCardVenueLine,
   pickShareCardBackgroundUri,
 } from './showNightShareCardLogic';
@@ -41,6 +44,10 @@ describe('showNightShareCardLogic', () => {
     assert.match(line, /2026/);
   });
 
+  it('formats poster date as dd.MM.yy', () => {
+    assert.equal(formatShareCardPosterDate('2026-10-30T03:00:00.000Z'), '30.10.26');
+  });
+
   it('prefers video thumbnail over photo', () => {
     const uri = pickShareCardBackgroundUri([
       {
@@ -69,7 +76,7 @@ describe('showNightShareCardLogic', () => {
     assert.equal(uri, 'ph://video-id');
   });
 
-  it('omits zero song count and empty prediction', () => {
+  it('omits zero song count when setlist is confirmed but empty', () => {
     const memory = {
       id: 'm1',
       user_id: 'u1',
@@ -84,11 +91,11 @@ describe('showNightShareCardLogic', () => {
 
     const model = buildShowNightShareCardModel(baseShow(), memory, [], null, 'es');
     assert.equal(model.liveSongCount, null);
-    assert.equal(model.prediction, null);
     assert.equal(model.rating, null);
+    assert.equal(model.hasConfirmedSetlist, false);
   });
 
-  it('includes highlights and counts when setlist is confirmed', () => {
+  it('includes songs and rating when setlist is confirmed', () => {
     const memory = {
       id: 'm1',
       user_id: 'u1',
@@ -117,21 +124,52 @@ describe('showNightShareCardLogic', () => {
           is_encore: false,
           is_highlight: false,
         },
-        {
-          id: 'ms3',
-          memory_id: 'm1',
-          song_id: 's3',
-          title: 'Viva',
-          position: 3,
-          is_encore: false,
-          is_highlight: true,
-        },
       ],
     } satisfies ShowMemory;
 
     const model = buildShowNightShareCardModel(baseShow(), memory, [], null, 'es');
-    assert.equal(model.liveSongCount, 3);
+    assert.equal(model.liveSongCount, 2);
     assert.equal(model.rating, 5);
-    assert.deepEqual(model.highlightTitles, ['Yellow', 'Viva']);
+    assert.equal(model.confirmedSongs.length, 2);
+    assert.equal(model.hasConfirmedSetlist, true);
+  });
+
+  it('lists setlist template only when confirmed songs exist', () => {
+    const withoutSetlist = buildShowNightShareCardModel(baseShow(), null, [], null, 'es');
+    assert.deepEqual(availableShowNightShareTemplates(withoutSetlist), ['boleto', 'poster']);
+
+    const memory = {
+      id: 'm1',
+      user_id: 'u1',
+      show_id: 'show-1',
+      note: null,
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      setlist_confirmed_at: '2026-10-31T00:00:00.000Z',
+      rating: null,
+      songs: [
+        {
+          id: 'ms1',
+          memory_id: 'm1',
+          song_id: 's1',
+          title: 'Yellow',
+          position: 1,
+          is_encore: false,
+          is_highlight: false,
+        },
+      ],
+    } satisfies ShowMemory;
+    const withSetlist = buildShowNightShareCardModel(baseShow(), memory, [], null, 'es');
+    assert.deepEqual(availableShowNightShareTemplates(withSetlist), ['boleto', 'setlist', 'poster']);
+  });
+
+  it('generates stable barcode widths from show id', () => {
+    const a = decorativeBarcodeBarWidths('show-abc');
+    const b = decorativeBarcodeBarWidths('show-abc');
+    const c = decorativeBarcodeBarWidths('other');
+    assert.equal(a.length, 48);
+    assert.deepEqual(a, b);
+    assert.notDeepEqual(a, c);
+    assert.ok(a.every((w) => w >= 2 && w <= 5));
   });
 });

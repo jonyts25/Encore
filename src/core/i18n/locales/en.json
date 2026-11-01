@@ -349,16 +349,28 @@
   },
   "showNightShare": {
     "screenTitle": "Share your night",
-    "previewHint": "This is how it will look in your stories. Share once the image has loaded.",
+    "previewHint": "Swipe to pick a template. Share or save the one you see.",
     "shareAction": "Share",
     "shareError": "We couldn't create the image to share.",
     "saveToPhotos": "Save to Photos",
     "savedToPhotos": "Saved to Photos",
     "savePhotosPermissionDenied": "We need permission to save to your photo library.",
-    "eyebrow": "I went to see",
-    "highlightsTitle": "My moments",
     "liveSongCount": "{{count}} live songs",
-    "ratingA11y": "Rating {{rating}} out of 5"
+    "ratingA11y": "Rating {{rating}} out of 5",
+    "ticket": {
+      "admitOne": "Admits one",
+      "dateLabel": "Date",
+      "venueLabel": "Venue",
+      "cityLabel": "City",
+      "liveCount": "{{count}} live songs"
+    },
+    "setlist": {
+      "encore": "Encore"
+    },
+    "poster": {
+      "liveLabel": "live songs",
+      "ratingLabel": "Your night"
+    }
   },
   "notifications": {
     "goingReminder": {
@@ -447,6 +459,7 @@
     "listenTitle": "Listen on",
     "listenSong": "Listen to this song",
     "listenSetlist": "Listen to the setlist",
+    "viewOnAppleMusic": "View on Apple Music",
     "appleMusic": "Apple Music",
     "spotify": "Spotify",
     "youtubeMusic": "YouTube Music"
