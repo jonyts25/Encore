@@ -1,4 +1,4 @@
-import { pickBestLrclibRecord, readLrclibDuration } from '../../../../shared/lrclibPick';
+import { pickBestLrclibRecord, readLrclibDuration } from '../../shared-copies/lrclibPick';
 
 import { lrclibRequestDirectWithFetch } from './lrclibRequest';
 import { LrclibRequestQueue } from './lrclibQueue';

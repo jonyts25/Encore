@@ -1,4 +1,4 @@
-import { parseLrc as parseLrcShared } from '../../../../shared/parseLrc';
+import { parseLrc as parseLrcShared } from '../../shared-copies/parseLrc';
 
 export type SyncedLine = {
   timestamp_seconds: number;

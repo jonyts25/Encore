@@ -1,26 +1,13 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { pickBestLrclibRecord as sharedPick } from './shared/lrclibPick';
+import * as sharedPick from './shared/lrclibPick';
+import * as serverPick from './server/lib/shared-copies/lrclibPick';
 
-type Record = Parameters<typeof sharedPick>[0][number];
+import * as sharedParse from './shared/parseLrc';
+import * as serverParse from './server/lib/shared-copies/parseLrc';
 
-/** Previous in-server ranking (kept here for regression parity). */
-function legacyServerPick(records: Record[]): Record | null {
-  const withLyrics = records.filter((record) => Boolean(record.plainLyrics?.trim()));
-  if (withLyrics.length === 0) return null;
-
-  const readDuration = (record: Record) =>
-    typeof record.duration === 'number' && record.duration > 0 ? record.duration : null;
-
-  return (
-    withLyrics.find((record) => Boolean(record.syncedLyrics?.trim())) ??
-    withLyrics.find((record) => readDuration(record) !== null) ??
-    withLyrics[0]
-  );
-}
-
-const FIXTURES: Record[][] = [
+const FIXTURES: sharedPick.LrclibPickRecord[][] = [
   [],
   [{ id: 1, plainLyrics: '' }],
   [
@@ -33,10 +20,25 @@ const FIXTURES: Record[][] = [
   ],
 ];
 
-describe('lrclibPick parity (shared vs legacy server)', () => {
+describe('lrclibPick parity (shared vs server/lib/shared-copies)', () => {
   for (const [index, fixture] of FIXTURES.entries()) {
-    it(`fixture ${index} matches legacy server pick`, () => {
-      assert.deepEqual(sharedPick(fixture), legacyServerPick(fixture));
+    it(`pick fixture ${index} matches`, () => {
+      assert.deepEqual(
+        sharedPick.pickBestLrclibRecord(fixture),
+        serverPick.pickBestLrclibRecord(fixture)
+      );
     });
   }
+
+  it('readLrclibDuration matches', () => {
+    const record = { id: 1, duration: 240 };
+    assert.equal(sharedPick.readLrclibDuration(record), serverPick.readLrclibDuration(record));
+  });
+});
+
+describe('parseLrc parity (shared vs server/lib/shared-copies)', () => {
+  it('parses the same LRC sample', () => {
+    const sample = '[00:01.00] Hello\n[00:02.50] World';
+    assert.deepEqual(sharedParse.parseLrc(sample), serverParse.parseLrc(sample));
+  });
 });
