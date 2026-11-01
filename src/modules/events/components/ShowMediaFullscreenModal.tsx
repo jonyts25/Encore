@@ -2,7 +2,7 @@ import { useEventListener } from 'expo';
 import { Image } from 'expo-image';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +15,7 @@ import {
   photosLibraryAssetUri,
   pickPlayableVideoFileUri,
 } from '../showNightLogic';
+import { clearShowNightVideoCache, copyShowNightVideoToCache } from '../showNightVideoCache';
 import type { ShowMediaType } from '../showMediaTypes';
 
 type ShowMediaFullscreenModalProps = {
@@ -24,9 +25,14 @@ type ShowMediaFullscreenModalProps = {
   onClose: () => void;
 };
 
+export type ShowNightPlaybackErrorDetail = {
+  uri: string;
+  message: string;
+};
+
 type ShowNightVideoPlayerProps = {
   localUri: string;
-  onPlaybackError: () => void;
+  onPlaybackError: (detail: ShowNightPlaybackErrorDetail) => void;
 };
 
 function ShowNightVideoPlayer({ localUri, onPlaybackError }: ShowNightVideoPlayerProps) {
@@ -34,9 +40,12 @@ function ShowNightVideoPlayer({ localUri, onPlaybackError }: ShowNightVideoPlaye
     instance.loop = false;
   });
 
-  useEventListener(player, 'statusChange', ({ status }) => {
+  useEventListener(player, 'statusChange', ({ status, error }) => {
     if (status === 'error') {
-      onPlaybackError();
+      const message =
+        error?.message ??
+        (error ? JSON.stringify(error) : 'statusChange error without payload');
+      onPlaybackError({ uri: localUri, message });
     }
   });
 
@@ -65,6 +74,20 @@ export function ShowMediaFullscreenModal({
   const [videoLoading, setVideoLoading] = useState(false);
   const [videoICloud, setVideoICloud] = useState(false);
   const [videoPlaybackError, setVideoPlaybackError] = useState(false);
+  const [playbackErrorDetail, setPlaybackErrorDetail] = useState<ShowNightPlaybackErrorDetail | null>(
+    null
+  );
+
+  const handleClose = useCallback(() => {
+    void clearShowNightVideoCache();
+    onClose();
+  }, [onClose]);
+
+  useEffect(() => {
+    if (!visible) {
+      void clearShowNightVideoCache();
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || !assetId || mediaType !== 'video' || Platform.OS === 'web') {
@@ -72,6 +95,7 @@ export function ShowMediaFullscreenModal({
       setVideoLoading(false);
       setVideoICloud(false);
       setVideoPlaybackError(false);
+      setPlaybackErrorDetail(null);
       return;
     }
 
@@ -80,6 +104,7 @@ export function ShowMediaFullscreenModal({
     setVideoLocalUri(null);
     setVideoICloud(false);
     setVideoPlaybackError(false);
+    setPlaybackErrorDetail(null);
 
     void (async () => {
       try {
@@ -106,8 +131,16 @@ export function ShowMediaFullscreenModal({
           });
         }
 
-        const playable = pickPlayableVideoFileUri(resolved.localUri, resolved.uri);
-        setVideoLocalUri(playable);
+        const sourceUri = pickPlayableVideoFileUri(resolved.localUri, resolved.uri);
+        if (!sourceUri) {
+          setVideoLocalUri(null);
+          return;
+        }
+
+        const cachedUri = await copyShowNightVideoToCache(sourceUri, assetId);
+        if (cancelled) return;
+
+        setVideoLocalUri(cachedUri);
         setVideoICloud(false);
       } catch {
         if (!cancelled) {
@@ -130,10 +163,10 @@ export function ShowMediaFullscreenModal({
   };
 
   return (
-    <Modal animationType="fade" visible={visible} onRequestClose={onClose}>
+    <Modal animationType="fade" visible={visible} onRequestClose={handleClose}>
       <View style={[styles.root, { backgroundColor: '#000' }]}>
         <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
-          <GlassIconButton accessibilityLabel={t('common.close')} icon="close" onPress={onClose} />
+          <GlassIconButton accessibilityLabel={t('common.close')} icon="close" onPress={handleClose} />
         </View>
         {photoUri ? (
           <View style={styles.mediaWrap}>
@@ -154,12 +187,20 @@ export function ShowMediaFullscreenModal({
                 <Text style={[typography.body, styles.loadingCopy, { color: '#fff' }]}>
                   {t('showNight.videoPlaybackError')}
                 </Text>
+                {playbackErrorDetail ? (
+                  <Text style={styles.debugError} selectable>
+                    {`${playbackErrorDetail.message}\n${playbackErrorDetail.uri}`}
+                  </Text>
+                ) : null}
                 <PillButton title={t('showNight.openInPhotos')} variant="secondary" onPress={openPhotosApp} />
               </View>
             ) : videoLocalUri ? (
               <ShowNightVideoPlayer
                 localUri={videoLocalUri}
-                onPlaybackError={() => setVideoPlaybackError(true)}
+                onPlaybackError={(detail) => {
+                  setPlaybackErrorDetail(detail);
+                  setVideoPlaybackError(true);
+                }}
               />
             ) : (
               <View style={styles.errorWrap}>
@@ -205,5 +246,12 @@ const styles = StyleSheet.create({
   loadingCopy: {
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  debugError: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'center',
+    width: '100%',
   },
 });

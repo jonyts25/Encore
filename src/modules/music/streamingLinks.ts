@@ -18,6 +18,10 @@ export function buildYouTubeMusicSearchUrl(query: string): string {
   return `https://music.youtube.com/search?q=${encodeURIComponent(query)}`;
 }
 
+export function buildYouTubeMusicDeepLink(query: string): string {
+  return `youtubemusic://search?q=${encodeURIComponent(query)}`;
+}
+
 export function buildSongSearchQuery(artist: string, title: string): string {
   return `${artist.trim()} ${title.trim()}`.trim();
 }

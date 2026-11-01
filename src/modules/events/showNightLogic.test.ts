@@ -4,6 +4,7 @@ import { describe, it } from 'node:test';
 import {
   getShowNightSearchWindow,
   photosLibraryAssetUri,
+  guessShowNightVideoExtension,
   pickPlayableVideoFileUri,
   stripVideoPlaybackUriFragment,
 } from './showNightLogic';
@@ -37,6 +38,17 @@ function baseShow(overrides: Partial<Show> = {}): Show {
     ...overrides,
   };
 }
+
+describe('guessShowNightVideoExtension', () => {
+  it('preserves common video extensions and strips query or hash', () => {
+    assert.equal(guessShowNightVideoExtension('file:///var/IMG_1.MOV#fragment'), '.mov');
+    assert.equal(guessShowNightVideoExtension('file:///var/video.mp4?cache=1'), '.mp4');
+  });
+
+  it('defaults to .mov for iPhone camera paths without extension', () => {
+    assert.equal(guessShowNightVideoExtension('file:///var/mobile/DCIM/100APPLE/IMG_0001'), '.mov');
+  });
+});
 
 describe('pickPlayableVideoFileUri', () => {
   it('prefers localUri and strips hash fragments', () => {
