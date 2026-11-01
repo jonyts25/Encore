@@ -2,7 +2,7 @@ import {
   APP_NAME,
   PRIVACY_NOTICE_LAST_UPDATED,
   privacyContactEmail,
-} from '../../shared/encoreConfig';
+} from './encoreConfig';
 
 export type PrivacySection = {
   title: string;
