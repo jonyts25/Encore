@@ -72,6 +72,12 @@ export type ParsedSetlistSong = {
 
 export interface SetlistFmAdapter {
   searchArtistsByName(name: string, page?: number): Promise<SetlistFmArtist[]>;
+  searchSetlists(params: {
+    artistMbid?: string;
+    artistName?: string;
+    date: string;
+    page?: number;
+  }): Promise<SetlistFmSetlist[]>;
   getArtistSetlists(mbid: string, page?: number): Promise<SetlistFmSetlist[]>;
   getArtistSetlistsOnDate(mbid: string, eventDateDdMmYyyy: string, page?: number): Promise<SetlistFmSetlist[]>;
   getSetlist(setlistId: string): Promise<SetlistFmSetlist>;

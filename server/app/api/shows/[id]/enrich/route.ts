@@ -27,8 +27,13 @@ export async function POST(request: Request, context: RouteContext) {
       return jsonError('Show not found', 404);
     }
 
-    const link = await linkShowToSetlistFm(showId);
-    const effectiveShowId = link.showId;
+    let effectiveShowId = showId;
+    try {
+      const link = await linkShowToSetlistFm(showId);
+      effectiveShowId = link.showId;
+    } catch (linkError) {
+      console.error('[enrich] setlist.fm link failed (continuing enrich)', showId, linkError);
+    }
     const slot = startEnrichShowInBackground(effectiveShowId);
     return jsonOk(
       { status: slot, show_id: effectiveShowId },

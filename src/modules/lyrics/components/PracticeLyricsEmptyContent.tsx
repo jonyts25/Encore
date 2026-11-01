@@ -28,6 +28,7 @@ import type { PracticePackSong } from '@/modules/events/practicePackTypes';
 import { practiceSongErrorMessageKey } from '@/modules/events/practiceSongErrors';
 import { addPracticeSongToShowPack } from '@/modules/events/showPack';
 import type { Show } from '@/modules/events/types';
+import { getShowPhase } from '@/modules/events/visibility';
 import { filterSongsByQuery, normalizeSongSearchQuery } from '@/modules/live/liveSongSearchLogic';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
 import {
@@ -81,7 +82,10 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
 
   const catalogSongs = artistSongsQuery.data ?? [];
   const practiceSongs = practiceSongsQuery.data ?? [];
-  const { prediction, isLoading: isPredictionLoading } = useShowPrediction(show.id);
+  const isPastShow = getShowPhase(show) === 'past';
+  const { prediction, isLoading: isPredictionLoading } = useShowPrediction(show.id, {
+    enabled: !isPastShow,
+  });
 
   const predictedSongs = useMemo(() => {
     if (!prediction || prediction.songs.length === 0) return [];
@@ -258,7 +262,7 @@ export function PracticeLyricsEmptyContent({ show }: PracticeLyricsEmptyContentP
         </View>
       ) : null}
 
-      {!searchMode && (isPredictionLoading || predictedSongs.length > 0) ? (
+      {!searchMode && !isPastShow && (isPredictionLoading || predictedSongs.length > 0) ? (
         <View style={styles.section}>
           <Text style={[typography.bodySemibold, { color: tokens.text }]}>
             {t('practice.probableSetlist')}

@@ -182,3 +182,25 @@ export function resolveRequestedSetlistDate(
     isoShowDateToSetlistFmDate(showDateIso)
   );
 }
+
+export function normalizeArtistName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+export function setlistArtistMatchesShow(
+  setlist: SetlistFmSetlist,
+  artistMbid: string | null,
+  artistName: string
+): boolean {
+  const setlistMbid = setlist.artist.mbid?.trim().toLowerCase();
+  const targetMbid = artistMbid?.trim().toLowerCase();
+  if (setlistMbid && targetMbid && setlistMbid === targetMbid) {
+    return true;
+  }
+  return normalizeArtistName(setlist.artist.name) === normalizeArtistName(artistName);
+}

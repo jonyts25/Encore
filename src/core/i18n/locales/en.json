@@ -328,6 +328,13 @@
       "minutesAgo": "{{count}} min ago",
       "hoursAgo": "{{count}} h ago",
       "daysAgo": "{{count}} d ago"
+    },
+    "pastSetlist": {
+      "notFound": "We haven't found this night's setlist yet",
+      "pasteLink": "Paste setlist.fm link",
+      "pasteTitle": "Paste setlist.fm link",
+      "pasteSubmit": "Link setlist",
+      "dateMismatch": "That setlist is from a different date"
     }
   },
   "memory": {

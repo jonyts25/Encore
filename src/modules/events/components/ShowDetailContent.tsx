@@ -4,6 +4,7 @@ import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import {
   Linking as RNLinking,
@@ -34,14 +35,17 @@ import {
 import { sortPredictedSongsByPosition } from '@/modules/setlist/predictionDisplay';
 import type { SetlistPredictionStructure } from '@/modules/setlist/types';
 
+import { fetchShowSongsForPrefill } from '@/modules/memory/memoryApi';
+
 import { formatShowDate } from '../api';
+import { PastSetlistLinkSection } from './PastSetlistLinkSection';
 import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShowEnrichIfNeeded } from '../hooks/useShowEnrichIfNeeded';
 import { useShow } from '../hooks/useShow';
 import { prefetchShowPack } from '../showPack';
 import { isShowPackSetlistLyricsComplete } from '../showPackLogic';
-import { hasConfirmedTime } from '../visibility';
+import { getShowPhase, hasConfirmedTime } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
 import { buildAppleMapsUrl } from '../showDetailMaps';
 import { SHOW_DETAIL_CANVAS, SHOW_DETAIL_PURPLE, SHOW_DETAIL_SURFACE } from '../showDetailTheme';
@@ -118,6 +122,19 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     : null;
 
   const tourSubtitle = show?.tour?.name?.trim() ?? null;
+
+  const showPhase = show ? getShowPhase(show) : null;
+  const isPastShow = showPhase === 'past';
+
+  const { data: ingestedShowSongs = [] } = useQuery({
+    queryKey: ['showSongPrefillCount', showId],
+    queryFn: () => fetchShowSongsForPrefill(showId),
+    enabled: Boolean(showId && isPastShow),
+    staleTime: 60_000,
+  });
+
+  const hasIngestedSetlist = ingestedShowSongs.length > 0 || Boolean(show?.setlistfm_id);
+  const showPastSetlistMissing = Boolean(isPastShow && show && !hasIngestedSetlist);
 
   useEffect(() => {
     if (!show || !prediction) return;
@@ -377,22 +394,40 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
             </View>
           ) : null}
 
-          <View style={styles.setlistHeader}>
-            <Text style={[typography.title, { color: tokens.text }]}>{t('setlist.probableTitle')}</Text>
-            {predictionMeta ? (
-              <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{predictionMeta}</Text>
-            ) : null}
-          </View>
+          {showPastSetlistMissing ? (
+            <PastSetlistLinkSection
+              showId={show.id}
+              onLinked={(resolvedId) => {
+                if (resolvedId !== showId) {
+                  router.replace(`/show/${resolvedId}`);
+                  return;
+                }
+                void refetch();
+                void queryClient.invalidateQueries({ queryKey: ['showSongPrefillCount', showId] });
+              }}
+            />
+          ) : !isPastShow ? (
+            <>
+              <View style={styles.setlistHeader}>
+                <Text style={[typography.title, { color: tokens.text }]}>{t('setlist.probableTitle')}</Text>
+                {predictionMeta ? (
+                  <Text style={[typography.secondary, { color: tokens.textSecondary }]}>
+                    {predictionMeta}
+                  </Text>
+                ) : null}
+              </View>
 
-          <SetlistPredictionPanel
-            artistId={show.artist_id}
-            artistName={show.artist.name}
-            includeCommunityPlaylists={false}
-            isEnriching={isEnriching}
-            showId={show.id}
-            tourId={show.tour_id}
-            variant="compact"
-          />
+              <SetlistPredictionPanel
+                artistId={show.artist_id}
+                artistName={show.artist.name}
+                includeCommunityPlaylists={false}
+                isEnriching={isEnriching}
+                showId={show.id}
+                tourId={show.tour_id}
+                variant="compact"
+              />
+            </>
+          ) : null}
 
           <CommunityPlaylistsSection artistId={show.artist_id} tourId={show.tour_id} />
 

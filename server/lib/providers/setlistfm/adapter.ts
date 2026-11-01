@@ -74,7 +74,15 @@ function buildSongNotes(song: SetlistFmSong): string | null {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
-async function setlistFmRequest<T>(path: string): Promise<T> {
+type SetlistFmRequestOptions = {
+  /** setlist.fm returns 404 when a search has zero hits — treat as empty. */
+  emptyOnNotFound?: boolean;
+};
+
+async function setlistFmRequest<T>(
+  path: string,
+  options: SetlistFmRequestOptions = {}
+): Promise<T | null> {
   const limiter = getSharedSetlistFmRateLimiter();
   await limiter.acquire();
 
@@ -86,6 +94,10 @@ async function setlistFmRequest<T>(path: string): Promise<T> {
     cache: 'no-store',
   });
 
+  if (response.status === 404 && options.emptyOnNotFound) {
+    return null;
+  }
+
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`setlist.fm request failed (${response.status}): ${text}`);
@@ -94,48 +106,77 @@ async function setlistFmRequest<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
+function parseSetlistSearchPage(data: SetlistFmPaginated<SetlistFmSetlist> | null): SetlistFmSetlist[] {
+  if (!data) return [];
+  return data.setlist ?? data.setlists ?? [];
+}
+
+export type SearchSetlistsParams = {
+  artistMbid?: string;
+  artistName?: string;
+  date: string;
+  page?: number;
+};
+
 export class SetlistFmProvider implements SetlistFmAdapter {
+  async searchSetlists(params: SearchSetlistsParams): Promise<SetlistFmSetlist[]> {
+    const query = new URLSearchParams({
+      date: params.date,
+      p: String(params.page ?? 1),
+    });
+    if (params.artistMbid?.trim()) {
+      query.set('artistMbid', params.artistMbid.trim());
+    }
+    if (params.artistName?.trim()) {
+      query.set('artistName', params.artistName.trim());
+    }
+
+    const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmSetlist>>(
+      `/1.0/search/setlists?${query.toString()}`,
+      { emptyOnNotFound: true }
+    );
+    return parseSetlistSearchPage(data);
+  }
+
   async searchArtistsByName(name: string, page = 1): Promise<SetlistFmArtist[]> {
     const params = new URLSearchParams({
       artistName: name,
       p: String(page),
     });
     const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmArtist>>(
-      `/1.0/search/artists?${params.toString()}`
+      `/1.0/search/artists?${params.toString()}`,
+      { emptyOnNotFound: true }
     );
-    return data.artist ?? [];
+    return data?.artist ?? [];
   }
 
   async getArtistSetlists(mbid: string, page = 1): Promise<SetlistFmSetlist[]> {
     const params = new URLSearchParams({ p: String(page) });
     const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmSetlist>>(
-      `/1.0/artist/${mbid}/setlists?${params.toString()}`
+      `/1.0/artist/${mbid}/setlists?${params.toString()}`,
+      { emptyOnNotFound: true }
     );
-    return data.setlist ?? [];
+    return data?.setlist ?? [];
   }
 
-  /**
-   * Date-filtered setlists must use search/setlists — artist/{mbid}/setlists ignores `date`.
-   * @see https://api.setlist.fm/docs/1.0/resource__search_setlists.html
-   */
   async getArtistSetlistsOnDate(
     mbid: string,
     eventDateDdMmYyyy: string,
     page = 1
   ): Promise<SetlistFmSetlist[]> {
-    const params = new URLSearchParams({
+    return this.searchSetlists({
       artistMbid: mbid,
       date: eventDateDdMmYyyy,
-      p: String(page),
+      page,
     });
-    const data = await setlistFmRequest<SetlistFmPaginated<SetlistFmSetlist>>(
-      `/1.0/search/setlists?${params.toString()}`
-    );
-    return data.setlist ?? [];
   }
 
   async getSetlist(setlistId: string): Promise<SetlistFmSetlist> {
-    return setlistFmRequest<SetlistFmSetlist>(`/1.0/setlist/${setlistId}`);
+    const data = await setlistFmRequest<SetlistFmSetlist>(`/1.0/setlist/${setlistId}`);
+    if (!data) {
+      throw new Error(`setlist.fm setlist not found: ${setlistId}`);
+    }
+    return data;
   }
 }
 

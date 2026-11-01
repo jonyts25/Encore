@@ -13,10 +13,12 @@ import {
   parseSetlistFmSetlistIdFromUrl,
   pickBestMatchingSetlist,
   resolveRequestedSetlistDate,
+  setlistArtistMatchesShow,
   setlistMatchesRequestedShowDate,
   shouldRunSetlistLink,
   venueMatchesForSetlistLink,
 } from './setlistfm-link-logic';
+import { parseSetlistFmLocalDate } from './providers/setlistfm';
 import { createSupabaseAdminClient } from './supabase';
 
 export type LinkShowToSetlistFmResult = {
@@ -53,15 +55,36 @@ async function markSetlistChecked(
 
 async function fetchSetlistsForShowDate(
   provider: ReturnType<typeof getSetlistFmProvider>,
-  mbid: string,
-  setlistDate: string
+  params: { mbid: string; artistName: string; setlistDate: string }
 ): Promise<SetlistFmSetlist[]> {
   const collected: SetlistFmSetlist[] = [];
+
   for (let page = 1; page <= 3; page += 1) {
-    const batch = await provider.getArtistSetlistsOnDate(mbid, setlistDate, page);
+    const batch = await provider.searchSetlists({
+      artistMbid: params.mbid,
+      date: params.setlistDate,
+      page,
+    });
     if (batch.length === 0) break;
     collected.push(...batch);
   }
+
+  if (collected.length === 0 && params.artistName.trim()) {
+    for (let page = 1; page <= 3; page += 1) {
+      const batch = await provider.searchSetlists({
+        artistName: params.artistName,
+        date: params.setlistDate,
+        page,
+      });
+      if (batch.length === 0) break;
+      collected.push(
+        ...batch.filter((item) =>
+          setlistArtistMatchesShow(item, params.mbid, params.artistName)
+        )
+      );
+    }
+  }
+
   return collected;
 }
 
@@ -244,7 +267,11 @@ export async function linkShowToSetlistFm(
     };
   }
 
-  const setlists = await fetchSetlistsForShowDate(provider, resolvedMbid, setlistDate);
+  const setlists = await fetchSetlistsForShowDate(provider, {
+    mbid: resolvedMbid,
+    artistName: artist.name,
+    setlistDate,
+  });
   const picked = pickBestMatchingSetlist(setlists, setlistDate, venueHint);
 
   if (!picked) {
@@ -332,6 +359,107 @@ export async function linkShowToSetlistFm(
   };
 }
 
+export async function linkSetlistUrlToShow(
+  showId: string,
+  url: string
+): Promise<{ showId: string; songsInserted: number }> {
+  const setlistId = parseSetlistFmSetlistIdFromUrl(url);
+  if (!setlistId) {
+    throw new Error('invalid_setlist_url');
+  }
+
+  const supabase = createSupabaseAdminClient();
+  const provider = getSetlistFmProvider();
+
+  const { data: show, error: showError } = await supabase
+    .from('shows')
+    .select(
+      `
+      id,
+      artist_id,
+      show_date,
+      local_date,
+      source,
+      artist:artists ( id, name, mbid ),
+      venue:venues ( city, lat, lng )
+    `
+    )
+    .eq('id', showId)
+    .maybeSingle();
+
+  if (showError) throw showError;
+  if (!show) throw new Error(`Show not found: ${showId}`);
+
+  const row = show as unknown as ShowLinkRow;
+  const artist = Array.isArray(row.artist) ? row.artist[0] : row.artist;
+  const venue = Array.isArray(row.venue) ? row.venue[0] : row.venue;
+  if (!artist) throw new Error(`Show ${showId} is missing artist`);
+
+  let setlist: SetlistFmSetlist;
+  try {
+    setlist = await provider.getSetlist(setlistId);
+  } catch {
+    throw new Error('setlist_not_found');
+  }
+
+  const expectedDate = resolveRequestedSetlistDate(row.local_date, row.show_date);
+  if (!expectedDate || !setlistMatchesRequestedShowDate(setlist, expectedDate)) {
+    throw new Error('setlist_date_mismatch');
+  }
+
+  if (!setlistArtistMatchesShow(setlist, artist.mbid, artist.name)) {
+    throw new Error('setlist_artist_mismatch');
+  }
+
+  const venueHint = {
+    city: venue?.city ?? null,
+    lat: venue?.lat ?? null,
+    lng: venue?.lng ?? null,
+  };
+
+  const { data: existingBySetlist, error: existingError } = await supabase
+    .from('shows')
+    .select('id')
+    .eq('setlistfm_id', setlist.id)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  let targetShowId = row.id;
+
+  if (existingBySetlist?.id && existingBySetlist.id !== row.id) {
+    await attachLinkedSetlist(supabase, {
+      showId: existingBySetlist.id as string,
+      artistId: row.artist_id,
+      setlist,
+      provider,
+      userShow: false,
+      venueHint,
+    });
+    await mergeShowIntoCanonical(supabase, row.id, existingBySetlist.id as string);
+    targetShowId = existingBySetlist.id as string;
+  } else {
+    const attached = await attachLinkedSetlist(supabase, {
+      showId: row.id,
+      artistId: row.artist_id,
+      setlist,
+      provider,
+      userShow: true,
+      venueHint,
+    });
+    targetShowId = attached.showId;
+  }
+
+  await markSetlistChecked(supabase, targetShowId, new Date());
+
+  const { count } = await supabase
+    .from('show_songs')
+    .select('id', { count: 'exact', head: true })
+    .eq('show_id', targetShowId);
+
+  return { showId: targetShowId, songsInserted: count ?? 0 };
+}
+
 export async function importSetlistFromUrl(url: string): Promise<{ showId: string }> {
   const setlistId = parseSetlistFmSetlistIdFromUrl(url);
   if (!setlistId) {
@@ -377,6 +505,21 @@ export async function importSetlistFromUrl(url: string): Promise<{ showId: strin
       mode: 'canonical',
     });
     return { showId: existingShow.id as string };
+  }
+
+  const localDate = parseSetlistFmLocalDate(setlist.eventDate);
+  const { data: sameDayShow, error: sameDayError } = await supabase
+    .from('shows')
+    .select('id')
+    .eq('artist_id', artist.id)
+    .eq('local_date', localDate)
+    .maybeSingle();
+
+  if (sameDayError) throw sameDayError;
+
+  if (sameDayShow?.id) {
+    const linked = await linkSetlistUrlToShow(sameDayShow.id as string, url);
+    return { showId: linked.showId };
   }
 
   await ingestSetlistEntry(supabase, artist.id, setlist, provider, {

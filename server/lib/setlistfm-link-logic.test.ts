@@ -3,8 +3,10 @@ import { describe, it } from 'node:test';
 
 import {
   filterSetlistsByExactEventDate,
+  normalizeArtistName,
   parseSetlistFmSetlistIdFromUrl,
   pickBestMatchingSetlist,
+  setlistArtistMatchesShow,
   shouldRunSetlistLink,
   showLocalDateToSetlistFmDate,
   venueMatchesForSetlistLink,
@@ -110,6 +112,34 @@ describe('venueMatchesForSetlistLink', () => {
 describe('showLocalDateToSetlistFmDate', () => {
   it('formats ISO local date to dd-MM-yyyy', () => {
     assert.equal(showLocalDateToSetlistFmDate('2024-10-26'), '26-10-2024');
+  });
+});
+
+describe('setlistArtistMatchesShow', () => {
+  const manaMbid = '55441123-89a2-49ab-ae3f-df7a3e86835a';
+
+  it('matches by mbid', () => {
+    const item = setlist('León', '26-10-2024', 21.12, -101.68);
+    item.artist = { mbid: manaMbid, name: 'Maná' };
+    assert.equal(setlistArtistMatchesShow(item, manaMbid, 'Maná'), true);
+  });
+
+  it('matches by normalized name when mbid differs', () => {
+    const item = setlist('León', '26-10-2024', 21.12, -101.68);
+    item.artist = { mbid: 'other-mbid', name: 'Maná' };
+    assert.equal(setlistArtistMatchesShow(item, manaMbid, 'Mana'), true);
+  });
+
+  it('rejects unrelated artist', () => {
+    const item = setlist('León', '26-10-2024', 21.12, -101.68);
+    item.artist = { mbid: 'x', name: 'Coldplay' };
+    assert.equal(setlistArtistMatchesShow(item, manaMbid, 'Maná'), false);
+  });
+});
+
+describe('normalizeArtistName', () => {
+  it('strips accents for comparison', () => {
+    assert.equal(normalizeArtistName('Maná'), normalizeArtistName('Mana'));
   });
 });
 

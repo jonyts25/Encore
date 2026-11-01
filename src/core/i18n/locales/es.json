@@ -328,6 +328,13 @@
       "minutesAgo": "hace {{count}} min",
       "hoursAgo": "hace {{count}} h",
       "daysAgo": "hace {{count}} d"
+    },
+    "pastSetlist": {
+      "notFound": "Aún no encontramos el setlist de esta noche",
+      "pasteLink": "Pegar link de setlist.fm",
+      "pasteTitle": "Pegar link de setlist.fm",
+      "pasteSubmit": "Ligar setlist",
+      "dateMismatch": "Ese setlist es de otra fecha"
     }
   },
   "memory": {
