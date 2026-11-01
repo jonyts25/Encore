@@ -7,7 +7,12 @@ import { getShowPackRecord, setShowPackRecord } from '@/core/db/showPackCache';
 import { queryKeys } from '@/core/query';
 
 import { addUserSong, fetchArtistSongs } from '@/modules/catalog/api';
-import { fetchLyrics, isLyricsBusyError, isLyricsNetworkFailure } from '@/modules/lyrics/api';
+import {
+  fetchLyrics,
+  getShowPackLyricsBatchSize,
+  isLyricsBusyError,
+  isLyricsNetworkFailure,
+} from '@/modules/lyrics/api';
 import { fetchShowPrediction } from '@/modules/setlist/api';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
@@ -219,8 +224,9 @@ export async function prefetchShowPack(
       lyricsBusyTitles: existingRecord?.lyricsBusyTitles ?? [],
     };
 
-    for (let index = 0; index < targets.length; index += LYRICS_BATCH_SIZE) {
-      const batch = targets.slice(index, index + LYRICS_BATCH_SIZE);
+    for (let index = 0; index < targets.length; ) {
+      const batchSize = getShowPackLyricsBatchSize(LYRICS_BATCH_SIZE);
+      const batch = targets.slice(index, index + batchSize);
       await Promise.all(
         batch.map(async ({ artist, title }) => {
           try {
@@ -254,7 +260,9 @@ export async function prefetchShowPack(
         practiceSongs: existingPractice,
       });
 
-      if (index + LYRICS_BATCH_SIZE < targets.length) {
+      index += batchSize;
+
+      if (index < targets.length) {
         await new Promise((resolve) => setTimeout(resolve, LYRICS_BATCH_PAUSE_MS));
       }
     }

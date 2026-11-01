@@ -29,7 +29,7 @@ describe('fetchLrclibSearchDirect', () => {
       );
     };
 
-    const data = await fetchLrclibSearchDirect('Band', 'Track', fetchFn);
+    const data = await fetchLrclibSearchDirect('Band', 'Track', { fetchFn });
     assert.equal(capturedHeader, LRCLIB_CLIENT_HEADER);
     assert.equal(data?.lyrics.id, '2');
     assert.equal(data?.lyrics.synced_lines.length, 1);

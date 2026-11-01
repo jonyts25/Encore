@@ -4,8 +4,8 @@ type QueueTask<T> = {
   reject: (error: unknown) => void;
 };
 
-const MAX_CONCURRENT_DIRECT_LRCLIB = 2;
-const MIN_GAP_BETWEEN_STARTS_MS = 300;
+const MAX_CONCURRENT_DIRECT_LRCLIB = 3;
+const MIN_GAP_BETWEEN_STARTS_MS = 250;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

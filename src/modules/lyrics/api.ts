@@ -2,6 +2,13 @@ import { apiFetch, ApiError } from '@/core/api/client';
 
 import { LyricsBusyError, toLyricsFetchError } from './errors';
 import { shouldTryDirectLrclibFallback, tryDirectLrclibFallback } from './fetchLyricsFallback';
+import {
+  isLyricsServerCircuitOpen,
+  recordLyricsServerBusy,
+  recordLyricsServerNonBusyFailure,
+  recordLyricsServerSuccess,
+  shouldBypassLyricsServer,
+} from './lyricsServerCircuitBreaker';
 import { getCachedLyrics, setCachedLyrics } from '@/core/db';
 
 import {
@@ -56,6 +63,64 @@ type FetchLyricsOptions = {
   expiresAt?: number;
 };
 
+function isLyricsBusyApiError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const body = error.body as { error?: string } | null;
+  return error.status === 503 && body?.error === 'lyrics_busy';
+}
+
+async function fetchLyricsViaDirect(
+  artist: string,
+  title: string,
+  options?: FetchLyricsOptions
+): Promise<LyricsResult | null | undefined> {
+  return tryDirectLrclibFallback(artist, title, {
+    expiresAt: options?.expiresAt,
+    mapResponse,
+    setCached: setCachedLyrics,
+  });
+}
+
+async function fetchLyricsFromServer(
+  artist: string,
+  title: string,
+  options?: FetchLyricsOptions
+): Promise<LyricsResult | null> {
+  const params = new URLSearchParams({ artist, title });
+
+  try {
+    const data = await apiFetch<LyricsSearchResponse>(`/api/lyrics/search?${params.toString()}`);
+    recordLyricsServerSuccess();
+    const result = mapResponse(data);
+    await setCachedLyrics(artist, title, result, { expiresAt: options?.expiresAt });
+    return result;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      recordLyricsServerNonBusyFailure();
+      return null;
+    }
+
+    if (isLyricsBusyApiError(error)) {
+      recordLyricsServerBusy();
+    } else if (error instanceof ApiError) {
+      recordLyricsServerNonBusyFailure();
+    }
+
+    if (shouldTryDirectLrclibFallback(error)) {
+      const direct = await fetchLyricsViaDirect(artist, title, options);
+      if (direct !== undefined) {
+        return direct;
+      }
+    }
+
+    const fallback = await getCachedLyrics(artist, title);
+    if (fallback) {
+      return normalizeCachedResult(fallback);
+    }
+    throw toLyricsFetchError(error);
+  }
+}
+
 export async function fetchLyrics(
   artist: string,
   title: string,
@@ -69,35 +134,15 @@ export async function fetchLyrics(
     return normalizeCachedResult(cached);
   }
 
-  const params = new URLSearchParams({ artist, title });
-
-  try {
-    const data = await apiFetch<LyricsSearchResponse>(`/api/lyrics/search?${params.toString()}`);
-    const result = mapResponse(data);
-    await setCachedLyrics(artist, title, result, { expiresAt: options?.expiresAt });
-    return result;
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null;
+  if (shouldBypassLyricsServer()) {
+    const direct = await fetchLyricsViaDirect(artist, title, options);
+    if (direct !== undefined) {
+      return direct;
     }
-
-    if (shouldTryDirectLrclibFallback(error)) {
-      const direct = await tryDirectLrclibFallback(artist, title, {
-        expiresAt: options?.expiresAt,
-        mapResponse,
-        setCached: setCachedLyrics,
-      });
-      if (direct !== undefined) {
-        return direct;
-      }
-    }
-
-    const fallback = await getCachedLyrics(artist, title);
-    if (fallback) {
-      return normalizeCachedResult(fallback);
-    }
-    throw toLyricsFetchError(error);
+    throw new LyricsBusyError();
   }
+
+  return fetchLyricsFromServer(artist, title, options);
 }
 
 export async function searchLyricsMatches(
@@ -130,6 +175,7 @@ export async function searchLyricsMatches(
 }
 
 export { LyricsBusyError, isLyricsBusyError, isLyricsNetworkFailure } from './errors';
+export { isLyricsServerCircuitOpen, getShowPackLyricsBatchSize } from './lyricsServerCircuitBreaker';
 
 export function buildGeniusSearchUrl(artist: string, title: string): string {
   const query = encodeURIComponent(`${artist} ${title}`);
