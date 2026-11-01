@@ -200,7 +200,7 @@ export function ShowNightSharePreviewContent() {
       if (!target) return;
 
       const nextHighlight = !target.is_highlight;
-      if (!canToggleHighlight(memory, songId, nextHighlight)) {
+      if (!canToggleHighlight(cached, songId, nextHighlight)) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         return;
       }
@@ -208,7 +208,7 @@ export function ShowNightSharePreviewContent() {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       try {
-        const updated = await setMemorySongHighlight(userId, memory, showId, songId, nextHighlight);
+        const updated = await setMemorySongHighlight(userId, cached, showId, songId, nextHighlight);
         queryClient.setQueryData(queryKeys.memory(showId, userId), updated);
         bumpShowNightShareCaptureVersion();
       } catch (error) {
