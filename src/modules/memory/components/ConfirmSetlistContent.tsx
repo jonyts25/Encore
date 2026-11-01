@@ -311,7 +311,13 @@ export function ConfirmSetlistContent({ showId }: ConfirmSetlistContentProps) {
 
         <View style={styles.section}>
           <Text style={[typography.title, { color: tokens.text }]}>{t('memory.setlist.songsTitle')}</Text>
-          {artistName ? <ListenSetlistButton artistName={artistName} /> : null}
+          {artistName ? (
+            <ListenSetlistButton
+              artistId={show?.artist_id}
+              artistName={artistName}
+              tourId={show?.tour_id ?? null}
+            />
+          ) : null}
           {rowsToDraft(rows).items.length === 0 ? (
             <Text style={[typography.secondary, { color: tokens.textSecondary }]}>{t('memory.setlist.empty')}</Text>
           ) : null}

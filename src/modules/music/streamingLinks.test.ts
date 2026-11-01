@@ -51,6 +51,20 @@ describe('streamingLinks', () => {
   });
 });
 
+describe('songlink parseSonglinkResponse', () => {
+  it('maps platform URLs from song.link payload shape', async () => {
+    const { parseSonglinkResponse } = await import(
+      '../../../server/lib/providers/songlink/parseSonglinkResponse'
+    );
+    const links = parseSonglinkResponse({
+      linksByPlatform: {
+        spotify: { url: 'https://open.spotify.com/track/1' },
+      },
+    });
+    assert.equal(links.spotify, 'https://open.spotify.com/track/1');
+  });
+});
+
 describe('appleMusicItunes', () => {
   afterEach(() => {
     clearAppleMusicItunesCacheForTests();

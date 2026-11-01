@@ -2,6 +2,7 @@ type ItunesSearchResponse = {
   resultCount?: number;
   results?: Array<{
     trackViewUrl?: string;
+    artistLinkUrl?: string;
     artistViewUrl?: string;
     collectionViewUrl?: string;
   }>;
@@ -67,6 +68,7 @@ export async function resolveAppleMusicArtistUrl(artist: string): Promise<string
   });
 
   const artistUrl =
+    data.results?.[0]?.artistLinkUrl ??
     data.results?.[0]?.artistViewUrl ??
     data.results?.[0]?.collectionViewUrl ??
     `https://music.apple.com/mx/search?term=${encodeURIComponent(artist.trim())}`;

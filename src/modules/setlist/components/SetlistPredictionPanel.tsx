@@ -91,7 +91,7 @@ export function SetlistPredictionPanel({
         <ThemedText style={styles.empty}>{t('setlist.insufficientData')}</ThemedText>
       ) : null}
 
-      <ListenSetlistButton artistName={artistName} />
+      <ListenSetlistButton artistId={artistId} artistName={artistName} tourId={tourId} />
       <CommunityPlaylistsSection artistId={artistId} tourId={tourId} />
 
       {!isLoading && !error && prediction && prediction.songs.length > 0 ? (
