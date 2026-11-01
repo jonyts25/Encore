@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/core/i18n';
@@ -65,6 +66,8 @@ export function SetlistPredictionPanel({
   const disclaimerKey = prediction ? getPredictionDisclaimerKey(prediction.structure) : null;
   const disclaimerParams = prediction ? getPredictionDisclaimerParams(prediction, locale) : undefined;
   const sortedSongs = prediction ? sortPredictedSongsForDisplay(prediction) : [];
+  const rotationSongs = prediction?.others ?? [];
+  const [rotationExpanded, setRotationExpanded] = useState(false);
 
   const isCompact = variant === 'compact';
 
@@ -196,6 +199,32 @@ export function SetlistPredictionPanel({
               )
             )}
           </View>
+
+          {!isCompact && rotationSongs.length > 0 ? (
+            <View style={styles.rotationBlock}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setRotationExpanded((value) => !value)}
+                style={({ pressed }) => [styles.rotationHeader, pressed && styles.rotationHeaderPressed]}>
+                <ThemedText style={styles.rotationTitle}>{t('setlist.rotationSectionTitle')}</ThemedText>
+                <ThemedText style={styles.rotationChevron}>{rotationExpanded ? '▾' : '▸'}</ThemedText>
+              </Pressable>
+              {rotationExpanded ? (
+                <View style={styles.rotationList}>
+                  {rotationSongs.map((song) => (
+                    <View key={song.song_id} style={styles.rotationRow}>
+                      <ThemedText style={styles.rotationSongTitle}>{song.title}</ThemedText>
+                      <ThemedText style={styles.rotationPct}>
+                        {t('setlist.rotationFrequency', {
+                          pct: Math.round(song.frequency_pct),
+                        })}
+                      </ThemedText>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </>
       ) : null}
     </ThemedView>
@@ -346,5 +375,43 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     opacity: 0.75,
+  },
+  rotationBlock: {
+    gap: 6,
+    marginTop: 8,
+  },
+  rotationChevron: {
+    fontSize: 16,
+    opacity: 0.6,
+  },
+  rotationHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  rotationHeaderPressed: {
+    opacity: 0.75,
+  },
+  rotationList: {
+    gap: 8,
+  },
+  rotationPct: {
+    fontSize: 13,
+    opacity: 0.7,
+  },
+  rotationRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'space-between',
+  },
+  rotationSongTitle: {
+    flex: 1,
+    fontSize: 15,
+  },
+  rotationTitle: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

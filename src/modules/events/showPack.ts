@@ -20,13 +20,20 @@ import { fetchShowById } from './api';
 import type { PracticePackSong } from './practicePackTypes';
 import { scheduleBusyLyricsRetry } from './showPackBusyLyricsRetry';
 import { withShowPackPrefetchLock } from './showPackLock';
+import { fetchLyricsForMedleySong } from '@/modules/lyrics/medleyLyrics';
+import { isMedleySong } from '@/modules/lyrics/medleyParts';
+
 import {
   addLyricsBusyTitle,
+  buildShowPackLyricsTargets,
   collectShowPackSongTitles,
   isShowWithinLyricsPrefetchSchedule,
   mergePracticeSong,
   removeLyricsBusyTitle,
   shouldPrefetchShowPackRecord,
+  showPackSegmentTotals,
+  type ShowPackLyricsSegment,
+  type ShowPackLyricsTarget,
 } from './showPackLogic';
 import type { Show } from './types';
 import { activeCutoffIso } from './visibility';
@@ -70,23 +77,44 @@ function isPrefetchQueryMissingOrFailed(
   return false;
 }
 
-function songTargets(
-  prediction: SetlistPrediction | null,
-  artistName: string,
-  practiceSongs: readonly PracticePackSong[]
-): { artist: string; title: string }[] {
-  return collectShowPackSongTitles(prediction, practiceSongs).map((title) => ({
-    artist: artistName,
-    title,
-  }));
-}
-
 type LyricsFetchCounters = {
   lyricsCached: number;
+  lyricsSetlistCached: number;
+  lyricsRotationCached: number;
   lyricsFailed: number;
   lyricsMissingTitles: string[];
   lyricsBusyTitles: string[];
 };
+
+function emptyCounters(existingBusy: readonly string[]): LyricsFetchCounters {
+  return {
+    lyricsCached: 0,
+    lyricsSetlistCached: 0,
+    lyricsRotationCached: 0,
+    lyricsFailed: 0,
+    lyricsMissingTitles: [],
+    lyricsBusyTitles: [...existingBusy],
+  };
+}
+
+function incrementLyricsCached(counters: LyricsFetchCounters, segment: ShowPackLyricsSegment): void {
+  counters.lyricsCached += 1;
+  if (segment === 'setlist') counters.lyricsSetlistCached += 1;
+  else if (segment === 'rotation') counters.lyricsRotationCached += 1;
+}
+
+async function fetchPackTargetLyrics(
+  target: ShowPackLyricsTarget,
+  expiresAt: number
+): Promise<boolean> {
+  const result = await fetchLyricsForMedleySong(
+    target.artist,
+    target.title,
+    (partTitle) => fetchLyrics(target.artist, partTitle, { expiresAt }),
+    target.isMedley
+  );
+  return result !== null;
+}
 
 function applyLyricsFetchError(
   counters: LyricsFetchCounters,
@@ -156,6 +184,10 @@ export async function prefetchShowPack(
       status: 'downloading',
       lyricsCached: existingRecord?.lyricsCached ?? 0,
       lyricsTotal: existingRecord?.lyricsTotal ?? 0,
+      lyricsSetlistCached: existingRecord?.lyricsSetlistCached ?? 0,
+      lyricsSetlistTotal: existingRecord?.lyricsSetlistTotal ?? 0,
+      lyricsRotationCached: existingRecord?.lyricsRotationCached ?? 0,
+      lyricsRotationTotal: existingRecord?.lyricsRotationTotal ?? 0,
       lyricsFailed: 0,
       downloadedAt: null,
       statusUpdatedAt: now,
@@ -201,6 +233,10 @@ export async function prefetchShowPack(
         status: 'partial',
         lyricsCached: 0,
         lyricsTotal: 0,
+        lyricsSetlistCached: 0,
+        lyricsSetlistTotal: 0,
+        lyricsRotationCached: 0,
+        lyricsRotationTotal: 0,
         lyricsFailed: 1,
         downloadedAt: failedAt,
         statusUpdatedAt: failedAt,
@@ -215,31 +251,33 @@ export async function prefetchShowPack(
     }
 
     const artistName = showFromNetwork.artist.name;
-    const targets = songTargets(prediction ?? null, artistName, existingPractice);
+    const targets = buildShowPackLyricsTargets(artistName, prediction ?? null, existingPractice);
+    const segmentTotals = showPackSegmentTotals(prediction ?? null, existingPractice);
 
-    const counters: LyricsFetchCounters = {
-      lyricsCached: 0,
-      lyricsFailed: 0,
-      lyricsMissingTitles: [],
-      lyricsBusyTitles: existingRecord?.lyricsBusyTitles ?? [],
-    };
+    const counters = emptyCounters(existingRecord?.lyricsBusyTitles ?? []);
 
     for (let index = 0; index < targets.length; ) {
       const batchSize = getShowPackLyricsBatchSize(LYRICS_BATCH_SIZE);
       const batch = targets.slice(index, index + batchSize);
       await Promise.all(
-        batch.map(async ({ artist, title }) => {
+        batch.map(async (target) => {
           try {
-            const result = await fetchLyrics(artist, title, { expiresAt });
-            if (result) {
-              counters.lyricsCached += 1;
-              counters.lyricsBusyTitles = removeLyricsBusyTitle(counters.lyricsBusyTitles, title);
+            const ok = await fetchPackTargetLyrics(target, expiresAt);
+            if (ok) {
+              incrementLyricsCached(counters, target.segment);
+              counters.lyricsBusyTitles = removeLyricsBusyTitle(
+                counters.lyricsBusyTitles,
+                target.title
+              );
             } else {
-              counters.lyricsMissingTitles.push(title);
-              counters.lyricsBusyTitles = removeLyricsBusyTitle(counters.lyricsBusyTitles, title);
+              counters.lyricsMissingTitles.push(target.title);
+              counters.lyricsBusyTitles = removeLyricsBusyTitle(
+                counters.lyricsBusyTitles,
+                target.title
+              );
             }
           } catch (error) {
-            applyLyricsFetchError(counters, title, showId, error);
+            applyLyricsFetchError(counters, target.title, showId, error);
           }
         })
       );
@@ -249,6 +287,10 @@ export async function prefetchShowPack(
         status: 'downloading',
         lyricsCached: counters.lyricsCached,
         lyricsTotal: targets.length,
+        lyricsSetlistCached: counters.lyricsSetlistCached,
+        lyricsSetlistTotal: segmentTotals.setlist,
+        lyricsRotationCached: counters.lyricsRotationCached,
+        lyricsRotationTotal: segmentTotals.rotation,
         lyricsFailed: counters.lyricsFailed,
         downloadedAt: null,
         statusUpdatedAt: Date.now(),
@@ -274,6 +316,10 @@ export async function prefetchShowPack(
       status: hasNetworkFailures ? 'partial' : 'ready',
       lyricsCached: counters.lyricsCached,
       lyricsTotal: targets.length,
+      lyricsSetlistCached: counters.lyricsSetlistCached,
+      lyricsSetlistTotal: segmentTotals.setlist,
+      lyricsRotationCached: counters.lyricsRotationCached,
+      lyricsRotationTotal: segmentTotals.rotation,
       lyricsFailed: counters.lyricsFailed,
       downloadedAt: finishedAt,
       statusUpdatedAt: finishedAt,
@@ -322,7 +368,9 @@ export async function addPracticeSongToShowPack(
 
   if (!songId) return { ok: false, code: 'unknown' };
 
-  const lyricsStatus = await cacheLyricsForShowPackTitle(show, canonicalTitle);
+  const lyricsStatus = await cacheLyricsForShowPackTitle(show, canonicalTitle, {
+    isMedley: isMedleySong(canonicalTitle),
+  });
 
   const record = await getShowPackRecord(show.id);
   const beforeTitles = collectShowPackSongTitles(record?.prediction ?? null, record?.practiceSongs ?? []);
@@ -335,7 +383,10 @@ export async function addPracticeSongToShowPack(
 
   const persistPack = async () => {
     if (record) {
+      const segmentTotals = showPackSegmentTotals(record.prediction, practiceSongs);
       let lyricsCached = record.lyricsCached;
+      let lyricsSetlistCached = record.lyricsSetlistCached;
+      let lyricsRotationCached = record.lyricsRotationCached;
       if (lyricsStatus === 'cached' && !beforeTitles.includes(canonicalTitle)) {
         lyricsCached += 1;
       }
@@ -346,7 +397,11 @@ export async function addPracticeSongToShowPack(
           record.lyricsTotal,
           collectShowPackSongTitles(record.prediction, practiceSongs).length
         ),
+        lyricsSetlistTotal: segmentTotals.setlist,
+        lyricsRotationTotal: segmentTotals.rotation,
         lyricsCached,
+        lyricsSetlistCached,
+        lyricsRotationCached,
         lyricsFailed: lyricsStatus === 'failed' ? record.lyricsFailed + 1 : record.lyricsFailed,
         lyricsBusyTitles:
           lyricsStatus === 'busy'
@@ -362,6 +417,10 @@ export async function addPracticeSongToShowPack(
       status: lyricsStatus === 'failed' ? 'partial' : 'ready',
       lyricsCached: lyricsStatus === 'cached' ? 1 : 0,
       lyricsTotal: 1,
+      lyricsSetlistCached: 0,
+      lyricsSetlistTotal: 0,
+      lyricsRotationCached: 0,
+      lyricsRotationTotal: 0,
       lyricsFailed: lyricsStatus === 'failed' ? 1 : 0,
       downloadedAt: now,
       statusUpdatedAt: now,
@@ -385,7 +444,8 @@ export async function addPracticeSongToShowPack(
 
 export async function cacheLyricsForShowPackTitle(
   show: Show,
-  title: string
+  title: string,
+  options?: { isMedley?: boolean }
 ): Promise<'cached' | 'missing' | 'failed' | 'busy'> {
   const trimmedTitle = title.trim();
   if (!trimmedTitle) return 'missing';
@@ -394,8 +454,13 @@ export async function cacheLyricsForShowPackTitle(
   const artistName = show.artist.name;
 
   try {
-    const result = await fetchLyrics(artistName, trimmedTitle, { expiresAt });
-    if (result) return 'cached';
+    const ok = await fetchLyricsForMedleySong(
+      artistName,
+      trimmedTitle,
+      (partTitle) => fetchLyrics(artistName, partTitle, { expiresAt }),
+      options?.isMedley
+    );
+    if (ok) return 'cached';
 
     const record = await getShowPackRecord(show.id);
     if (record) {

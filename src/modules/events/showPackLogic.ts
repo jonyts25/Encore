@@ -1,6 +1,7 @@
 import { expiresAtAfterShowDate, SHOW_CACHE_TTL_MS } from '@/core/time/showCacheTtl';
 
 import { normalizeSongTitle } from '@/modules/catalog/songTitleNormalize';
+import { medleyPartTitles } from '@/modules/lyrics/medleyParts';
 import type { SetlistPrediction } from '@/modules/setlist/types';
 
 import type { Show } from './types';
@@ -20,10 +21,23 @@ export type ShowPackPrefetchRecord = {
   prediction: SetlistPrediction | null;
   lyricsCached: number;
   lyricsTotal: number;
+  lyricsSetlistCached: number;
+  lyricsSetlistTotal: number;
+  lyricsRotationCached: number;
+  lyricsRotationTotal: number;
   lyricsMissingTitles: string[];
   lyricsBusyTitles: string[];
   lyricsFailed: number;
   expiresAt: number | null;
+};
+
+export type ShowPackLyricsSegment = 'setlist' | 'rotation' | 'practice';
+
+export type ShowPackLyricsTarget = {
+  artist: string;
+  title: string;
+  segment: ShowPackLyricsSegment;
+  isMedley?: boolean;
 };
 
 export function addLyricsBusyTitle(titles: readonly string[], title: string): string[] {
@@ -39,32 +53,84 @@ export function removeLyricsBusyTitle(titles: readonly string[], title: string):
 }
 
 export type ShowPackProgressLabel = {
-  key: 'events.showPackDownloadingProgress' | 'events.showPackDownloadingProgressRetrying';
+  key:
+    | 'events.showPackSetlistProgress'
+    | 'events.showPackSetlistProgressRetrying'
+    | 'events.showPackReadyForShow';
   cached: number;
   total: number;
   retrying?: number;
 };
 
+export type ShowPackRotationProgressLabel = {
+  key: 'events.showPackRotationProgress';
+  cached: number;
+  total: number;
+};
+
+function resolveSetlistCounts(record: {
+  lyricsSetlistCached: number;
+  lyricsSetlistTotal: number;
+  lyricsCached: number;
+  lyricsTotal: number;
+}): { cached: number; total: number } {
+  if (record.lyricsSetlistTotal > 0) {
+    return { cached: record.lyricsSetlistCached, total: record.lyricsSetlistTotal };
+  }
+  return { cached: record.lyricsCached, total: record.lyricsTotal };
+}
+
 export function showPackProgressLabel(record: {
+  lyricsSetlistCached: number;
+  lyricsSetlistTotal: number;
   lyricsCached: number;
   lyricsTotal: number;
   lyricsBusyTitles: readonly string[];
+  status: string;
 }): ShowPackProgressLabel | null {
-  if (record.lyricsTotal <= 0) return null;
+  const { cached, total } = resolveSetlistCounts(record);
+  if (total <= 0) return null;
+
+  if (record.status === 'ready' && cached >= total) {
+    return { key: 'events.showPackReadyForShow', cached, total };
+  }
+
   const retrying = record.lyricsBusyTitles.length;
   if (retrying > 0) {
     return {
-      key: 'events.showPackDownloadingProgressRetrying',
-      cached: record.lyricsCached,
-      total: record.lyricsTotal,
+      key: 'events.showPackSetlistProgressRetrying',
+      cached,
+      total,
       retrying,
     };
   }
   return {
-    key: 'events.showPackDownloadingProgress',
-    cached: record.lyricsCached,
-    total: record.lyricsTotal,
+    key: 'events.showPackSetlistProgress',
+    cached,
+    total,
   };
+}
+
+export function showPackRotationProgressLabel(record: {
+  lyricsRotationCached: number;
+  lyricsRotationTotal: number;
+}): ShowPackRotationProgressLabel | null {
+  if (record.lyricsRotationTotal <= 0) return null;
+  return {
+    key: 'events.showPackRotationProgress',
+    cached: record.lyricsRotationCached,
+    total: record.lyricsRotationTotal,
+  };
+}
+
+export function isShowPackSetlistLyricsComplete(record: {
+  lyricsSetlistCached: number;
+  lyricsSetlistTotal: number;
+  lyricsCached: number;
+  lyricsTotal: number;
+}): boolean {
+  const { cached, total } = resolveSetlistCounts(record);
+  return total > 0 && cached >= total;
 }
 
 function getZonedHour(show: Pick<Show, 'show_date' | 'local_date' | 'venue'>, now: Date): number {
@@ -184,8 +250,7 @@ export function shouldPrefetchShowPackRecord(
     }
 
     if (options?.show && isShowLyricsScheduleMilestone(options.show, now)) {
-      const incomplete =
-        record.lyricsTotal > 0 && record.lyricsCached < record.lyricsTotal;
+      const incomplete = !isShowPackSetlistLyricsComplete(record);
       if (
         incomplete ||
         record.lyricsBusyTitles.length > 0 ||
@@ -271,17 +336,71 @@ export function collectShowPackSongTitles(
   prediction: SetlistPrediction | null,
   practiceSongs: readonly PracticePackSong[]
 ): string[] {
-  const titles = new Set<string>();
+  return buildShowPackLyricsTargets('', prediction, practiceSongs).map((target) => target.title);
+}
+
+function titleKey(title: string): string {
+  return normalizeSongTitle(title);
+}
+
+export function buildShowPackLyricsTargets(
+  artistName: string,
+  prediction: SetlistPrediction | null,
+  practiceSongs: readonly PracticePackSong[]
+): ShowPackLyricsTarget[] {
+  const targets: ShowPackLyricsTarget[] = [];
+  const seen = new Set<string>();
+
+  const pushTarget = (
+    title: string,
+    segment: ShowPackLyricsSegment,
+    isMedley?: boolean
+  ): void => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    const key = titleKey(trimmed);
+    if (seen.has(key)) return;
+    seen.add(key);
+    targets.push({
+      artist: artistName,
+      title: trimmed,
+      segment,
+      isMedley,
+    });
+  };
+
   for (const song of prediction?.songs ?? []) {
-    titles.add(song.title);
+    pushTarget(song.title, 'setlist', song.is_medley);
   }
   for (const other of prediction?.others ?? []) {
-    titles.add(other.title);
+    pushTarget(other.title, 'rotation');
   }
   for (const song of practiceSongs) {
-    titles.add(song.title);
+    pushTarget(song.title, 'practice');
   }
-  return [...titles];
+
+  return targets;
+}
+
+export function showPackSegmentTotals(
+  prediction: SetlistPrediction | null,
+  practiceSongs: readonly PracticePackSong[]
+): { setlist: number; rotation: number; practice: number; all: number } {
+  const targets = buildShowPackLyricsTargets('', prediction, practiceSongs);
+  let setlist = 0;
+  let rotation = 0;
+  let practice = 0;
+  for (const target of targets) {
+    if (target.segment === 'setlist') setlist += 1;
+    else if (target.segment === 'rotation') rotation += 1;
+    else practice += 1;
+  }
+  return { setlist, rotation, practice, all: targets.length };
+}
+
+/** Medley parts that must be cached for the pack unit to count as ready. */
+export function showPackLyricsPartTitles(target: Pick<ShowPackLyricsTarget, 'title' | 'isMedley'>): string[] {
+  return medleyPartTitles(target.title, target.isMedley);
 }
 
 export { SHOW_CACHE_TTL_MS as SEVEN_DAYS_MS };

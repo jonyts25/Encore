@@ -39,6 +39,7 @@ import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShowEnrichIfNeeded } from '../hooks/useShowEnrichIfNeeded';
 import { useShow } from '../hooks/useShow';
 import { prefetchShowPack } from '../showPack';
+import { isShowPackSetlistLyricsComplete } from '../showPackLogic';
 import { hasConfirmedTime } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
 import { buildAppleMapsUrl } from '../showDetailMaps';
@@ -98,6 +99,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const {
     record: packRecord,
     label: packLabel,
+    rotationProgressLine,
     missingTitlesLine,
     canRetry,
     retry,
@@ -139,6 +141,9 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const packSubtitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return null;
     const lines: string[] = [];
+    if (rotationProgressLine) {
+      lines.push(rotationProgressLine);
+    }
     if (missingTitlesLine) {
       lines.push(missingTitlesLine);
     }
@@ -150,7 +155,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
       );
     }
     return lines.length > 0 ? lines.join('\n') : null;
-  }, [missingTitlesLine, packRecord, packUpdatedAt, t]);
+  }, [missingTitlesLine, packRecord, packUpdatedAt, rotationProgressLine, t]);
 
   const handleShare = () => {
     if (!show) return;
@@ -350,7 +355,9 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
               <View style={[styles.packIcon, { backgroundColor: tokens.successMuted }]}>
                 <Ionicons
                   color={tokens.success}
-                  name={packRecord.status === 'ready' ? 'checkmark' : 'cloud-download-outline'}
+                  name={
+                    isShowPackSetlistLyricsComplete(packRecord) ? 'checkmark' : 'cloud-download-outline'
+                  }
                   size={18}
                 />
               </View>

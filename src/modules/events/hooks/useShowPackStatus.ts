@@ -4,7 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@/core/i18n';
 import { getShowPackRecord, type ShowPackRecord } from '@/core/db/showPackCache';
 
-import { showPackProgressLabel } from '../showPackLogic';
+import {
+  isShowPackSetlistLyricsComplete,
+  showPackProgressLabel,
+  showPackRotationProgressLabel,
+} from '../showPackLogic';
+import { prefetchShowPack } from '../showPack';
+import type { Show } from '../types';
 
 function resolveShowPackCardTitle(
   record: ShowPackRecord,
@@ -23,37 +29,24 @@ function resolveShowPackCardTitle(
   }
 
   if (record.status === 'ready') {
-    if (record.lyricsTotal === 0) {
+    if (record.lyricsSetlistTotal === 0 && record.lyricsTotal === 0) {
       return t('events.showPackNoSongsYet');
     }
-    if (record.lyricsCached === 0) {
-      return progress
-        ? t(progress.key, {
-            cached: progress.cached,
-            total: progress.total,
-            retrying: progress.retrying,
-          })
-        : t('events.showPackNoSongsYet');
+    if (isShowPackSetlistLyricsComplete(record)) {
+      return t('events.showPackReadyForShow');
     }
-    if (record.lyricsCached >= record.lyricsTotal) {
-      return t('events.showPackAllLyricsReady', {
-        cached: record.lyricsCached,
-        total: record.lyricsTotal,
+    if (progress) {
+      return t(progress.key, {
+        cached: progress.cached,
+        total: progress.total,
+        retrying: progress.retrying,
       });
     }
-    return progress
-      ? t(progress.key, {
-          cached: progress.cached,
-          total: progress.total,
-          retrying: progress.retrying,
-        })
-      : null;
+    return t('events.showPackNoSongsYet');
   }
 
   return null;
 }
-import { prefetchShowPack } from '../showPack';
-import type { Show } from '../types';
 
 export function useShowPackStatus(show: Show | null, enabled: boolean) {
   const { t } = useTranslation();
@@ -101,6 +94,13 @@ export function useShowPackStatus(show: Show | null, enabled: boolean) {
     return t('events.showPackMissingLyrics', { titles: `${preview}${suffix}` });
   }, [record?.lyricsMissingTitles, t]);
 
+  const rotationProgressLine = useMemo(() => {
+    if (!record) return null;
+    const rotation = showPackRotationProgressLabel(record);
+    if (!rotation) return null;
+    return t(rotation.key, { cached: rotation.cached, total: rotation.total });
+  }, [record, t]);
+
   let label: string | null = record ? resolveShowPackCardTitle(record, t) : null;
   let isPartial = record?.status === 'partial';
   let canRetry = false;
@@ -115,7 +115,7 @@ export function useShowPackStatus(show: Show | null, enabled: boolean) {
       record.lyricsMissingTitles.length > 0 ||
         record.lyricsFailed > 0 ||
         record.lyricsBusyTitles.length > 0 ||
-        (record.lyricsTotal > 0 && record.lyricsCached < record.lyricsTotal)
+        !isShowPackSetlistLyricsComplete(record)
     );
   }
 
@@ -127,6 +127,7 @@ export function useShowPackStatus(show: Show | null, enabled: boolean) {
   return {
     record,
     label,
+    rotationProgressLine,
     missingTitlesLine,
     isPartial,
     canRetry,

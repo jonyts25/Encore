@@ -12,6 +12,7 @@ export type PredictedSong = {
   frequency_pct: number | null;
   avg_position: number | null;
   is_wildcard: boolean;
+  is_medley?: boolean;
   appeared_in_shows: number;
   total_shows: number;
 };

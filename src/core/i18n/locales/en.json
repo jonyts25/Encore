@@ -299,6 +299,9 @@
     "showPackReadyForShow": "Ready for the show",
     "showPackNoSongsYet": "No songs yet",
     "showPackAllLyricsReady": "{{cached}} of {{total}} lyrics ready",
+    "showPackSetlistProgress": "{{cached}} of {{total}} of setlist",
+    "showPackSetlistProgressRetrying": "{{cached}} of {{total}} of setlist · retrying {{retrying}}",
+    "showPackRotationProgress": "+ {{cached}} of {{total}} rotation",
     "showPackDownloadingProgress": "Downloading lyrics · {{cached}} of {{total}}",
     "showPackDownloadingProgressRetrying": "{{cached}} of {{total}} · retrying {{retrying}}",
     "showPackMissingLyrics": "No lyrics: {{titles}}",
@@ -452,6 +455,8 @@
     "fallbackNoTour": "No shows from this tour are recorded yet — this is the artist's general repertoire and may not reflect the actual show.",
     "newTourFromRecentShows": "New tour: based on their most recent concerts.",
     "sampleSize": "{{count}} shows analyzed",
+    "rotationSectionTitle": "May play (rotation)",
+    "rotationFrequency": "{{pct}}% appearance rate",
     "structure": {
       "mostly_fixed": "Mostly fixed setlist",
       "rotating": "Rotating setlist",

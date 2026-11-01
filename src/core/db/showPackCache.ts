@@ -14,6 +14,10 @@ export type ShowPackRecord = {
   status: ShowPackStatus;
   lyricsCached: number;
   lyricsTotal: number;
+  lyricsSetlistCached: number;
+  lyricsSetlistTotal: number;
+  lyricsRotationCached: number;
+  lyricsRotationTotal: number;
   lyricsFailed: number;
   downloadedAt: number | null;
   statusUpdatedAt: number;
@@ -40,6 +44,10 @@ type ShowPackRow = {
   practice_titles_json: string | null;
   practice_songs_json: string | null;
   lyrics_busy_json: string | null;
+  lyrics_setlist_cached: number | null;
+  lyrics_setlist_total: number | null;
+  lyrics_rotation_cached: number | null;
+  lyrics_rotation_total: number | null;
 };
 
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -69,6 +77,10 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
         'ALTER TABLE show_pack ADD COLUMN practice_titles_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN practice_songs_json TEXT;',
         'ALTER TABLE show_pack ADD COLUMN lyrics_busy_json TEXT;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_setlist_cached INTEGER NOT NULL DEFAULT 0;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_setlist_total INTEGER NOT NULL DEFAULT 0;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_rotation_cached INTEGER NOT NULL DEFAULT 0;',
+        'ALTER TABLE show_pack ADD COLUMN lyrics_rotation_total INTEGER NOT NULL DEFAULT 0;',
       ]) {
         try {
           await db.execAsync(ddl);
@@ -145,6 +157,10 @@ function rowToRecord(row: ShowPackRow): ShowPackRecord {
     status: row.status as ShowPackStatus,
     lyricsCached: row.lyrics_cached,
     lyricsTotal: row.lyrics_total,
+    lyricsSetlistCached: row.lyrics_setlist_cached ?? row.lyrics_cached,
+    lyricsSetlistTotal: row.lyrics_setlist_total ?? row.lyrics_total,
+    lyricsRotationCached: row.lyrics_rotation_cached ?? 0,
+    lyricsRotationTotal: row.lyrics_rotation_total ?? 0,
     lyricsFailed: row.lyrics_failed,
     downloadedAt: row.downloaded_at,
     statusUpdatedAt: row.status_updated_at,
@@ -162,7 +178,8 @@ export async function listShowPackRecordsWithBusyLyrics(): Promise<ShowPackRecor
   const rows = await db.getAllAsync<ShowPackRow>(
     `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
             status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-            practice_titles_json, practice_songs_json, lyrics_busy_json
+            practice_titles_json, practice_songs_json, lyrics_busy_json,
+            lyrics_setlist_cached, lyrics_setlist_total, lyrics_rotation_cached, lyrics_rotation_total
      FROM show_pack
      WHERE lyrics_busy_json IS NOT NULL AND lyrics_busy_json != '[]'`
   );
@@ -183,7 +200,8 @@ export async function getShowPackRecord(showId: string): Promise<ShowPackRecord 
   const row = await db.getFirstAsync<ShowPackRow>(
     `SELECT show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
             status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-            practice_titles_json, practice_songs_json, lyrics_busy_json
+            practice_titles_json, practice_songs_json, lyrics_busy_json,
+            lyrics_setlist_cached, lyrics_setlist_total, lyrics_rotation_cached, lyrics_rotation_total
      FROM show_pack WHERE show_id = ?`,
     showId
   );
@@ -205,8 +223,9 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     `INSERT OR REPLACE INTO show_pack (
       show_id, status, lyrics_cached, lyrics_total, lyrics_failed, downloaded_at,
       status_updated_at, expires_at, show_json, prediction_json, lyrics_missing_json,
-      practice_titles_json, practice_songs_json, lyrics_busy_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      practice_titles_json, practice_songs_json, lyrics_busy_json,
+      lyrics_setlist_cached, lyrics_setlist_total, lyrics_rotation_cached, lyrics_rotation_total
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     record.showId,
     record.status,
     record.lyricsCached,
@@ -220,7 +239,11 @@ export async function setShowPackRecord(record: ShowPackRecord): Promise<void> {
     JSON.stringify(record.lyricsMissingTitles),
     JSON.stringify(record.practiceSongs.map((song) => song.title)),
     JSON.stringify(record.practiceSongs),
-    JSON.stringify(record.lyricsBusyTitles)
+    JSON.stringify(record.lyricsBusyTitles),
+    record.lyricsSetlistCached,
+    record.lyricsSetlistTotal,
+    record.lyricsRotationCached,
+    record.lyricsRotationTotal
   );
 }
 

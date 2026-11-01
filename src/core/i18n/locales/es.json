@@ -299,6 +299,9 @@
     "showPackReadyForShow": "Listo para el show",
     "showPackNoSongsYet": "Sin canciones todavía",
     "showPackAllLyricsReady": "{{cached}} de {{total}} letras listas",
+    "showPackSetlistProgress": "{{cached}} de {{total}} del setlist",
+    "showPackSetlistProgressRetrying": "{{cached}} de {{total}} del setlist · reintentando {{retrying}}",
+    "showPackRotationProgress": "+ {{cached}} de {{total}} de rotación",
     "showPackDownloadingProgress": "Descargando letras · {{cached}} de {{total}}",
     "showPackDownloadingProgressRetrying": "{{cached}} de {{total}} · reintentando {{retrying}}",
     "showPackMissingLyrics": "Sin letra: {{titles}}",
@@ -452,6 +455,8 @@
     "fallbackNoTour": "Aún no hay shows registrados de esta gira — esto es su repertorio general, podría no reflejar el show real.",
     "newTourFromRecentShows": "Gira nueva: basado en sus conciertos más recientes.",
     "sampleSize": "{{count}} shows analizados",
+    "rotationSectionTitle": "Pueden sonar (rotación)",
+    "rotationFrequency": "{{pct}}% de aparición",
     "structure": {
       "mostly_fixed": "Setlist mayormente fijo",
       "rotating": "Setlist con rotación",

@@ -260,9 +260,15 @@ export function LiveCameraContent({ artist, title, showId }: LiveCameraContentPr
     }
   }, [title, pickerSongs]);
 
+  const activeSongMeta = useMemo(
+    () => prediction?.songs.find((song) => song.title === activeTitle),
+    [activeTitle, prediction?.songs]
+  );
+
   const { lyrics, isLoading: lyricsLoading, error: lyricsError, notFound } = useLyrics(
     artist,
-    activeTitle
+    activeTitle,
+    { isMedley: activeSongMeta?.is_medley }
   );
 
   useEffect(() => {

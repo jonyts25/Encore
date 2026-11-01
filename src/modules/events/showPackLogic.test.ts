@@ -6,17 +6,21 @@ import { normalizeSongTitle } from '../catalog/songTitleNormalize';
 
 import {
   addLyricsBusyTitle,
+  buildShowPackLyricsTargets,
   collectShowPackSongTitles,
   predictionTitleKeys,
   showPackPredictionTitlesMismatch,
   isShowPackComplete,
   isShowPackExpired,
+  isShowPackSetlistLyricsComplete,
   mergePracticeSong,
   mergePracticeTitles,
   removeLyricsBusyTitle,
   shouldPrefetchShowPackRecord,
   showPackExpiresAt,
   showPackProgressLabel,
+  showPackSegmentTotals,
+  showPackLyricsPartTitles,
   SHOW_PACK_STALE_AFTER_MS,
   SEVEN_DAYS_MS,
 } from './showPackLogic';
@@ -74,6 +78,10 @@ describe('showPackLogic', () => {
       statusUpdatedAt: now.getTime(),
       lyricsCached: 10,
       lyricsTotal: 10,
+      lyricsSetlistCached: 10,
+      lyricsSetlistTotal: 10,
+      lyricsRotationCached: 0,
+      lyricsRotationTotal: 0,
       lyricsMissingTitles: [] as string[],
       lyricsBusyTitles: [] as string[],
       lyricsFailed: 0,
@@ -111,6 +119,10 @@ describe('showPackLogic', () => {
           statusUpdatedAt: now.getTime(),
           lyricsCached: 1,
           lyricsTotal: 1,
+          lyricsSetlistCached: 1,
+          lyricsSetlistTotal: 1,
+          lyricsRotationCached: 0,
+          lyricsRotationTotal: 0,
           lyricsMissingTitles: [],
           lyricsBusyTitles: [],
           lyricsFailed: 0,
@@ -138,6 +150,10 @@ describe('showPackLogic', () => {
           statusUpdatedAt: now.getTime(),
           lyricsCached: 1,
           lyricsTotal: 1,
+          lyricsSetlistCached: 1,
+          lyricsSetlistTotal: 1,
+          lyricsRotationCached: 0,
+          lyricsRotationTotal: 0,
           lyricsMissingTitles: [],
           lyricsBusyTitles: [],
           lyricsFailed: 0,
@@ -184,23 +200,89 @@ describe('showPackLogic', () => {
     assert.deepEqual(removeLyricsBusyTitle(['A', 'B'], 'A'), ['B']);
   });
 
-  it('builds progress label with retrying count', () => {
+  it('builds setlist progress label with retrying count', () => {
     assert.deepEqual(
-      showPackProgressLabel({ lyricsCached: 22, lyricsTotal: 28, lyricsBusyTitles: ['a', 'b', 'c', 'd', 'e'] }),
+      showPackProgressLabel({
+        status: 'downloading',
+        lyricsSetlistCached: 20,
+        lyricsSetlistTotal: 29,
+        lyricsCached: 28,
+        lyricsTotal: 41,
+        lyricsBusyTitles: ['a'],
+      }),
       {
-        key: 'events.showPackDownloadingProgressRetrying',
-        cached: 22,
-        total: 28,
-        retrying: 5,
+        key: 'events.showPackSetlistProgressRetrying',
+        cached: 20,
+        total: 29,
+        retrying: 1,
       }
     );
     assert.deepEqual(
-      showPackProgressLabel({ lyricsCached: 22, lyricsTotal: 28, lyricsBusyTitles: [] }),
+      showPackProgressLabel({
+        status: 'ready',
+        lyricsSetlistCached: 29,
+        lyricsSetlistTotal: 29,
+        lyricsCached: 30,
+        lyricsTotal: 41,
+        lyricsBusyTitles: [],
+      }),
       {
-        key: 'events.showPackDownloadingProgress',
-        cached: 22,
-        total: 28,
+        key: 'events.showPackReadyForShow',
+        cached: 29,
+        total: 29,
       }
+    );
+  });
+
+  it('orders pack targets setlist, rotation, then practice', () => {
+    const targets = buildShowPackLyricsTargets(
+      'Artist',
+      {
+        songs: [
+          { song_id: '1', title: 'Main A' },
+          { song_id: '2', title: 'Part A / Part B', is_medley: true },
+        ],
+        others: [{ song_id: '3', title: 'Rotation', frequency: 1, frequency_pct: 40 }],
+      } as never,
+      [{ songId: '4', title: 'Practice' }]
+    );
+    assert.deepEqual(
+      targets.map((target) => [target.segment, target.title]),
+      [
+        ['setlist', 'Main A'],
+        ['setlist', 'Part A / Part B'],
+        ['rotation', 'Rotation'],
+        ['practice', 'Practice'],
+      ]
+    );
+    assert.deepEqual(showPackLyricsPartTitles(targets[1]!), ['Part A', 'Part B']);
+  });
+
+  it('counts setlist and rotation separately', () => {
+    const totals = showPackSegmentTotals(
+      {
+        songs: [{ song_id: '1', title: 'A' }],
+        others: [
+          { song_id: '2', title: 'R1', frequency: 1, frequency_pct: 10 },
+          { song_id: '3', title: 'R2', frequency: 1, frequency_pct: 20 },
+        ],
+      } as never,
+      []
+    );
+    assert.equal(totals.setlist, 1);
+    assert.equal(totals.rotation, 2);
+    assert.equal(totals.all, 3);
+  });
+
+  it('considers setlist complete even when rotation is pending', () => {
+    assert.equal(
+      isShowPackSetlistLyricsComplete({
+        lyricsSetlistCached: 29,
+        lyricsSetlistTotal: 29,
+        lyricsCached: 30,
+        lyricsTotal: 41,
+      }),
+      true
     );
   });
 
@@ -226,15 +308,15 @@ describe('showPackLogic', () => {
     );
   });
 
-  it('collects prediction and practice titles', () => {
+  it('collects prediction and practice titles in priority order', () => {
     const titles = collectShowPackSongTitles(
       {
         songs: [{ song_id: '1', title: 'Hit', confidence: 0.9 }],
-        others: [{ song_id: '2', title: 'Deep cut', confidence: 0.1 }],
+        others: [{ song_id: '2', title: 'Deep cut', frequency: 1, frequency_pct: 10 }],
       } as never,
       [{ songId: '3', title: 'Custom' }]
     );
-    assert.deepEqual(titles.sort(), ['Custom', 'Deep cut', 'Hit']);
+    assert.deepEqual(titles, ['Hit', 'Deep cut', 'Custom']);
   });
 
   it('formats show card meta without GMT label', () => {

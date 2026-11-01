@@ -9,10 +9,15 @@ import { createStaleWhileRevalidateQueryFn } from '@/core/query/staleWhileRevali
 import { queryKeys } from '@/core/query';
 
 import { fetchLyrics } from '../api';
+import { fetchLyricsForMedleySong } from '../medleyLyrics';
 import { LyricsBusyError } from '../errors';
 import type { LyricsResult } from '../types';
 
-export function useLyrics(artist: string, title: string) {
+type UseLyricsOptions = {
+  isMedley?: boolean;
+};
+
+export function useLyrics(artist: string, title: string, options?: UseLyricsOptions) {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const trimmedArtist = artist.trim();
@@ -45,7 +50,13 @@ export function useLyrics(artist: string, title: string) {
   const query = useQuery<LyricsResult | null>({
     queryKey,
     queryFn: createStaleWhileRevalidateQueryFn({
-      fetchFresh: () => fetchLyrics(trimmedArtist, trimmedTitle),
+      fetchFresh: () =>
+        fetchLyricsForMedleySong(
+          trimmedArtist,
+          trimmedTitle,
+          (partTitle) => fetchLyrics(trimmedArtist, partTitle),
+          options?.isMedley
+        ),
       readCache: async () => {
         const fromLyricsDb = await getCachedLyrics(trimmedArtist, trimmedTitle);
         if (fromLyricsDb) return fromLyricsDb;

@@ -9,8 +9,13 @@ import {
 import { ApiError } from '@/core/api/client';
 import { fetchLyrics, isLyricsBusyError, isLyricsNetworkFailure } from '@/modules/lyrics/api';
 import { lyricsExpiresAfterShow } from '@/core/db/lyricsCache';
+import { fetchLyricsForMedleySong } from '@/modules/lyrics/medleyLyrics';
 
-import { LYRICS_BUSY_RETRY_DELAYS_MS, removeLyricsBusyTitle } from './showPackLogic';
+import {
+  buildShowPackLyricsTargets,
+  LYRICS_BUSY_RETRY_DELAYS_MS,
+  removeLyricsBusyTitle,
+} from './showPackLogic';
 import { withShowPackPrefetchLock } from './showPackLock';
 
 type BusyRetrySchedule = {
@@ -64,15 +69,39 @@ async function retryOneBusyTitle(showId: string, title: string): Promise<void> {
     const expiresAt = lyricsExpiresAfterShow(record.show.show_date);
 
     try {
-      const result = await fetchLyrics(artist, title, { expiresAt });
+      const target = buildShowPackLyricsTargets(artist, record.prediction, record.practiceSongs).find(
+        (entry) => entry.title === title
+      );
+      const result = await fetchLyricsForMedleySong(
+        artist,
+        title,
+        (partTitle) => fetchLyrics(artist, partTitle, { expiresAt }),
+        target?.isMedley
+      );
       const nextBusy = removeLyricsBusyTitle(record.lyricsBusyTitles, title);
       retryScheduleByKey.delete(scheduleKey(showId, title));
 
       if (result) {
+        let lyricsCached = Math.min(record.lyricsTotal, record.lyricsCached + 1);
+        let lyricsSetlistCached = record.lyricsSetlistCached;
+        let lyricsRotationCached = record.lyricsRotationCached;
+        if (target?.segment === 'setlist') {
+          lyricsSetlistCached = Math.min(
+            record.lyricsSetlistTotal,
+            record.lyricsSetlistCached + 1
+          );
+        } else if (target?.segment === 'rotation') {
+          lyricsRotationCached = Math.min(
+            record.lyricsRotationTotal,
+            record.lyricsRotationCached + 1
+          );
+        }
         await setShowPackRecord({
           ...record,
           lyricsBusyTitles: nextBusy,
-          lyricsCached: Math.min(record.lyricsTotal, record.lyricsCached + 1),
+          lyricsCached,
+          lyricsSetlistCached,
+          lyricsRotationCached,
           status:
             nextBusy.length === 0 && record.lyricsFailed === 0 && record.status === 'partial'
               ? 'ready'
