@@ -24,6 +24,7 @@ type SetlistPredictionPanelProps = {
   artistName: string;
   tourId: string | null;
   variant?: 'default' | 'compact';
+  includeCommunityPlaylists?: boolean;
 };
 
 function formatConfidence(confidence: number): string {
@@ -36,6 +37,7 @@ export function SetlistPredictionPanel({
   artistName,
   tourId,
   variant = 'default',
+  includeCommunityPlaylists = true,
 }: SetlistPredictionPanelProps) {
   const { t, i18n } = useTranslation();
   const { tokens } = useEncoreTheme();
@@ -92,7 +94,9 @@ export function SetlistPredictionPanel({
       ) : null}
 
       <ListenSetlistButton artistId={artistId} artistName={artistName} tourId={tourId} />
-      <CommunityPlaylistsSection artistId={artistId} tourId={tourId} />
+      {includeCommunityPlaylists ? (
+        <CommunityPlaylistsSection artistId={artistId} tourId={tourId} />
+      ) : null}
 
       {!isLoading && !error && prediction && prediction.songs.length > 0 ? (
         <>

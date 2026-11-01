@@ -1,9 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { useFonts } from 'expo-font';
+import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useMemo } from 'react';
 import {
+  Linking as RNLinking,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -21,6 +24,7 @@ import { GlassIconButton, PillButton } from '@/core/ui';
 import { useEncoreTheme } from '@/core/ui/theme';
 import { typography } from '@/core/ui/theme/typography';
 import { ThemedText, ThemedView } from '@/core/ui/Themed';
+import { CommunityPlaylistsSection } from '@/modules/communityPlaylists/components/CommunityPlaylistsSection';
 import {
   getSetlistPredictionMetaLine,
   SetlistPredictionPanel,
@@ -32,12 +36,15 @@ import { formatShowDate } from '../api';
 import { formatShowVenueDateDisplay } from '../showVenueTime';
 import { useShowPackStatus } from '../hooks/useShowPackStatus';
 import { useShow } from '../hooks/useShow';
-import { getShowPhase } from '../visibility';
+import { hasConfirmedTime } from '../visibility';
 import { useShowStatus } from '../hooks/useShowStatus';
-import { ShowMemoryBlock } from '@/modules/memory/components/ShowMemoryBlock';
+import { buildAppleMapsUrl } from '../showDetailMaps';
+import { SHOW_DETAIL_CANVAS, SHOW_DETAIL_PURPLE, SHOW_DETAIL_SURFACE } from '../showDetailTheme';
 
 import { ShowNightSection } from './ShowNightSection';
-import { ShowStatusButtons } from './ShowStatusButtons';
+import { ShowDetailDateBadge } from './ShowDetailDateBadge';
+import { ShowDetailPhaseActions } from './ShowDetailPhaseActions';
+import { ShowTourDatesSection } from './ShowTourDatesSection';
 
 const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
   'mostly_fixed',
@@ -45,7 +52,8 @@ const CONFIDENCE_STRUCTURES: SetlistPredictionStructure[] = [
   'no_tour_data_fallback',
 ];
 
-const HERO_PLACEHOLDER = '#1B1024';
+const HEADER_BLUR = 40;
+const HEADER_DARKEN = 0.55;
 
 type ShowDetailContentProps = {
   showId: string;
@@ -77,7 +85,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tokens } = useEncoreTheme();
+  const { tokens, resolvedScheme } = useEncoreTheme();
   const isOffline = useIsOffline();
   const { show, isLoading, error, refetch, isFetching } = useShow(showId);
   const { status: userShowStatus } = useShowStatus(showId);
@@ -90,6 +98,10 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     retry,
   } = useShowPackStatus(show, Boolean(show));
 
+  const [fontsLoaded] = useFonts({
+    'SpaceGrotesk-Bold': require('../../../../assets/fonts/SpaceGrotesk-Bold.ttf'),
+  });
+
   const showConfidence = prediction
     ? CONFIDENCE_STRUCTURES.includes(prediction.structure)
     : false;
@@ -97,10 +109,7 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     ? getSetlistPredictionMetaLine(prediction, t, showConfidence)
     : null;
 
-  const heroSubtitle = useMemo(() => {
-    if (show?.artist.genres?.length) return show.artist.genres.join(' · ');
-    return t('setlist.predictionSubtitle');
-  }, [show?.artist.genres, t]);
+  const tourSubtitle = show?.tour_id ? t('events.showDetail.onTour') : null;
 
   const primarySongTitle = useMemo(() => {
     if (!prediction?.songs.length) return null;
@@ -108,7 +117,11 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     return sorted[0]?.title ?? null;
   }, [prediction, showConfidence]);
 
-  const phase = show ? getShowPhase(show) : 'upcoming';
+  const pageBackground =
+    resolvedScheme === 'dark' ? SHOW_DETAIL_CANVAS : tokens.background;
+  const infoCardBackground =
+    resolvedScheme === 'dark' ? SHOW_DETAIL_SURFACE : tokens.surface;
+  const headerFadeColor = pageBackground;
 
   const packCardTitle = useMemo(() => {
     if (!packRecord || packRecord.status === 'idle') return null;
@@ -137,11 +150,13 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
 
   const handleShare = () => {
     if (!show) return;
+    const link = Linking.createURL(`/show/${show.id}`);
     void Share.share({
-      message: t('events.shareMessage', {
+      message: t('events.shareMessageWithLink', {
         artist: show.artist.name,
         date: formatShowDate(show.show_date, i18n.language),
         venue: show.venue.name,
+        link,
       }),
     });
   };
@@ -173,13 +188,18 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     });
   };
 
-  const handleFab = () => {
-    openPracticeLyrics();
+  const openMaps = () => {
+    if (!show) return;
+    void RNLinking.openURL(buildAppleMapsUrl(show.venue));
   };
 
   const venueDateDisplay = show
     ? formatShowVenueDateDisplay(show, i18n.language, t)
     : null;
+
+  const venueTimeLine =
+    venueDateDisplay?.venueTimeLine ??
+    (show && hasConfirmedTime(show.show_date) ? null : t('events.timeUnconfirmed'));
 
   if (isLoading && !show) {
     return (
@@ -199,25 +219,37 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
     );
   }
 
+  const hasArtistImage = Boolean(show.artist.image_url);
+
   return (
-    <View style={[styles.root, { backgroundColor: tokens.background }]}>
+    <View style={[styles.root, { backgroundColor: pageBackground }]}>
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 120 }]}
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
         refreshControl={
           <RefreshControl refreshing={isFetching && !isLoading} onRefresh={() => void refetch()} />
         }>
-        <View style={styles.hero}>
-          <Image
-            contentFit="cover"
-            source={show.artist.image_url ? { uri: show.artist.image_url } : undefined}
-            style={[styles.heroImage, { backgroundColor: HERO_PLACEHOLDER }]}
-          />
+        <View style={styles.header}>
+          {hasArtistImage ? (
+            <Image
+              blurRadius={HEADER_BLUR}
+              contentFit="cover"
+              source={{ uri: show.artist.image_url! }}
+              style={styles.headerBackdrop}
+            />
+          ) : (
+            <LinearGradient
+              colors={[`${SHOW_DETAIL_PURPLE}40`, headerFadeColor]}
+              style={styles.headerBackdrop}
+            />
+          )}
+          <View style={[styles.headerDim, { opacity: HEADER_DARKEN }]} />
           <LinearGradient
-            colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.82)']}
-            locations={[0, 0.3, 1]}
+            colors={['rgba(0,0,0,0)', headerFadeColor]}
+            locations={[0.35, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={[styles.heroActions, { top: insets.top + 8 }]}>
+
+          <View style={[styles.headerActions, { top: insets.top + 8 }]}>
             <GlassIconButton
               accessibilityLabel={t('live.back')}
               icon="chevron-back"
@@ -229,27 +261,52 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
               onPress={handleShare}
             />
           </View>
-          <View style={styles.heroText}>
-            <Text style={[styles.heroArtist, { color: tokens.onAccent }]}>{show.artist.name}</Text>
-            <Text style={styles.heroTour}>{heroSubtitle}</Text>
+
+          <View style={styles.headerCenter}>
+            <View style={styles.avatarWrap}>
+              <Image
+                contentFit="cover"
+                source={show.artist.image_url ? { uri: show.artist.image_url } : undefined}
+                style={[styles.avatar, { borderColor: 'rgba(255,255,255,0.22)' }]}
+              />
+              <ShowDetailDateBadge
+                locale={i18n.language}
+                showDate={show.show_date}
+                style={styles.dateBadgeOnAvatar}
+              />
+            </View>
+            <Text
+              style={[
+                styles.artistName,
+                fontsLoaded ? { fontFamily: 'SpaceGrotesk-Bold' } : null,
+                { color: '#FFFFFF' },
+              ]}>
+              {show.artist.name}
+            </Text>
+            {tourSubtitle ? (
+              <Text style={[typography.secondary, styles.tourLine]}>{tourSubtitle}</Text>
+            ) : null}
           </View>
         </View>
+
+        <ShowDetailPhaseActions
+          show={show}
+          onOpenLive={openLive}
+          onOpenLyrics={openPracticeLyrics}
+        />
 
         <View style={styles.body}>
           <OfflineBanner visible={isOffline} />
 
-          <View style={[styles.infoCard, { backgroundColor: tokens.surface }]}>
+          <View style={[styles.infoCard, { backgroundColor: infoCardBackground }]}>
             <View style={[styles.infoRow, { borderBottomColor: tokens.separator }]}>
-              <Ionicons color={tokens.accent} name="calendar-outline" size={20} />
-              <View style={{ flex: 1, gap: 4 }}>
+              <View style={styles.infoTextBlock}>
                 <Text style={[typography.body, { color: tokens.text }]}>
                   {venueDateDisplay?.calendarLine ?? formatShowDate(show.show_date, i18n.language)}
                 </Text>
-                {venueDateDisplay?.venueTimeLine ? (
-                  <Text style={[typography.body, { color: tokens.text }]}>
-                    {venueDateDisplay.venueTimeLine}
-                  </Text>
-                ) : null}
+                <Text style={[typography.body, { color: tokens.textSecondary }]}>
+                  {venueTimeLine}
+                </Text>
                 {venueDateDisplay?.deviceTimeHint ? (
                   <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
                     {venueDateDisplay.deviceTimeHint}
@@ -257,26 +314,35 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
                 ) : null}
               </View>
             </View>
-            <View style={[styles.infoRow, styles.infoRowLast]}>
-              <Ionicons color={tokens.accent} name="location-outline" size={20} />
-              <Text numberOfLines={2} style={[typography.body, { color: tokens.text, flex: 1 }]}>
-                {show.venue.name}
-              </Text>
-              <Ionicons color={tokens.tabIconDefault} name="chevron-forward" size={16} />
-            </View>
+            <Pressable
+              accessibilityLabel={t('events.showDetail.openMaps')}
+              accessibilityRole="button"
+              onPress={openMaps}
+              style={({ pressed }) => [
+                styles.infoRow,
+                styles.infoRowLast,
+                pressed && styles.pressed,
+              ]}>
+              <View style={styles.infoTextBlock}>
+                <Text style={[typography.bodySemibold, { color: tokens.text }]}>
+                  {show.venue.name}
+                </Text>
+                <Text style={[typography.footnote, { color: tokens.textSecondary }]}>
+                  {show.venue.city}
+                </Text>
+              </View>
+              <Ionicons color={tokens.accent} name="map-outline" size={22} />
+            </Pressable>
           </View>
-
-          <ShowStatusButtons appearance="showDetail" show={show} showId={show.id} />
 
           {userShowStatus === 'fui' ? (
             <>
-              <ShowMemoryBlock showId={show.id} />
               <ShowNightSection show={show} />
             </>
           ) : null}
 
           {packRecord && packRecord.status !== 'idle' ? (
-            <View style={[styles.packCard, { backgroundColor: tokens.surface }]}>
+            <View style={[styles.packCard, { backgroundColor: infoCardBackground }]}>
               <View style={[styles.packIcon, { backgroundColor: tokens.successMuted }]}>
                 <Ionicons
                   color={tokens.success}
@@ -310,43 +376,40 @@ export function ShowDetailContent({ showId }: ShowDetailContentProps) {
           <SetlistPredictionPanel
             artistId={show.artist_id}
             artistName={show.artist.name}
+            includeCommunityPlaylists={false}
             showId={show.id}
             tourId={show.tour_id}
             variant="compact"
           />
+
+          <CommunityPlaylistsSection artistId={show.artist_id} tourId={show.tour_id} />
+
+          <ShowTourDatesSection show={show} />
         </View>
       </ScrollView>
-
-      <View pointerEvents="box-none" style={[styles.fabWrap, { paddingBottom: insets.bottom + 16 }]}>
-        <LinearGradient
-          colors={[`${tokens.background}00`, `${tokens.background}E6`]}
-          style={styles.fabGradient}
-        />
-        {phase === 'today' ? (
-          <View style={styles.fabRow}>
-            <PillButton
-              icon="videocam"
-              style={styles.fabHalf}
-              title={t('events.openLiveFab')}
-              variant="recording"
-              onPress={openLive}
-            />
-            <PillButton
-              style={styles.fabHalf}
-              title={t('events.practiceLyrics')}
-              variant="glass"
-              onPress={openPracticeLyrics}
-            />
-          </View>
-        ) : (
-          <PillButton style={styles.fabButton} title={t('events.practiceLyrics')} onPress={handleFab} />
-        )}
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  artistName: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 32,
+    textAlign: 'center',
+  },
+  avatar: {
+    backgroundColor: '#1B1024',
+    borderRadius: 64,
+    borderWidth: 2,
+    height: 128,
+    width: 128,
+  },
+  avatarWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   body: {
     gap: 14,
     paddingHorizontal: 20,
@@ -358,60 +421,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  fabButton: {
-    marginHorizontal: 20,
-  },
-  fabGradient: {
-    ...StyleSheet.absoluteFill,
-  },
-  fabHalf: {
-    flex: 1,
-    minHeight: 54,
-  },
-  fabRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginHorizontal: 20,
-  },
-  fabWrap: {
-    bottom: 0,
-    left: 0,
+  dateBadgeOnAvatar: {
+    bottom: -4,
     position: 'absolute',
-    right: 0,
+    right: -8,
   },
-  hero: {
-    height: 300,
+  header: {
+    minHeight: 340,
     overflow: 'hidden',
+    paddingBottom: 20,
     position: 'relative',
     width: '100%',
   },
-  heroActions: {
+  headerActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     left: 16,
     position: 'absolute',
     right: 16,
+    zIndex: 3,
+  },
+  headerBackdrop: {
+    ...StyleSheet.absoluteFill,
+    height: '100%',
+    width: '100%',
+  },
+  headerCenter: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 108,
+    paddingHorizontal: 24,
     zIndex: 2,
   },
-  heroArtist: {
-    color: '#FFFFFF',
-    fontSize: 36,
-    fontWeight: '800',
-    letterSpacing: -0.8,
-  },
-  heroImage: {
+  headerDim: {
     ...StyleSheet.absoluteFill,
-  },
-  heroText: {
-    bottom: 18,
-    left: 20,
-    position: 'absolute',
-    right: 20,
-  },
-  heroTour: {
-    color: 'rgba(255,255,255,0.88)',
-    fontSize: 15,
-    marginTop: 4,
+    backgroundColor: '#000',
+    zIndex: 1,
   },
   infoCard: {
     borderRadius: 20,
@@ -422,12 +467,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
-    gap: 12,
-    minHeight: 54,
-    paddingVertical: 12,
+    minHeight: 56,
+    paddingVertical: 14,
   },
   infoRowLast: {
     borderBottomWidth: 0,
+  },
+  infoTextBlock: {
+    flex: 1,
+    gap: 4,
   },
   packCard: {
     alignItems: 'center',
@@ -460,5 +508,9 @@ const styles = StyleSheet.create({
   setlistHeader: {
     gap: 2,
     marginTop: 4,
+  },
+  tourLine: {
+    color: 'rgba(255,255,255,0.75)',
+    textAlign: 'center',
   },
 });
