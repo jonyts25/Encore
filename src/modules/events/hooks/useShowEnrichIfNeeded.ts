@@ -46,7 +46,7 @@ export function useShowEnrichIfNeeded({
 
     void (async () => {
       try {
-        const result = await requestShowEnrich(show.id);
+        const result = await requestShowEnrich(show.id, session.access_token);
         if (result.prediction) {
           queryClient.setQueryData(queryKeys.prediction(show.id), result.prediction);
         } else {
@@ -55,8 +55,10 @@ export function useShowEnrichIfNeeded({
         await queryClient.invalidateQueries({ queryKey: queryKeys.show(show.id) });
         const refreshedShow = queryClient.getQueryData<Show>(queryKeys.show(show.id)) ?? show;
         void prefetchShowPack(refreshedShow, queryClient, { force: true });
-      } catch {
-        // Best-effort background enrich.
+      } catch (error) {
+        if (__DEV__) {
+          console.warn('[Encore] show enrich failed', error);
+        }
       }
     })();
   }, [

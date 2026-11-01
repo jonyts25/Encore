@@ -10,8 +10,12 @@ export type EnrichShowResponse = {
   prediction: SetlistPrediction | null;
 };
 
-export async function requestShowEnrich(showId: string): Promise<EnrichShowResponse> {
+export async function requestShowEnrich(
+  showId: string,
+  accessToken: string
+): Promise<EnrichShowResponse> {
   return apiFetch<EnrichShowResponse>(`/api/shows/${showId}/enrich`, {
     method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 }
