@@ -352,6 +352,9 @@
     "previewHint": "This is how it will look in your stories. Share once the image has loaded.",
     "shareAction": "Share",
     "shareError": "We couldn't create the image to share.",
+    "saveToPhotos": "Save to Photos",
+    "savedToPhotos": "Saved to Photos",
+    "savePhotosPermissionDenied": "We need permission to save to your photo library.",
     "eyebrow": "I went to see",
     "highlightsTitle": "My moments",
     "liveSongCount": "{{count}} live songs",
@@ -440,6 +443,7 @@
     "deleteConfirm": "Remove"
   },
   "musicStreaming": {
+    "openFailed": "Couldn't open the music link",
     "listenTitle": "Listen on",
     "listenSong": "Listen to this song",
     "listenSetlist": "Listen to the setlist",

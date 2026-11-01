@@ -352,6 +352,9 @@
     "previewHint": "Así se verá en tus historias. Cuando la imagen termine de cargar, comparte.",
     "shareAction": "Compartir",
     "shareError": "No pudimos crear la imagen para compartir.",
+    "saveToPhotos": "Guardar en Fotos",
+    "savedToPhotos": "Guardada en Fotos",
+    "savePhotosPermissionDenied": "Necesitamos permiso para guardar en tu biblioteca de fotos.",
     "eyebrow": "Fui a ver a",
     "highlightsTitle": "Mis momentos",
     "liveSongCount": "{{count}} canciones en vivo",
@@ -440,6 +443,7 @@
     "deleteConfirm": "Eliminar"
   },
   "musicStreaming": {
+    "openFailed": "No se pudo abrir el enlace de música",
     "listenTitle": "Escuchar en",
     "listenSong": "Escuchar esta canción",
     "listenSetlist": "Escuchar el setlist",

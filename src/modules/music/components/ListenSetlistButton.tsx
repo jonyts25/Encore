@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { useTranslation } from '@/core/i18n';
 import { PillButton } from '@/core/ui';
 
@@ -6,21 +8,29 @@ import { useOpenMusicSearch } from '../useOpenMusicSearch';
 
 type ListenSetlistButtonProps = {
   artistName: string;
+  artistId?: string | null;
+  tourId?: string | null;
 };
 
-export function ListenSetlistButton({ artistName }: ListenSetlistButtonProps) {
+export function ListenSetlistButton({ artistName, artistId, tourId }: ListenSetlistButtonProps) {
   const { t } = useTranslation();
   const { openSearch } = useOpenMusicSearch();
+  const [resolving, setResolving] = useState(false);
 
   return (
     <PillButton
-      title={t('musicStreaming.listenSetlist')}
+      disabled={resolving}
+      title={resolving ? t('common.loading') : t('musicStreaming.listenSetlist')}
       variant="secondary"
       onPress={() =>
         openSearch(buildSetlistSearchQuery(artistName), {
           dialogTitle: t('musicStreaming.listenSetlist'),
           intent: 'setlist',
           artistName,
+          artistId,
+          tourId,
+          onResolveStart: () => setResolving(true),
+          onResolveEnd: () => setResolving(false),
         })
       }
     />

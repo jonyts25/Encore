@@ -1,5 +1,6 @@
+import * as MediaLibrary from 'expo-media-library';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -21,7 +22,11 @@ import { useQuery } from '@tanstack/react-query';
 
 import { useShowMemory } from '../hooks/useShowMemory';
 import { buildShowNightShareCardModel, SHARE_CARD_HEIGHT, SHARE_CARD_WIDTH } from '../showNightShareCardLogic';
-import { captureAndShareShowNightCard } from '../shareShowNightImage';
+import {
+  captureAndShareShowNightCard,
+  captureShowNightCardForSave,
+  deleteShowNightShareCache,
+} from '../shareShowNightImage';
 import { ShowNightShareCard } from './ShowNightShareCard';
 
 export function ShowNightSharePreviewContent() {
@@ -35,6 +40,12 @@ export function ShowNightSharePreviewContent() {
 
   const [visualReady, setVisualReady] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!showId) return;
+    void deleteShowNightShareCache(showId);
+  }, [showId]);
 
   const showQuery = useQuery({
     queryKey: ['show', showId],
@@ -61,16 +72,35 @@ export function ShowNightSharePreviewContent() {
   const previewScale = previewWidth / SHARE_CARD_WIDTH;
 
   const onShare = useCallback(async () => {
-    if (!visualReady || sharing) return;
+    if (!visualReady || sharing || !showId) return;
     setSharing(true);
     try {
-      await captureAndShareShowNightCard(captureRef);
+      await captureAndShareShowNightCard(captureRef, showId);
     } catch {
       Alert.alert(t('showNightShare.shareError'));
     } finally {
       setSharing(false);
     }
-  }, [sharing, t, visualReady]);
+  }, [sharing, showId, t, visualReady]);
+
+  const onSaveToPhotos = useCallback(async () => {
+    if (!visualReady || saving || !showId) return;
+    setSaving(true);
+    try {
+      const permission = await MediaLibrary.requestPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert(t('showNightShare.savePhotosPermissionDenied'));
+        return;
+      }
+      const uri = await captureShowNightCardForSave(captureRef, showId);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      Alert.alert(t('showNightShare.savedToPhotos'));
+    } catch {
+      Alert.alert(t('showNightShare.shareError'));
+    } finally {
+      setSaving(false);
+    }
+  }, [saving, showId, t, visualReady]);
 
   if (!showId) {
     return null;
@@ -128,6 +158,12 @@ export function ShowNightSharePreviewContent() {
       <View style={[styles.actions, { paddingHorizontal: 16 }]}>
         <PillButton title={t('common.back')} variant="secondary" onPress={() => router.back()} />
         <PillButton
+          disabled={!visualReady || saving}
+          title={saving ? t('common.loading') : t('showNightShare.saveToPhotos')}
+          variant="secondary"
+          onPress={() => void onSaveToPhotos()}
+        />
+        <PillButton
           disabled={!visualReady || sharing}
           title={sharing ? t('common.loading') : t('showNightShare.shareAction')}
           variant="primary"
@@ -168,6 +204,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
     justifyContent: 'center',
   },

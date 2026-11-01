@@ -4,10 +4,12 @@ import { Alert, Linking } from 'react-native';
 import { useTranslation } from '@/core/i18n';
 
 import { resolveAppleMusicArtistUrl, resolveAppleMusicSongUrl } from './appleMusicItunes';
+import { fetchMusicLinksByAppleUrl } from './musicLinksApi';
 import {
   readPreferredMusicService,
   writePreferredMusicService,
 } from './musicServicePreference';
+import { resolveAppleMusicSetlistUrl } from './openAppleMusicSetlist';
 import {
   buildStreamingSearchUrl,
   buildYouTubeMusicDeepLink,
@@ -27,7 +29,16 @@ export type OpenMusicSearchOptions = {
   intent?: 'song' | 'setlist';
   artistName?: string;
   songTitle?: string;
+  artistId?: string | null;
+  tourId?: string | null;
+  onResolveStart?: () => void;
+  onResolveEnd?: () => void;
 };
+
+function showOpenError(t: (key: string) => string, error: unknown): void {
+  const message = error instanceof Error ? error.message : String(error);
+  Alert.alert(t('musicStreaming.openFailed'), message);
+}
 
 async function openYouTubeMusicSearch(query: string): Promise<void> {
   const deepLink = buildYouTubeMusicDeepLink(query);
@@ -41,22 +52,102 @@ async function openYouTubeMusicSearch(query: string): Promise<void> {
   }
 }
 
-async function openAppleMusicSearch(options: OpenMusicSearchOptions, fallbackQuery: string): Promise<void> {
-  const artist = options.artistName?.trim() ?? fallbackQuery.trim();
-  if (options.intent === 'setlist') {
-    const url = await resolveAppleMusicArtistUrl(artist);
-    await Linking.openURL(url);
+async function openDirectOrSearch(service: MusicStreamingService, directUrl: string | null, query: string): Promise<void> {
+  if (directUrl) {
+    try {
+      const opened = await Linking.openURL(directUrl);
+      if (opened) return;
+    } catch {
+      // fall through to search
+    }
+  }
+  if (service === 'youtube_music') {
+    await openYouTubeMusicSearch(query);
     return;
   }
+  await Linking.openURL(buildStreamingSearchUrl(service, query));
+}
 
+async function openAppleMusicSong(options: OpenMusicSearchOptions, fallbackQuery: string): Promise<void> {
+  const artist = options.artistName?.trim() ?? fallbackQuery.trim();
   const title = options.songTitle?.trim();
   if (title) {
     const url = await resolveAppleMusicSongUrl(artist, title);
     await Linking.openURL(url);
     return;
   }
-
   await Linking.openURL(await resolveAppleMusicArtistUrl(artist));
+}
+
+async function openAppleMusicSetlist(options: OpenMusicSearchOptions, fallbackQuery: string): Promise<void> {
+  const artistName = options.artistName?.trim() ?? fallbackQuery.replace(/^Setlist\s+/i, '').trim();
+  const url = await resolveAppleMusicSetlistUrl({
+    artistName,
+    artistId: options.artistId,
+    tourId: options.tourId,
+  });
+  await Linking.openURL(url);
+}
+
+async function openSongOnService(
+  service: MusicStreamingService,
+  options: OpenMusicSearchOptions,
+  query: string
+): Promise<void> {
+  if (service === 'apple_music') {
+    await openAppleMusicSong(options, query);
+    return;
+  }
+
+  const artist = options.artistName?.trim() ?? '';
+  const title = options.songTitle?.trim() ?? '';
+  if (artist && title) {
+    try {
+      const appleUrl = await resolveAppleMusicSongUrl(artist, title);
+      const links = await fetchMusicLinksByAppleUrl(appleUrl);
+      if (service === 'spotify') {
+        await openDirectOrSearch(service, links.spotify, query);
+        return;
+      }
+      if (service === 'youtube_music') {
+        await openDirectOrSearch(service, links.youtubeMusic, query);
+        return;
+      }
+    } catch {
+      // fallback below
+    }
+  }
+
+  if (service === 'youtube_music') {
+    await openYouTubeMusicSearch(query);
+    return;
+  }
+  await Linking.openURL(buildStreamingSearchUrl(service, query));
+}
+
+async function openService(
+  service: MusicStreamingService,
+  options: OpenMusicSearchOptions,
+  query: string
+): Promise<void> {
+  writePreferredMusicService(service);
+  if (options.intent === 'setlist' && service === 'apple_music') {
+    await openAppleMusicSetlist(options, query);
+    return;
+  }
+  if (options.intent === 'song') {
+    await openSongOnService(service, options, query);
+    return;
+  }
+  if (service === 'apple_music') {
+    await openAppleMusicSong(options, query);
+    return;
+  }
+  if (service === 'youtube_music') {
+    await openYouTubeMusicSearch(query);
+    return;
+  }
+  await Linking.openURL(buildStreamingSearchUrl(service, query));
 }
 
 export function useOpenMusicSearch() {
@@ -75,19 +166,11 @@ export function useOpenMusicSearch() {
       const preference = readPreferredMusicService();
       const services = orderStreamingServices(preference);
 
-      const openService = (service: MusicStreamingService) => {
-        writePreferredMusicService(service);
-        void (async () => {
-          if (service === 'apple_music') {
-            await openAppleMusicSearch(options, trimmed);
-            return;
-          }
-          if (service === 'youtube_music') {
-            await openYouTubeMusicSearch(trimmed);
-            return;
-          }
-          await Linking.openURL(buildStreamingSearchUrl(service, trimmed));
-        })();
+      const runService = (service: MusicStreamingService) => {
+        options.onResolveStart?.();
+        void openService(service, options, trimmed)
+          .catch((error) => showOpenError(t, error))
+          .finally(() => options.onResolveEnd?.());
       };
 
       Alert.alert(
@@ -96,7 +179,7 @@ export function useOpenMusicSearch() {
         [
           ...services.map((service) => ({
             text: t(SERVICE_I18N_KEY[service]),
-            onPress: () => openService(service),
+            onPress: () => runService(service),
           })),
           { text: t('common.cancel'), style: 'cancel' as const },
         ],
