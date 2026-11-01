@@ -1,6 +1,7 @@
 import { apiFetch, ApiError } from '@/core/api/client';
 
 import { LyricsBusyError, toLyricsFetchError } from './errors';
+import { shouldTryDirectLrclibFallback, tryDirectLrclibFallback } from './fetchLyricsFallback';
 import { getCachedLyrics, setCachedLyrics } from '@/core/db';
 
 import {
@@ -79,6 +80,18 @@ export async function fetchLyrics(
     if (error instanceof ApiError && error.status === 404) {
       return null;
     }
+
+    if (shouldTryDirectLrclibFallback(error)) {
+      const direct = await tryDirectLrclibFallback(artist, title, {
+        expiresAt: options?.expiresAt,
+        mapResponse,
+        setCached: setCachedLyrics,
+      });
+      if (direct !== undefined) {
+        return direct;
+      }
+    }
+
     const fallback = await getCachedLyrics(artist, title);
     if (fallback) {
       return normalizeCachedResult(fallback);

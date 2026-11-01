@@ -1,3 +1,5 @@
+import { pickBestLrclibRecord, readLrclibDuration } from '../../../../shared/lrclibPick';
+
 import { lrclibRequestDirectWithFetch } from './lrclibRequest';
 import { LrclibRequestQueue } from './lrclibQueue';
 import { parseLrc } from './lrc';
@@ -50,7 +52,7 @@ function trimCacheIfNeeded() {
 }
 
 function readDuration(record: LrclibRecord): number | null {
-  return typeof record.duration === 'number' && record.duration > 0 ? record.duration : null;
+  return readLrclibDuration(record);
 }
 
 function mapMatch(record: LrclibRecord): LyricsMatch {
@@ -106,17 +108,6 @@ async function lrclibRequest<T>(path: string): Promise<T> {
   );
 }
 
-function pickBestRecord(records: LrclibRecord[]): LrclibRecord | null {
-  const withLyrics = records.filter((record) => Boolean(record.plainLyrics?.trim()));
-  if (withLyrics.length === 0) return null;
-
-  return (
-    withLyrics.find((record) => Boolean(record.syncedLyrics?.trim())) ??
-    withLyrics.find((record) => readDuration(record) !== null) ??
-    withLyrics[0]
-  );
-}
-
 export async function resolveLyricsSearch(
   artist: string,
   title: string
@@ -134,7 +125,7 @@ export async function resolveLyricsSearch(
 
   const records = await lrclibRequest<LrclibRecord[]>(`/search?${params.toString()}`);
   const matches = (records ?? []).map(mapMatch);
-  const best = pickBestRecord(records ?? []);
+  const best = pickBestLrclibRecord(records ?? []) as LrclibRecord | null;
 
   if (!best) {
     throw new Error('Lyrics not found');

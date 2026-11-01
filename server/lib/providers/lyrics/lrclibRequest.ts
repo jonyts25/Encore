@@ -19,6 +19,17 @@ function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
+async function logLrclibNonOkResponse(response: Response): Promise<void> {
+  const bodyPreview = (await response.text()).slice(0, 200);
+  console.warn('[lrclib] non-OK response', {
+    status: response.status,
+    cfRay: response.headers.get('cf-ray'),
+    retryAfter: response.headers.get('retry-after'),
+    server: response.headers.get('server'),
+    bodyPreview,
+  });
+}
+
 export function parseRetryAfterMs(response: Response, now = Date.now()): number | null {
   const header = response.headers.get('retry-after');
   if (!header) return null;
@@ -82,6 +93,7 @@ export async function lrclibRequestDirectWithFetch<T>(
       });
 
       if (response.status === 503 || response.status === 429) {
+        await logLrclibNonOkResponse(response.clone());
         lastTransient = new Error(`LRCLIB temporary failure (${response.status})`);
         const retryAfterMs = parseRetryAfterMs(response, nowFn());
         if (retryAfterMs != null && retryAfterMs > LRCLIB_MAX_RETRY_AFTER_MS) {
@@ -103,6 +115,7 @@ export async function lrclibRequestDirectWithFetch<T>(
       }
 
       if (!response.ok) {
+        await logLrclibNonOkResponse(response.clone());
         const text = await response.text();
         throw new Error(`LRCLIB request failed (${response.status}): ${text}`);
       }

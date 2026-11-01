@@ -81,6 +81,45 @@ test('production constants keep per-song budget at 20s with 8s fetch cap', () =>
   assert.equal(LRCLIB_FETCH_TIMEOUT_MS, 8000);
 });
 
+test('lrclibRequestDirectWithFetch logs non-OK response metadata', async () => {
+  const warnings: unknown[] = [];
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warnings.push(args);
+  };
+
+  try {
+    await assert.rejects(
+      async () => {
+        await lrclibRequestDirectWithFetch(
+          '/search?q=log',
+          'https://lrclib.test',
+          async () =>
+            new Response('rate limited', {
+              status: 429,
+              headers: {
+                'retry-after': '1',
+                'cf-ray': 'abc123',
+                server: 'cloudflare',
+              },
+            })
+        );
+      },
+      LyricsBusyError
+    );
+  } finally {
+    console.warn = originalWarn;
+  }
+
+  assert.ok(warnings.length > 0);
+  const payload = warnings[0] as [string, Record<string, unknown>];
+  assert.equal(payload[1].status, 429);
+  assert.equal(payload[1].cfRay, 'abc123');
+  assert.equal(payload[1].retryAfter, '1');
+  assert.equal(payload[1].server, 'cloudflare');
+  assert.match(String(payload[1].bodyPreview), /rate limited/);
+});
+
 test('LrclibRequestQueue releases slot when first fetch hangs until timeout', async () => {
   const queue = new LrclibRequestQueue(1);
   const events: string[] = [];
