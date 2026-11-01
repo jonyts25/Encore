@@ -6,7 +6,7 @@ import { useTranslation } from '@/core/i18n';
 import type { ShowNightShareCardModel } from '../../showNightShareCardLogic';
 import type { ImageSource } from 'expo-image';
 
-import type { ShowNightShareFrameTransform } from '../../showNightShareMediaPreference';
+import type { ImageContentPosition } from 'expo-image';
 import { SHARE_STORY_SAFE_BOTTOM, SHARE_STORY_SAFE_TOP } from '../../showNightShareSafeZones';
 import { SHARE_NIGHT, SHARE_NIGHT_FONTS } from '../../showNightShareTheme';
 import { ShowNightShareCanvas } from './ShowNightShareCanvas';
@@ -16,18 +16,14 @@ import { ShowNightShareRatingStars } from './ShowNightShareRatingStars';
 type Props = {
   model: ShowNightShareCardModel;
   mediaSource: ImageSource | null;
-  frame: ShowNightShareFrameTransform;
-  interactive?: boolean;
-  onFrameChange?: (frame: ShowNightShareFrameTransform) => void;
+  contentPosition: ImageContentPosition;
   onMediaLoad?: () => void;
 };
 
 export function ShowNightSharePosterTemplate({
   model,
   mediaSource,
-  frame,
-  interactive,
-  onFrameChange,
+  contentPosition,
   onMediaLoad,
 }: Props) {
   const { t } = useTranslation();
@@ -37,14 +33,12 @@ export function ShowNightSharePosterTemplate({
     <ShowNightShareCanvas>
       <View style={StyleSheet.absoluteFill}>
         <ShowNightShareMediaLayer
-          frame={frame}
+          contentPosition={contentPosition}
           fallbackSource={model.fallbackArtistImageUrl ? { uri: model.fallbackArtistImageUrl } : null}
           height={1920}
-          interactive={interactive}
           source={mediaSource}
           width={1080}
           onFallbackLoad={onMediaLoad}
-          onFrameChange={onFrameChange}
           onLoad={onMediaLoad}
         />
       </View>

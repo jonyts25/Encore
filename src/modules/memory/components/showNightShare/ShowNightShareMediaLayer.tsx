@@ -1,18 +1,13 @@
-import type { ImageSource } from 'expo-image';
+import { Image, type ImageContentPosition, type ImageSource } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
-
-import type { ShowNightShareFrameTransform } from '../../showNightShareMediaPreference';
-import { ShowNightShareFramedPhoto } from './ShowNightShareFramedPhoto';
 
 type Props = {
   source: ImageSource | null;
   fallbackSource?: ImageSource | null;
   width: number;
   height: number;
-  frame: ShowNightShareFrameTransform;
-  interactive?: boolean;
+  contentPosition: ImageContentPosition;
   borderRadius?: number;
-  onFrameChange?: (frame: ShowNightShareFrameTransform) => void;
   onLoad?: () => void;
   onFallbackLoad?: () => void;
 };
@@ -22,14 +17,13 @@ export function ShowNightShareMediaLayer({
   fallbackSource,
   width,
   height,
-  frame,
-  interactive,
-  borderRadius,
-  onFrameChange,
+  contentPosition,
+  borderRadius = 0,
   onLoad,
   onFallbackLoad,
 }: Props) {
   const resolved = source ?? fallbackSource;
+  const isFallback = !source && Boolean(fallbackSource);
 
   if (!resolved) {
     return (
@@ -41,23 +35,25 @@ export function ShowNightShareMediaLayer({
   }
 
   return (
-    <ShowNightShareFramedPhoto
-      borderRadius={borderRadius}
-      frame={frame}
-      height={height}
-      interactive={interactive}
-      source={resolved}
-      width={width}
-      onFrameChange={onFrameChange}
-      onLoad={() => {
-        if (source) onLoad?.();
-        else onFallbackLoad?.();
-      }}
-    />
+    <View style={[styles.clip, { width, height, borderRadius }]}>
+      <Image
+        contentFit="cover"
+        contentPosition={contentPosition}
+        source={resolved}
+        style={{ width, height }}
+        onLoad={() => {
+          if (isFallback) onFallbackLoad?.();
+          else onLoad?.();
+        }}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  clip: {
+    overflow: 'hidden',
+  },
   fallback: {
     backgroundColor: '#1A1A21',
   },

@@ -365,6 +365,11 @@
       "liveCount": "{{count}} live songs"
     },
     "changePhoto": "Change photo",
+    "framing": {
+      "top": "Top",
+      "center": "Center",
+      "bottom": "Bottom"
+    },
     "changePhotoTitle": "Choose a photo",
     "changePhotoEmpty": "No Tu noche photos saved for this show yet.",
     "videoFrameLabel": "Video frame",

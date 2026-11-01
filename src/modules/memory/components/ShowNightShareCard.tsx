@@ -1,7 +1,6 @@
-import type { ImageSource } from 'expo-image';
+import type { ImageContentPosition, ImageSource } from 'expo-image';
 
 import type { ShowNightShareCardModel, ShowNightShareTemplateId } from '../showNightShareCardLogic';
-import type { ShowNightShareFrameTransform } from '../showNightShareMediaPreference';
 import { ShowNightShareBoletoTemplate } from './showNightShare/ShowNightShareBoletoTemplate';
 import { ShowNightSharePosterTemplate } from './showNightShare/ShowNightSharePosterTemplate';
 import { ShowNightShareSetlistTemplate } from './showNightShare/ShowNightShareSetlistTemplate';
@@ -10,9 +9,7 @@ export type ShowNightShareCardProps = {
   model: ShowNightShareCardModel;
   template: ShowNightShareTemplateId;
   mediaSource?: ImageSource | null;
-  frame?: ShowNightShareFrameTransform;
-  interactive?: boolean;
-  onFrameChange?: (frame: ShowNightShareFrameTransform) => void;
+  contentPosition?: ImageContentPosition;
   onMediaLoad?: () => void;
   onVisualReady?: () => void;
   fontsReady?: boolean;
@@ -23,9 +20,7 @@ export function ShowNightShareCard({
   model,
   template,
   mediaSource = null,
-  frame = { scale: 1, translateX: 0, translateY: 0 },
-  interactive = false,
-  onFrameChange,
+  contentPosition = 'center',
   onMediaLoad,
   onVisualReady,
   fontsReady = true,
@@ -36,7 +31,7 @@ export function ShowNightShareCard({
       return (
         <ShowNightShareSetlistTemplate
           fontsReady={fontsReady}
-          interactive={Boolean(interactive && onToggleHighlight)}
+          interactive={Boolean(onToggleHighlight)}
           model={model}
           onToggleHighlight={onToggleHighlight}
           onVisualReady={onVisualReady}
@@ -45,11 +40,9 @@ export function ShowNightShareCard({
     case 'poster':
       return (
         <ShowNightSharePosterTemplate
+          contentPosition={contentPosition}
           mediaSource={mediaSource}
-          frame={frame}
-          interactive={interactive}
           model={model}
-          onFrameChange={onFrameChange}
           onMediaLoad={() => {
             onMediaLoad?.();
             onVisualReady?.();
@@ -60,11 +53,9 @@ export function ShowNightShareCard({
     default:
       return (
         <ShowNightShareBoletoTemplate
+          contentPosition={contentPosition}
           mediaSource={mediaSource}
-          frame={frame}
-          interactive={interactive}
           model={model}
-          onFrameChange={onFrameChange}
           onMediaLoad={() => {
             onMediaLoad?.();
             onVisualReady?.();

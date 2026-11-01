@@ -11,10 +11,17 @@ import {
   type ShowNightShareTemplateId,
 } from './showNightShareCardLogic';
 
-const sessionCaptureUri = new Map<string, string>();
+const CAPTURE_VERSION_KEY = 'v3';
 
-function cacheKey(showId: string, template: ShowNightShareTemplateId): string {
-  return `${showId}:${template}`;
+function cacheKey(showId: string, template: ShowNightShareTemplateId, versionToken: string): string {
+  return `${showId}:${template}:${versionToken}`;
+}
+
+let captureVersionToken = CAPTURE_VERSION_KEY;
+
+/** Bump when photo, template, framing, or highlights change so cached files are not reused incorrectly. */
+export function bumpShowNightShareCaptureVersion(): void {
+  captureVersionToken = `${CAPTURE_VERSION_KEY}-${Date.now()}`;
 }
 
 export function showNightShareCacheUri(
@@ -26,19 +33,16 @@ export function showNightShareCacheUri(
   return `${base}encore-noche-${showId}-${template}.jpg`;
 }
 
-export async function deleteShowNightShareCache(
-  showId: string,
-  template?: ShowNightShareTemplateId
+export async function waitForShareCardBackgroundReady(
+  waitFn: () => Promise<void>,
+  timeoutMs = 3000
 ): Promise<void> {
-  if (template) {
-    const uri = showNightShareCacheUri(showId, template);
-    sessionCaptureUri.delete(cacheKey(showId, template));
-    if (uri) await FileSystem.deleteAsync(uri, { idempotent: true });
-    return;
-  }
-  for (const id of ['boleto', 'setlist', 'poster'] as ShowNightShareTemplateId[]) {
-    await deleteShowNightShareCache(showId, id);
-  }
+  await Promise.race([
+    waitFn(),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, timeoutMs);
+    }),
+  ]);
 }
 
 async function captureShowNightCardToCache(
@@ -47,17 +51,7 @@ async function captureShowNightCardToCache(
   template: ShowNightShareTemplateId
 ): Promise<string> {
   if (!viewRef.current) {
-    throw new Error('Share card is not ready');
-  }
-
-  const key = cacheKey(showId, template);
-  const existingSession = sessionCaptureUri.get(key);
-  if (existingSession) {
-    const info = await FileSystem.getInfoAsync(existingSession);
-    if (info.exists) {
-      return existingSession;
-    }
-    sessionCaptureUri.delete(key);
+    throw new Error('Share card view is not mounted');
   }
 
   const dest = showNightShareCacheUri(showId, template);
@@ -67,13 +61,21 @@ async function captureShowNightCardToCache(
 
   await FileSystem.deleteAsync(dest, { idempotent: true });
 
-  const tmpUri = await captureRef(viewRef, {
-    format: 'jpg',
-    quality: 0.9,
-    width: SHARE_CARD_WIDTH,
-    height: SHARE_CARD_HEIGHT,
-    result: 'tmpfile',
-  });
+  let tmpUri: string;
+  try {
+    tmpUri = await captureRef(viewRef, {
+      format: 'jpg',
+      quality: 0.9,
+      width: SHARE_CARD_WIDTH,
+      height: SHARE_CARD_HEIGHT,
+      result: 'tmpfile',
+    });
+  } catch (error) {
+    if (__DEV__) {
+      console.error('[ShowNightShare] captureRef failed', { showId, template, error });
+    }
+    throw error;
+  }
 
   try {
     await FileSystem.copyAsync({ from: tmpUri, to: dest });
@@ -84,8 +86,6 @@ async function captureShowNightCardToCache(
     throw error;
   }
 
-  sessionCaptureUri.set(key, dest);
-
   if (__DEV__) {
     const info = await FileSystem.getInfoAsync(dest);
     const sizeKb =
@@ -95,6 +95,7 @@ async function captureShowNightCardToCache(
     console.log('[ShowNightShare] capture', {
       showId,
       template,
+      version: cacheKey(showId, template, captureVersionToken),
       width: SHARE_CARD_WIDTH,
       height: SHARE_CARD_HEIGHT,
       uri: dest,
@@ -103,14 +104,6 @@ async function captureShowNightCardToCache(
   }
 
   return dest;
-}
-
-export async function ensureShowNightShareCapture(
-  viewRef: RefObject<View | null>,
-  showId: string,
-  template: ShowNightShareTemplateId
-): Promise<string> {
-  return captureShowNightCardToCache(viewRef, showId, template);
 }
 
 export async function captureAndShareShowNightCard(
@@ -122,7 +115,7 @@ export async function captureAndShareShowNightCard(
     throw new Error('Sharing is not available on web');
   }
 
-  const uri = await ensureShowNightShareCapture(viewRef, showId, template);
+  const uri = await captureShowNightCardToCache(viewRef, showId, template);
 
   const canShare = await Sharing.isAvailableAsync();
   if (!canShare) {
@@ -143,13 +136,5 @@ export async function captureShowNightCardForSave(
   if (Platform.OS === 'web') {
     throw new Error('Saving is not available on web');
   }
-  return ensureShowNightShareCapture(viewRef, showId, template);
-}
-
-/** Call when the visible template changes so the next share/save re-captures. */
-export function invalidateShowNightShareSessionCapture(
-  showId: string,
-  template: ShowNightShareTemplateId
-): void {
-  sessionCaptureUri.delete(cacheKey(showId, template));
+  return captureShowNightCardToCache(viewRef, showId, template);
 }

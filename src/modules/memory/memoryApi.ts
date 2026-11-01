@@ -7,6 +7,7 @@ import {
   removeMemoryPendingIds,
 } from '@/core/db/memoryQueue';
 
+import { applyMemorySongHighlight, memoryToSavePayload } from './memoryHighlightLogic';
 import type { MemoryRow, MemorySavePayload, MemorySongWithTitle, ShowMemory } from './types';
 
 const MEMORY_SELECT = `
@@ -156,6 +157,34 @@ async function persistMemoryOnline(userId: string, payload: MemorySavePayload): 
   );
 
   if (insertError) throw insertError;
+}
+
+export async function setMemorySongHighlight(
+  userId: string,
+  memory: ShowMemory,
+  showId: string,
+  songId: string,
+  isHighlight: boolean
+): Promise<ShowMemory> {
+  if (!onlineManager.isOnline()) {
+    const next = applyMemorySongHighlight(memory, songId, isHighlight);
+    await persistShowMemory(userId, memoryToSavePayload(next));
+    return next;
+  }
+
+  const { error } = await supabase
+    .from('memory_songs')
+    .update({ is_highlight: isHighlight })
+    .eq('memory_id', memory.id)
+    .eq('song_id', songId);
+
+  if (error) throw error;
+
+  const refreshed = await getMemoryForShow(userId, showId);
+  if (!refreshed) {
+    throw new Error('Memory missing after highlight update');
+  }
+  return refreshed;
 }
 
 export async function persistShowMemory(

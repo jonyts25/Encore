@@ -1,63 +1,53 @@
 import 'expo-sqlite/localStorage/install';
 
-import type { ShowNightShareTemplateId } from './showNightShareCardLogic';
+import type { ImageContentPosition } from 'expo-image';
+
 import type { ShowNightShareMediaKind } from './showNightShareMediaLogic';
 
-export type ShowNightShareFrameTransform = {
-  scale: number;
-  translateX: number;
-  translateY: number;
-};
+export type ShowNightShareContentAnchor = 'top' | 'center' | 'bottom';
 
-export type ShowNightShareMediaSelection = {
+export type ShowNightShareMediaPrefs = {
   assetId: string;
   mediaType: ShowNightShareMediaKind;
-  videoTimeSec: number;
-  frame: ShowNightShareFrameTransform;
+  contentAnchor: ShowNightShareContentAnchor;
 };
 
-const DEFAULT_FRAME: ShowNightShareFrameTransform = {
-  scale: 1,
-  translateX: 0,
-  translateY: 0,
-};
+const STORAGE_KEY_PREFIX = 'encore.showNightShare.media.v2';
 
-function storageKey(showId: string, template: ShowNightShareTemplateId): string {
-  return `encore.showNightShare.media.${showId}.${template}`;
+function storageKey(showId: string): string {
+  return `${STORAGE_KEY_PREFIX}.${showId}`;
 }
 
-export function readShowNightShareMediaSelection(
-  showId: string,
-  template: ShowNightShareTemplateId
-): ShowNightShareMediaSelection | null {
+export function showNightShareContentPosition(anchor: ShowNightShareContentAnchor): ImageContentPosition {
+  if (anchor === 'top') return 'top center';
+  if (anchor === 'bottom') return 'bottom center';
+  return 'center';
+}
+
+export function readShowNightShareMediaPrefs(showId: string): ShowNightShareMediaPrefs | null {
   try {
-    const raw = globalThis.localStorage.getItem(storageKey(showId, template));
+    const raw = globalThis.localStorage.getItem(storageKey(showId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ShowNightShareMediaSelection;
+    const parsed = JSON.parse(raw) as ShowNightShareMediaPrefs;
     if (!parsed?.assetId || !parsed.mediaType) return null;
-    return {
-      assetId: parsed.assetId,
-      mediaType: parsed.mediaType,
-      videoTimeSec: typeof parsed.videoTimeSec === 'number' ? parsed.videoTimeSec : 0,
-      frame: parsed.frame ?? DEFAULT_FRAME,
-    };
+    const anchor = parsed.contentAnchor;
+    if (anchor !== 'top' && anchor !== 'center' && anchor !== 'bottom') {
+      return { ...parsed, contentAnchor: 'center' };
+    }
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export function writeShowNightShareMediaSelection(
-  showId: string,
-  template: ShowNightShareTemplateId,
-  selection: ShowNightShareMediaSelection
-): void {
+export function writeShowNightShareMediaPrefs(showId: string, prefs: ShowNightShareMediaPrefs): void {
   try {
-    globalThis.localStorage.setItem(storageKey(showId, template), JSON.stringify(selection));
+    globalThis.localStorage.setItem(storageKey(showId), JSON.stringify(prefs));
   } catch {
     // ignore
   }
 }
 
-export function defaultShowNightShareFrame(): ShowNightShareFrameTransform {
-  return { ...DEFAULT_FRAME };
+export function defaultShowNightShareContentAnchor(): ShowNightShareContentAnchor {
+  return 'center';
 }

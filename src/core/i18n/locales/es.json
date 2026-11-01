@@ -365,6 +365,11 @@
       "liveCount": "{{count}} canciones en vivo"
     },
     "changePhoto": "Cambiar foto",
+    "framing": {
+      "top": "Arriba",
+      "center": "Centro",
+      "bottom": "Abajo"
+    },
     "changePhotoTitle": "Elige una foto",
     "changePhotoEmpty": "Aún no hay fotos en Tu noche para este show.",
     "videoFrameLabel": "Cuadro del video",

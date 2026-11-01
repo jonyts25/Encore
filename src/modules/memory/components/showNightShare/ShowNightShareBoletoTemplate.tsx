@@ -8,9 +8,7 @@ import {
   type ShowNightShareCardModel,
 } from '../../showNightShareCardLogic';
 import { BOLETO_TICKET_FIXED_HEIGHT } from '../../showNightShareLayoutMetrics';
-import type { ImageSource } from 'expo-image';
-
-import type { ShowNightShareFrameTransform } from '../../showNightShareMediaPreference';
+import type { ImageContentPosition, ImageSource } from 'expo-image';
 import { SHARE_STORY_SAFE_BOTTOM, SHARE_STORY_SAFE_TOP } from '../../showNightShareSafeZones';
 import { SHARE_NIGHT, SHARE_NIGHT_FONTS } from '../../showNightShareTheme';
 import { ShowNightShareCanvas } from './ShowNightShareCanvas';
@@ -20,18 +18,14 @@ import { ShowNightShareRatingStars } from './ShowNightShareRatingStars';
 type Props = {
   model: ShowNightShareCardModel;
   mediaSource: ImageSource | null;
-  frame: ShowNightShareFrameTransform;
-  interactive?: boolean;
-  onFrameChange?: (frame: ShowNightShareFrameTransform) => void;
+  contentPosition: ImageContentPosition;
   onMediaLoad?: () => void;
 };
 
 export function ShowNightShareBoletoTemplate({
   model,
   mediaSource,
-  frame,
-  interactive,
-  onFrameChange,
+  contentPosition,
   onMediaLoad,
 }: Props) {
   const { t } = useTranslation();
@@ -51,14 +45,12 @@ export function ShowNightShareBoletoTemplate({
         <View style={styles.photoSlot} onLayout={onPhotoLayout}>
           <ShowNightShareMediaLayer
             borderRadius={36}
+            contentPosition={contentPosition}
             fallbackSource={model.fallbackArtistImageUrl ? { uri: model.fallbackArtistImageUrl } : null}
-            frame={frame}
             height={photoSize.height}
-            interactive={interactive}
             source={mediaSource}
             width={photoSize.width}
             onFallbackLoad={onMediaLoad}
-            onFrameChange={onFrameChange}
             onLoad={onMediaLoad}
           />
         </View>
