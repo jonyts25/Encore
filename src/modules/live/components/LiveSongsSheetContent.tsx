@@ -29,7 +29,7 @@ import { addPracticeSongToShowPack, cacheLyricsForShowPackTitle } from '@/module
 import type { PracticePackSong } from '@/modules/events/practicePackTypes';
 import { useShow } from '@/modules/events/hooks/useShow';
 import { useShowPrediction } from '@/modules/setlist/hooks/useShowPrediction';
-import type { PredictedSong } from '@/modules/setlist/types';
+import { sortPredictedSongsByPosition } from '@/modules/setlist/predictionDisplay';
 import { useLyricsSearchMatches } from '@/modules/lyrics/hooks/useLyricsSearchMatches';
 
 import { useLiveSession } from '../context/LiveSessionContext';
@@ -56,10 +56,6 @@ type SongRow = {
 
 const LIST_HEADER_BACKGROUND = 'rgba(28,28,30,0.98)';
 const tokens = darkTokens;
-
-function sortPredicted(songs: PredictedSong[]) {
-  return [...songs].sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-}
 
 type LiveSongsSheetListHeaderProps = {
   segment: SongSegment;
@@ -186,7 +182,7 @@ export function LiveSongsSheetContent() {
   });
 
   const predictedSongs = useMemo(
-    () => sortPredicted(prediction?.songs ?? []),
+    () => sortPredictedSongsByPosition(prediction?.songs ?? []),
     [prediction?.songs]
   );
   const otherSongs = prediction?.others ?? [];
@@ -224,11 +220,11 @@ export function LiveSongsSheetContent() {
 
   const rows = useMemo((): SongRow[] => {
     if (effectiveSegment === 'predicted') {
-      const predictedRows = filterSongsByQuery(predictedSongs, searchQuery).map((song, index) => ({
+      const predictedRows = filterSongsByQuery(predictedSongs, searchQuery).map((song) => ({
         key: `pred-${song.song_id}`,
         kind: 'song' as const,
         title: song.title,
-        index: index + 1,
+        index: predictedSongs.findIndex((candidate) => candidate.song_id === song.song_id) + 1,
         detail:
           song.title === activeTitle
             ? t('live.songsNowPlaying')
@@ -239,7 +235,7 @@ export function LiveSongsSheetContent() {
       }));
 
       const filteredOthers = filterSongsByQuery(otherSongs, searchQuery);
-      const withPractice = [...practiceRows, ...predictedRows];
+      const withPractice = [...predictedRows, ...practiceRows];
 
       if (filteredOthers.length === 0) {
         return withPractice;
